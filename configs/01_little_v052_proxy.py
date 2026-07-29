@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from m5.objects import ArmO3CPU
+from m5.objects import ArmO3CPU, IQUnit
 
 from gem5.components.boards.simple_board import SimpleBoard
 from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarchy import (
@@ -45,7 +45,7 @@ class LittleV052ProxyCore(BaseCPUCore):
         cpu.commitWidth = commit_width
 
         cpu.numROBEntries = rob_entries
-        cpu.numIQEntries = iq_entries
+        cpu.instQueues = [IQUnit(numEntries=iq_entries)]
         cpu.LQEntries = lq_entries
         cpu.SQEntries = sq_entries
 
