@@ -50,6 +50,16 @@ class IQUnit(SimObject):
 
     numEntries = Param.Unsigned(64, "Number of instruction queue entries")
 
+    enableNSkip = Param.Bool(
+        False,
+        "Enable bounded Head-to-Head+N issue-window filtering",
+    )
+
+    nSkip = Param.Unsigned(
+        0,
+        "Number of younger valid entries visible beyond the queue head",
+    )
+
     fuPool = Param.FUPool(DefaultFUPool(), "Functional Unit pool")
 
     numThreads = Param.Unsigned(
