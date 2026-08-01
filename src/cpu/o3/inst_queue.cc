@@ -124,6 +124,7 @@ IQUnit::insert(const DynInstPtr &inst)
     _freeEntries--;
 
     inst->setInIQ(this);
+    _orderedInsts.push_back(inst);
 
     count[inst->threadNumber]++;
 }
@@ -131,6 +132,18 @@ IQUnit::insert(const DynInstPtr &inst)
 void
 IQUnit::remove(const DynInstPtr &inst)
 {
+    bool found = false;
+
+    for (auto it = _orderedInsts.begin(); it != _orderedInsts.end(); ++it) {
+        if (*it == inst) {
+            _orderedInsts.erase(it);
+            found = true;
+            break;
+        }
+    }
+
+    assert(found);
+
     _freeEntries++;
     assert(_freeEntries <= _numEntries);
 
@@ -146,6 +159,7 @@ IQUnit::setActiveThreads(list<ThreadID> *at_ptr)
 void
 IQUnit::resetState()
 {
+    _orderedInsts.clear();
     _freeEntries = _numEntries;
     for (ThreadID tid = 0; tid < numThreads; ++tid) {
         count[tid] = 0;

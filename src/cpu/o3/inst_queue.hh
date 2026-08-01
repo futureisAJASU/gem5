@@ -160,6 +160,9 @@ class IQUnit : public SimObject
     /** Number of younger entries visible beyond the queue head. */
     const unsigned _nSkip;
 
+    /** Instructions currently owned by this IQ, in dispatch order. */
+    std::list<DynInstPtr> _orderedInsts;
+
     /** Number of free IQ entries left. */
     unsigned _freeEntries;
 
