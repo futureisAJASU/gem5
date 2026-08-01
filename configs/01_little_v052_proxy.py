@@ -33,6 +33,7 @@ class LittleV052ProxyCore(BaseCPUCore):
         commit_width: int = 3,
         int_regs: int = 112,
         fp_regs: int = 96,
+        n_skip: int = -1,
     ) -> None:
         cpu = ArmO3CPU()
 
@@ -45,7 +46,13 @@ class LittleV052ProxyCore(BaseCPUCore):
         cpu.commitWidth = commit_width
 
         cpu.numROBEntries = rob_entries
-        cpu.instQueues = [IQUnit(numEntries=iq_entries)]
+
+        iq = IQUnit(numEntries=iq_entries)
+        if n_skip >= 0:
+            iq.enableNSkip = True
+            iq.nSkip = n_skip
+        cpu.instQueues = [iq]
+
         cpu.LQEntries = lq_entries
         cpu.SQEntries = sq_entries
 
@@ -64,6 +71,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         sq_entries: int,
         width: int,
         commit_width: int,
+        n_skip: int,
     ) -> None:
         cores = [
             LittleV052ProxyCore(
@@ -73,6 +81,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 sq_entries=sq_entries,
                 width=width,
                 commit_width=commit_width,
+                n_skip=n_skip,
             )
         ]
         super().__init__(cores=cores)
@@ -90,6 +99,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iq", type=int, default=40)
     parser.add_argument("--lq", type=int, default=12)
     parser.add_argument("--sq", type=int, default=16)
+    parser.add_argument(
+        "--n-skip",
+        type=int,
+        default=-1,
+        help="-1 disables N-SKIP; 0 is head-only; N exposes Head..Head+N",
+    )
     return parser.parse_args()
 
 
@@ -108,6 +123,7 @@ def main() -> None:
         sq_entries=args.sq,
         width=args.width,
         commit_width=args.commit_width,
+        n_skip=args.n_skip,
     )
 
     # First proxy pass: sizes and associativity only.
@@ -146,6 +162,7 @@ def main() -> None:
         f"IQ={args.iq}",
         f"LQ={args.lq}",
         f"SQ={args.sq}",
+        f"N-SKIP={'stock' if args.n_skip < 0 else args.n_skip}",
         sep="\n  ",
     )
 

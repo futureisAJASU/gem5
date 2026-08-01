@@ -949,12 +949,23 @@ InstructionQueue::scheduleReadyInsts()
             continue;
         }
 
+        IQUnit *iq = issuing_inst->iq;
+        assert(iq);
+
+        if (iq->nSkipEnabled()) {
+            const int offset = iq->issueWindowOffset(issuing_inst);
+
+            if (offset < 0 ||
+                offset > static_cast<int>(iq->nSkip())) {
+                ++order_it;
+                continue;
+            }
+        }
+
         int idx = FUPool::NoNeedFU;
         Cycles op_latency = Cycles(1);
         ThreadID tid = issuing_inst->threadNumber;
 
-        IQUnit *iq = issuing_inst->iq;
-        assert(iq);
         auto fu_pool = iq->fuPool();
         if (op_class != No_OpClass) {
             idx = fu_pool->getUnit(op_class);
