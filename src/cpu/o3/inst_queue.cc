@@ -69,6 +69,8 @@ IQUnit::IQUnit(const IQUnitParams &params)
       iqPolicy(params.smtIQPolicy),
       numThreads(params.numThreads),
       activeThreads(nullptr),
+      _enableNSkip(params.enableNSkip),
+      _nSkip(params.nSkip),
       _freeEntries(params.numEntries),
       _numEntries(params.numEntries),
       _fuPool(params.fuPool)

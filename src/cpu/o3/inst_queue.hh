@@ -107,6 +107,18 @@ class IQUnit : public SimObject
 
     unsigned numFreeEntries(const DynInstPtr &inst) const;
 
+    bool
+    nSkipEnabled() const
+    {
+        return _enableNSkip;
+    }
+
+    unsigned
+    nSkip() const
+    {
+        return _nSkip;
+    }
+
     /** Returns the number of used entries for a thread. */
     unsigned
     getCount(ThreadID tid)
@@ -141,6 +153,12 @@ class IQUnit : public SimObject
 
     /** Pointer to list of active threads. */
     std::list<ThreadID> *activeThreads;
+
+    /** Whether bounded Head-to-Head+N scheduling is enabled. */
+    const bool _enableNSkip;
+
+    /** Number of younger entries visible beyond the queue head. */
+    const unsigned _nSkip;
 
     /** Number of free IQ entries left. */
     unsigned _freeEntries;
