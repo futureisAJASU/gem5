@@ -206,6 +206,30 @@ IQUnit::numFreeEntries(const DynInstPtr &inst) const
     }
 }
 
+int
+IQUnit::issueWindowOffset(const DynInstPtr &inst) const
+{
+    int offset = 0;
+
+    for (const auto &entry : _orderedInsts) {
+        /*
+         * Issued memory operations may remain allocated until completion.
+         * They no longer occupy a visible position in the issue window.
+         */
+        if (entry->isIssued() || entry->isSquashed()) {
+            continue;
+        }
+
+        if (entry == inst) {
+            return offset;
+        }
+
+        ++offset;
+    }
+
+    return -1;
+}
+
 InstructionQueue::FUCompletion::FUCompletion(const DynInstPtr &_inst,
                                              FUPool *fu_pool, int fu_idx,
                                              InstructionQueue *iq_ptr)

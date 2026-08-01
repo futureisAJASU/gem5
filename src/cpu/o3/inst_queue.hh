@@ -119,6 +119,12 @@ class IQUnit : public SimObject
         return _nSkip;
     }
 
+    /**
+     * Return the instruction's position among valid, unissued entries.
+     * The queue head has offset zero. Returns -1 if the instruction is absent.
+     */
+    int issueWindowOffset(const DynInstPtr &inst) const;
+
     /** Returns the number of used entries for a thread. */
     unsigned
     getCount(ThreadID tid)
