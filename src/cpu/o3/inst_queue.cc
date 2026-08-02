@@ -341,6 +341,16 @@ InstructionQueue::IQStats::IQStats(CPU *cpu, const unsigned &total_width)
                "removed from graph"),
       ADD_STAT(squashedNonSpecRemoved, statistics::units::Count::get(),
                "Number of squashed non-spec instructions that were removed"),
+      ADD_STAT(nSkipWindowRejects, statistics::units::Count::get(),
+               "Ready candidates rejected outside the N-SKIP window"),
+      ADD_STAT(nSkipBlockedCycles, statistics::units::Cycle::get(),
+               "Zero-issue cycles with an N-SKIP window rejection"),
+      ADD_STAT(nSkipHeadIssued, statistics::units::Count::get(),
+               "N-SKIP instructions issued from the queue head"),
+      ADD_STAT(nSkipBypassIssued, statistics::units::Count::get(),
+               "N-SKIP instructions issued from non-head offsets"),
+      ADD_STAT(nSkipIssuedOffset, statistics::units::Count::get(),
+               "Distribution of N-SKIP issue-window offsets"),
       ADD_STAT(numIssuedDist, statistics::units::Count::get(),
                "Number of insts issued each cycle"),
       ADD_STAT(statFuBusy, statistics::units::Count::get(),
@@ -393,6 +403,22 @@ InstructionQueue::IQStats::IQStats(CPU *cpu, const unsigned &total_width)
 
     squashedNonSpecRemoved
         .prereq(squashedNonSpecRemoved);
+
+    nSkipWindowRejects
+        .prereq(nSkipWindowRejects);
+
+    nSkipBlockedCycles
+        .prereq(nSkipBlockedCycles);
+
+    nSkipHeadIssued
+        .prereq(nSkipHeadIssued);
+
+    nSkipBypassIssued
+        .prereq(nSkipBypassIssued);
+
+    nSkipIssuedOffset
+        .init(0, 16, 1)
+        .flags(statistics::pdf);
 /*
     queueResDist
         .init(Num_OpClasses, 0, 99, 2)
@@ -912,6 +938,7 @@ InstructionQueue::scheduleReadyInsts()
     // This will avoid trying to schedule a certain op class if there are no
     // FUs that handle it.
     int total_issued = 0;
+    bool nSkipRejectedThisCycle = false;
     ListOrderIt order_it = listOrder.begin();
     ListOrderIt order_end_it = listOrder.end();
 
@@ -952,11 +979,15 @@ InstructionQueue::scheduleReadyInsts()
         IQUnit *iq = issuing_inst->iq;
         assert(iq);
 
-        if (iq->nSkipEnabled()) {
-            const int offset = iq->issueWindowOffset(issuing_inst);
+        int nSkipOffset = -1;
 
-            if (offset < 0 ||
-                offset > static_cast<int>(iq->nSkip())) {
+        if (iq->nSkipEnabled()) {
+            nSkipOffset = iq->issueWindowOffset(issuing_inst);
+
+            if (nSkipOffset < 0 ||
+                nSkipOffset > static_cast<int>(iq->nSkip())) {
+                iqStats.nSkipWindowRejects++;
+                nSkipRejectedThisCycle = true;
                 ++order_it;
                 continue;
             }
@@ -1038,6 +1069,18 @@ InstructionQueue::scheduleReadyInsts()
             }
 
             issuing_inst->setIssued();
+
+            if (iq->nSkipEnabled()) {
+                assert(nSkipOffset >= 0);
+                iqStats.nSkipIssuedOffset.sample(nSkipOffset);
+
+                if (nSkipOffset == 0) {
+                    iqStats.nSkipHeadIssued++;
+                } else {
+                    iqStats.nSkipBypassIssued++;
+                }
+            }
+
             ++total_issued;
 
 #if TRACING_ON
@@ -1063,6 +1106,10 @@ InstructionQueue::scheduleReadyInsts()
             iqStats.fuBusy[tid]++;
             ++order_it;
         }
+    }
+
+    if (total_issued == 0 && nSkipRejectedThisCycle) {
+        iqStats.nSkipBlockedCycles++;
     }
 
     iqStats.numIssuedDist.sample(total_issued);

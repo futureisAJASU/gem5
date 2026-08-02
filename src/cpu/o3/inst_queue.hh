@@ -612,6 +612,25 @@ class InstructionQueue
          *  a squash.
          */
         statistics::Scalar squashedNonSpecRemoved;
+
+        /** Ready candidates rejected for being outside Head..Head+N. */
+        statistics::Scalar nSkipWindowRejects;
+
+        /**
+         * Zero-issue cycles which observed at least one ready candidate
+         * outside the enabled N-SKIP window.
+         */
+        statistics::Scalar nSkipBlockedCycles;
+
+        /** Instructions issued from offset zero. */
+        statistics::Scalar nSkipHeadIssued;
+
+        /** Instructions issued from visible offsets greater than zero. */
+        statistics::Scalar nSkipBypassIssued;
+
+        /** Distribution of issued offsets within the N-SKIP window. */
+        statistics::Distribution nSkipIssuedOffset;
+
         // Also include number of instructions rescheduled and replayed.
 
         /** Distribution of number of instructions in the queue.
