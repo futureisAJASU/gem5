@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from m5.objects import ArmO3CPU, IQUnit
+from m5.objects import ArmO3CPU, IQUnit, ArmExtension
 
 from gem5.components.boards.simple_board import SimpleBoard
 from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarchy import (
@@ -34,6 +34,7 @@ class LittleV052ProxyCore(BaseCPUCore):
         int_regs: int = 112,
         fp_regs: int = 96,
         n_skip: int = -1,
+        checker: bool = False,
     ) -> None:
         cpu = ArmO3CPU()
 
@@ -59,7 +60,39 @@ class LittleV052ProxyCore(BaseCPUCore):
         cpu.numPhysIntRegs = int_regs
         cpu.numPhysFloatRegs = fp_regs
 
+        self._checker_enabled = checker
+
+        if checker:
+            cpu.addCheckerCpu()
+            cpu.checker.exitOnError = True
+            cpu.checker.updateOnError = False
+            cpu.checker.warnOnlyOnLoadError = False
+
         super().__init__(core=cpu, isa=ISA.ARM)
+
+        if checker:
+            # gem5 v25.1 ARM SE enables TME by default. ArmISA::startup()
+            # consequently installs an HTM checkpoint, but CheckerThreadContext
+            # does not implement setHtmCheckpointPtr(). This benchmark does not
+            # exercise transactional memory, so disable TME symmetrically on
+            # the main and checker ISAs for strict CheckerCPU validation.
+            for isa in cpu.isa:
+                isa.release_se.remove(ArmExtension("TME"))
+
+            for isa in cpu.checker.isa:
+                isa.release_se.remove(ArmExtension("TME"))
+
+    def set_workload(self, process) -> None:
+        super().set_workload(process)
+
+        if self._checker_enabled:
+            self.core.checker.workload = process
+
+    def connect_walker_ports(self, port1, port2) -> None:
+        super().connect_walker_ports(port1, port2)
+
+        if self._checker_enabled:
+            self.core.checker.mmu.connectWalkerPorts(port1, port2)
 
 
 class LittleV052ProxyProcessor(BaseCPUProcessor):
@@ -72,6 +105,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         width: int,
         commit_width: int,
         n_skip: int,
+        checker: bool,
     ) -> None:
         cores = [
             LittleV052ProxyCore(
@@ -82,6 +116,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 width=width,
                 commit_width=commit_width,
                 n_skip=n_skip,
+                checker=checker,
             )
         ]
         super().__init__(cores=cores)
@@ -105,6 +140,11 @@ def parse_args() -> argparse.Namespace:
         default=-1,
         help="-1 disables N-SKIP; 0 is head-only; N exposes Head..Head+N",
     )
+    parser.add_argument(
+        "--checker",
+        action="store_true",
+        help="Enable strict Arm O3 CheckerCPU validation",
+    )
     return parser.parse_args()
 
 
@@ -124,6 +164,7 @@ def main() -> None:
         width=args.width,
         commit_width=args.commit_width,
         n_skip=args.n_skip,
+        checker=args.checker,
     )
 
     # First proxy pass: sizes and associativity only.
@@ -163,11 +204,19 @@ def main() -> None:
         f"LQ={args.lq}",
         f"SQ={args.sq}",
         f"N-SKIP={'stock' if args.n_skip < 0 else args.n_skip}",
+        f"Checker={args.checker}",
         sep="\n  ",
     )
 
     simulator = Simulator(board=board)
     simulator.run()
+
+    print(
+        f"SIMULATION_EXIT_CAUSE={simulator.get_last_exit_event_cause()}"
+    )
+    print(
+        f"SIMULATION_EXIT_CODE={simulator.get_last_exit_event_code()}"
+    )
 
 
 if __name__ in ("__main__", "__m5_main__"):
