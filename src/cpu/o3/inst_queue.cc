@@ -132,6 +132,10 @@ IQUnit::insert(const DynInstPtr &inst)
 void
 IQUnit::remove(const DynInstPtr &inst)
 {
+    // Any instruction leaving the physical IQ must also leave its
+    // scheduler-ready mirror.  This covers squash and normal completion.
+    markNotReady(inst);
+
     bool found = false;
 
     for (auto it = _orderedInsts.begin(); it != _orderedInsts.end(); ++it) {
@@ -160,6 +164,7 @@ void
 IQUnit::resetState()
 {
     _orderedInsts.clear();
+    _readyInsts.clear();
     _freeEntries = _numEntries;
     for (ThreadID tid = 0; tid < numThreads; ++tid) {
         count[tid] = 0;
@@ -228,6 +233,44 @@ IQUnit::issueWindowOffset(const DynInstPtr &inst) const
     }
 
     return -1;
+}
+
+void
+IQUnit::markReady(const DynInstPtr &inst)
+{
+    assert(inst);
+    assert(inst->iq == this);
+
+    for (const auto &entry : _readyInsts) {
+        if (entry == inst) {
+            return;
+        }
+    }
+
+    _readyInsts.push_back(inst);
+}
+
+void
+IQUnit::markNotReady(const DynInstPtr &inst)
+{
+    for (auto it = _readyInsts.begin(); it != _readyInsts.end(); ++it) {
+        if (*it == inst) {
+            _readyInsts.erase(it);
+            return;
+        }
+    }
+}
+
+bool
+IQUnit::isReady(const DynInstPtr &inst) const
+{
+    for (const auto &entry : _readyInsts) {
+        if (entry == inst) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 InstructionQueue::FUCompletion::FUCompletion(const DynInstPtr &_inst,
@@ -979,6 +1022,12 @@ InstructionQueue::scheduleReadyInsts()
         IQUnit *iq = issuing_inst->iq;
         assert(iq);
 
+        /*
+         * Non-squashed entries visible to the legacy ready picker must
+         * also exist in their owning IQ's local readiness mirror.
+         */
+        assert(iq->isReady(issuing_inst));
+
         int nSkipOffset = -1;
 
         if (iq->nSkipEnabled()) {
@@ -1059,6 +1108,7 @@ InstructionQueue::scheduleReadyInsts()
                     tid, issuing_inst->pcState(),
                     issuing_inst->seqNum);
 
+            iq->markNotReady(issuing_inst);
             readyInsts[op_class].pop();
 
             if (!readyInsts[op_class].empty()) {
@@ -1274,7 +1324,9 @@ InstructionQueue::addReadyMemInst(const DynInstPtr &ready_inst)
     OpClass op_class = ready_inst->opClass();
 
     assert(op_class < Num_OpClasses);
+    assert(ready_inst->iq);
 
+    ready_inst->iq->markReady(ready_inst);
     readyInsts[op_class].push(ready_inst);
 
     // Will need to reorder the list if either a queue is not on the list,
@@ -1652,6 +1704,9 @@ InstructionQueue::addIfReady(const DynInstPtr &inst)
         OpClass op_class = inst->opClass();
 
         assert(op_class < Num_OpClasses);
+        assert(inst->iq);
+
+        inst->iq->markReady(inst);
 
         DPRINTF(IQ, "Instruction is ready to issue, putting it onto "
                 "the ready list, PC %s opclass:%i [sn:%llu].\n",

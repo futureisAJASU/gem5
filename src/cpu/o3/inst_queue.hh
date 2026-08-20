@@ -125,6 +125,23 @@ class IQUnit : public SimObject
      */
     int issueWindowOffset(const DynInstPtr &inst) const;
 
+    /**
+     * Track scheduler-ready instructions owned by this IQ.
+     *
+     * This is intentionally only a local readiness mirror for now.
+     * The legacy global ready queues remain authoritative for issue
+     * selection until the distributed local picker is enabled.
+     */
+    void markReady(const DynInstPtr &inst);
+    void markNotReady(const DynInstPtr &inst);
+    bool isReady(const DynInstPtr &inst) const;
+
+    unsigned
+    readyCount() const
+    {
+        return _readyInsts.size();
+    }
+
     /** Returns the number of used entries for a thread. */
     unsigned
     getCount(ThreadID tid)
@@ -168,6 +185,16 @@ class IQUnit : public SimObject
 
     /** Instructions currently owned by this IQ, in dispatch order. */
     std::list<DynInstPtr> _orderedInsts;
+
+    /**
+     * Instructions in this IQ that have reached scheduler-ready state.
+     *
+     * Memory readiness cannot be reconstructed from DynInst::CanIssue
+     * alone because MemDepUnit may clear CanIssue while retaining its
+     * own dependency state.  The ready handoff therefore explicitly
+     * mirrors legacy ready-queue membership here.
+     */
+    std::list<DynInstPtr> _readyInsts;
 
     /** Number of free IQ entries left. */
     unsigned _freeEntries;
