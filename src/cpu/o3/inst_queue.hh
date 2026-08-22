@@ -136,6 +136,14 @@ class IQUnit : public SimObject
     void markNotReady(const DynInstPtr &inst);
     bool isReady(const DynInstPtr &inst) const;
 
+    /**
+     * Return scheduler-ready instructions visible inside this IQ's
+     * current Head..Head+N window, in dispatch/age order.
+     *
+     * When N-SKIP is disabled, the whole IQ is visible.
+     */
+    std::vector<DynInstPtr> readyCandidates() const;
+
     unsigned
     readyCount() const
     {

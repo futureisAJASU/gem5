@@ -273,6 +273,32 @@ IQUnit::isReady(const DynInstPtr &inst) const
     return false;
 }
 
+std::vector<DynInstPtr>
+IQUnit::readyCandidates() const
+{
+    std::vector<DynInstPtr> candidates;
+    int offset = 0;
+
+    for (const auto &entry : _orderedInsts) {
+        if (entry->isIssued() || entry->isSquashed()) {
+            continue;
+        }
+
+        if (_enableNSkip &&
+            offset > static_cast<int>(_nSkip)) {
+            break;
+        }
+
+        if (isReady(entry)) {
+            candidates.push_back(entry);
+        }
+
+        ++offset;
+    }
+
+    return candidates;
+}
+
 InstructionQueue::FUCompletion::FUCompletion(const DynInstPtr &_inst,
                                              FUPool *fu_pool, int fu_idx,
                                              InstructionQueue *iq_ptr)
@@ -980,6 +1006,42 @@ InstructionQueue::scheduleReadyInsts()
     // Increment the iterator.
     // This will avoid trying to schedule a certain op class if there are no
     // FUs that handle it.
+    /*
+     * Shadow validation for the future distributed picker.
+     *
+     * This must not affect issue selection.  It only verifies that each
+     * IQ can independently reconstruct its scheduler-ready candidates
+     * from local ownership + ready-state information.
+     */
+    for (auto iq : iqs) {
+        const auto candidates = iq->readyCandidates();
+
+        InstSeqNum previous = 0;
+        bool first = true;
+
+        for (const auto &candidate : candidates) {
+            assert(candidate);
+            assert(candidate->iq == iq);
+            assert(iq->isReady(candidate));
+            assert(!candidate->isIssued());
+            assert(!candidate->isSquashed());
+
+            const int offset = iq->issueWindowOffset(candidate);
+            assert(offset >= 0);
+
+            if (iq->nSkipEnabled()) {
+                assert(offset <= static_cast<int>(iq->nSkip()));
+            }
+
+            if (!first) {
+                assert(previous < candidate->seqNum);
+            }
+
+            previous = candidate->seqNum;
+            first = false;
+        }
+    }
+
     int total_issued = 0;
     bool nSkipRejectedThisCycle = false;
     ListOrderIt order_it = listOrder.begin();
