@@ -2,6 +2,8 @@ import argparse
 from pathlib import Path
 
 from m5.objects import ArmO3CPU, IQUnit, ArmExtension
+from m5.objects.FUPool import FUPool
+from m5.objects.FuncUnit import FUDesc, OpDesc
 
 from gem5.components.boards.simple_board import SimpleBoard
 from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarchy import (
@@ -14,6 +16,213 @@ from gem5.isas import ISA
 from gem5.resources.resource import BinaryResource
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
+
+
+#
+# Provisional distributed scheduler topology.
+#
+# FU counts intentionally retain roughly the stock DefaultFUPool execution
+# capacity for this structural stage. Queue sizing, steering, N-SKIP policy,
+# and final Little-core FU counts are validated separately later.
+#
+
+class LittleInt0AluFU(FUDesc):
+    opList = [OpDesc(opClass="IntAlu", opLat=1)]
+    count = 3
+
+
+class LittleInt0MulFU(FUDesc):
+    opList = [OpDesc(opClass="IntMult", opLat=3)]
+    count = 2
+
+
+class LittleSystemFU(FUDesc):
+    opList = [OpDesc(opClass="System", opLat=1)]
+    count = 1
+
+
+class LittleInt0Pool(FUPool):
+    FUList = [
+        LittleInt0AluFU(),
+        LittleInt0MulFU(),
+        LittleSystemFU(),
+    ]
+
+
+class LittleInt1AluFU(FUDesc):
+    opList = [OpDesc(opClass="IntAlu", opLat=1)]
+    count = 3
+
+
+class LittleInt1Pool(FUPool):
+    FUList = [LittleInt1AluFU()]
+
+
+class LittleDivFU(FUDesc):
+    opList = [
+        OpDesc(
+            opClass="IntDiv",
+            opLat=20,
+            pipelined=False,
+        )
+    ]
+    count = 2
+
+
+class LittleDivPool(FUPool):
+    FUList = [LittleDivFU()]
+
+
+class LittleMemFU(FUDesc):
+    opList = [
+        OpDesc(opClass="MemRead"),
+        OpDesc(opClass="MemWrite"),
+        OpDesc(opClass="FloatMemRead"),
+        OpDesc(opClass="FloatMemWrite"),
+        OpDesc(opClass="InstPrefetch"),
+        OpDesc(opClass="SimdUnitStrideLoad"),
+        OpDesc(opClass="SimdUnitStrideStore"),
+        OpDesc(opClass="SimdUnitStrideMaskLoad"),
+        OpDesc(opClass="SimdUnitStrideMaskStore"),
+        OpDesc(opClass="SimdStridedLoad"),
+        OpDesc(opClass="SimdStridedStore"),
+        OpDesc(opClass="SimdIndexedLoad"),
+        OpDesc(opClass="SimdIndexedStore"),
+        OpDesc(opClass="SimdWholeRegisterLoad"),
+        OpDesc(opClass="SimdWholeRegisterStore"),
+        OpDesc(opClass="SimdUnitStrideFaultOnlyFirstLoad"),
+        OpDesc(opClass="SimdUnitStrideSegmentedLoad"),
+        OpDesc(opClass="SimdUnitStrideSegmentedStore"),
+        OpDesc(opClass="SimdUnitStrideSegmentedFaultOnlyFirstLoad"),
+        OpDesc(opClass="SimdStrideSegmentedLoad"),
+        OpDesc(opClass="SimdStrideSegmentedStore"),
+    ]
+    count = 4
+
+
+class LittleMemPool(FUPool):
+    FUList = [LittleMemFU()]
+
+
+class LittleFpAluFU(FUDesc):
+    opList = [
+        OpDesc(opClass="FloatAdd", opLat=2),
+        OpDesc(opClass="FloatCmp", opLat=2),
+        OpDesc(opClass="FloatCvt", opLat=2),
+        OpDesc(opClass="Bf16Cvt", opLat=2),
+    ]
+    count = 4
+
+
+class LittleFpMultDivFU(FUDesc):
+    opList = [
+        OpDesc(opClass="FloatMult", opLat=4),
+        OpDesc(opClass="FloatMultAcc", opLat=5),
+        OpDesc(opClass="FloatMisc", opLat=3),
+        OpDesc(
+            opClass="FloatDiv",
+            opLat=12,
+            pipelined=False,
+        ),
+        OpDesc(
+            opClass="FloatSqrt",
+            opLat=24,
+            pipelined=False,
+        ),
+    ]
+    count = 2
+
+
+class LittleSimdFU(FUDesc):
+    opList = [
+        OpDesc(opClass="SimdAdd"),
+        OpDesc(opClass="SimdAddAcc"),
+        OpDesc(opClass="SimdAlu"),
+        OpDesc(opClass="SimdCmp"),
+        OpDesc(opClass="SimdCvt"),
+        OpDesc(opClass="SimdMisc"),
+        OpDesc(opClass="SimdMult"),
+        OpDesc(opClass="SimdMultAcc"),
+        OpDesc(opClass="SimdMatMultAcc"),
+        OpDesc(opClass="SimdShift"),
+        OpDesc(opClass="SimdShiftAcc"),
+        OpDesc(opClass="SimdDiv"),
+        OpDesc(opClass="SimdSqrt"),
+        OpDesc(opClass="SimdFloatAdd"),
+        OpDesc(opClass="SimdFloatAlu"),
+        OpDesc(opClass="SimdFloatCmp"),
+        OpDesc(opClass="SimdFloatCvt"),
+        OpDesc(opClass="SimdFloatDiv"),
+        OpDesc(opClass="SimdFloatMisc"),
+        OpDesc(opClass="SimdFloatMult"),
+        OpDesc(opClass="SimdFloatMultAcc"),
+        OpDesc(opClass="SimdFloatMatMultAcc"),
+        OpDesc(opClass="SimdFloatSqrt"),
+        OpDesc(opClass="SimdReduceAdd"),
+        OpDesc(opClass="SimdReduceAlu"),
+        OpDesc(opClass="SimdReduceCmp"),
+        OpDesc(opClass="SimdFloatReduceAdd"),
+        OpDesc(opClass="SimdFloatReduceCmp"),
+        OpDesc(opClass="SimdAes"),
+        OpDesc(opClass="SimdAesMix"),
+        OpDesc(opClass="SimdSha1Hash"),
+        OpDesc(opClass="SimdSha1Hash2"),
+        OpDesc(opClass="SimdSha256Hash"),
+        OpDesc(opClass="SimdSha256Hash2"),
+        OpDesc(opClass="SimdShaSigma2"),
+        OpDesc(opClass="SimdShaSigma3"),
+        OpDesc(opClass="SimdSha3"),
+        OpDesc(opClass="SimdSm4e"),
+        OpDesc(opClass="SimdCrc"),
+        OpDesc(opClass="SimdPredAlu"),
+        OpDesc(opClass="SimdDotProd"),
+        OpDesc(opClass="SimdExt"),
+        OpDesc(opClass="SimdFloatExt"),
+        OpDesc(opClass="SimdConfig"),
+        OpDesc(opClass="SimdBf16Add"),
+        OpDesc(opClass="SimdBf16Cmp"),
+        OpDesc(opClass="SimdBf16Cvt"),
+        OpDesc(opClass="SimdBf16DotProd"),
+        OpDesc(opClass="SimdBf16MatMultAcc"),
+        OpDesc(opClass="SimdBf16Mult"),
+        OpDesc(opClass="SimdBf16MultAcc"),
+    ]
+    count = 4
+
+
+class LittleMatrixFU(FUDesc):
+    opList = [
+        OpDesc(opClass="Matrix"),
+        OpDesc(opClass="MatrixMov"),
+        OpDesc(opClass="MatrixOP"),
+    ]
+    count = 1
+
+
+class LittleFpSimdPool(FUPool):
+    FUList = [
+        LittleFpAluFU(),
+        LittleFpMultDivFU(),
+        LittleSimdFU(),
+        LittleMatrixFU(),
+    ]
+
+
+def make_little_distributed_iqs(n_skip: int):
+    iqs = [
+        IQUnit(numEntries=10, fuPool=LittleInt0Pool()),
+        IQUnit(numEntries=6, fuPool=LittleInt1Pool()),
+        IQUnit(numEntries=12, fuPool=LittleMemPool()),
+        IQUnit(numEntries=4, fuPool=LittleDivPool()),
+        IQUnit(numEntries=6, fuPool=LittleFpSimdPool()),
+    ]
+
+    if n_skip >= 0:
+        for iq in iqs:
+            iq.enableNSkip = True
+            iq.nSkip = n_skip
+
+    return iqs
 
 
 class LittleV052ProxyCore(BaseCPUCore):
@@ -35,6 +244,7 @@ class LittleV052ProxyCore(BaseCPUCore):
         fp_regs: int = 96,
         n_skip: int = -1,
         checker: bool = False,
+        distributed_iq: bool = False,
     ) -> None:
         cpu = ArmO3CPU()
 
@@ -48,11 +258,14 @@ class LittleV052ProxyCore(BaseCPUCore):
 
         cpu.numROBEntries = rob_entries
 
-        iq = IQUnit(numEntries=iq_entries)
-        if n_skip >= 0:
-            iq.enableNSkip = True
-            iq.nSkip = n_skip
-        cpu.instQueues = [iq]
+        if distributed_iq:
+            cpu.instQueues = make_little_distributed_iqs(n_skip)
+        else:
+            iq = IQUnit(numEntries=iq_entries)
+            if n_skip >= 0:
+                iq.enableNSkip = True
+                iq.nSkip = n_skip
+            cpu.instQueues = [iq]
 
         cpu.LQEntries = lq_entries
         cpu.SQEntries = sq_entries
@@ -106,6 +319,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         commit_width: int,
         n_skip: int,
         checker: bool,
+        distributed_iq: bool,
     ) -> None:
         cores = [
             LittleV052ProxyCore(
@@ -117,6 +331,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 commit_width=commit_width,
                 n_skip=n_skip,
                 checker=checker,
+                distributed_iq=distributed_iq,
             )
         ]
         super().__init__(cores=cores)
@@ -145,6 +360,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable strict Arm O3 CheckerCPU validation",
     )
+    parser.add_argument(
+        "--distributed-iq",
+        action="store_true",
+        help=(
+            "Use provisional five-bank Little scheduler storage: "
+            "INT0 Q10, INT1 Q6, MEM Q12, DIV Q4, FP/SIMD Q6"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -165,6 +388,7 @@ def main() -> None:
         commit_width=args.commit_width,
         n_skip=args.n_skip,
         checker=args.checker,
+        distributed_iq=args.distributed_iq,
     )
 
     # First proxy pass: sizes and associativity only.
