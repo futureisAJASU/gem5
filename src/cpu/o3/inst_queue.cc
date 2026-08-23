@@ -337,7 +337,7 @@ InstructionQueue::InstructionQueue(CPU *cpu_ptr, IEW *iew_ptr,
       numThreads(params.numThreads),
       totalWidth(params.issueWidth),
       commitToIEWDelay(params.commitToIEWDelay),
-      iqStats(cpu, totalWidth),
+      iqStats(cpu, totalWidth, params.instQueues.size()),
       iqIOStats(cpu)
 {
     const auto &reg_classes = params.isa[0]->regClasses();
@@ -382,12 +382,27 @@ InstructionQueue::name() const
     return cpu->name() + ".iq";
 }
 
-InstructionQueue::IQStats::IQStats(CPU *cpu, const unsigned &total_width)
+InstructionQueue::IQStats::IQStats(
+    CPU *cpu,
+    const unsigned &total_width,
+    unsigned num_iqs)
     : statistics::Group(cpu),
       ADD_STAT(instsAdded, statistics::units::Count::get(),
                "Number of instructions added to the IQ (excludes non-spec)"),
       ADD_STAT(nonSpecInstsAdded, statistics::units::Count::get(),
                "Number of non-speculative instructions added to the IQ"),
+      ADD_STAT(steerDispatches, statistics::units::Count::get(),
+               "Instructions dispatched into each physical IQ"),
+      ADD_STAT(steerIntAluDispatches, statistics::units::Count::get(),
+               "IntAlu instructions dispatched into each physical IQ"),
+      ADD_STAT(steerIntMultDispatches, statistics::units::Count::get(),
+               "IntMult instructions dispatched into each physical IQ"),
+      ADD_STAT(steerOccupancySum, statistics::units::Count::get(),
+               "Sum of physical IQ occupancy samples"),
+      ADD_STAT(steerFullCycles, statistics::units::Cycle::get(),
+               "Scheduler samples where each physical IQ was full"),
+      ADD_STAT(steerOccupancySamples, statistics::units::Cycle::get(),
+               "Number of physical IQ occupancy samples"),
       ADD_STAT(instsIssued, statistics::units::Count::get(),
                "Number of instructions issued"),
       ADD_STAT(intInstsIssued, statistics::units::Count::get(),
@@ -437,6 +452,39 @@ InstructionQueue::IQStats::IQStats(CPU *cpu, const unsigned &total_width)
                                        statistics::units::Count>::get(),
                "FU busy rate (busy events/executed inst)")
 {
+    steerDispatches
+        .init(num_iqs)
+        .flags(statistics::total);
+
+    steerIntAluDispatches
+        .init(num_iqs)
+        .flags(statistics::total);
+
+    steerIntMultDispatches
+        .init(num_iqs)
+        .flags(statistics::total);
+
+    steerOccupancySum
+        .init(num_iqs)
+        .flags(statistics::total);
+
+    steerFullCycles
+        .init(num_iqs)
+        .flags(statistics::total);
+
+    for (unsigned i = 0; i < num_iqs; ++i) {
+        const std::string iq_name = "IQ" + std::to_string(i);
+
+        steerDispatches.subname(i, iq_name);
+        steerIntAluDispatches.subname(i, iq_name);
+        steerIntMultDispatches.subname(i, iq_name);
+        steerOccupancySum.subname(i, iq_name);
+        steerFullCycles.subname(i, iq_name);
+    }
+
+    steerOccupancySamples
+        .prereq(steerOccupancySamples);
+
     instsAdded
         .prereq(instsAdded);
 
@@ -801,6 +849,30 @@ InstructionQueue::findIQ(const DynInstPtr &inst)
 }
 
 void
+InstructionQueue::recordSteeringDispatch(
+    IQUnit *iq, const DynInstPtr &inst)
+{
+    assert(iq);
+    assert(inst);
+
+    unsigned iq_index = 0;
+
+    while (iq_index < iqs.size() && iqs[iq_index] != iq) {
+        ++iq_index;
+    }
+
+    assert(iq_index < iqs.size());
+
+    iqStats.steerDispatches[iq_index]++;
+
+    if (inst->opClass() == enums::IntAlu) {
+        iqStats.steerIntAluDispatches[iq_index]++;
+    } else if (inst->opClass() == enums::IntMult) {
+        iqStats.steerIntMultDispatches[iq_index]++;
+    }
+}
+
+void
 InstructionQueue::insert(const DynInstPtr &new_inst)
 {
     if (new_inst->isFloating()) {
@@ -821,6 +893,7 @@ InstructionQueue::insert(const DynInstPtr &new_inst)
     auto iq = findIQ(new_inst);
     assert(iq);
     iq->insert(new_inst);
+    recordSteeringDispatch(iq, new_inst);
 
     // Look through its source registers (physical regs), and mark any
     // dependencies.
@@ -865,6 +938,7 @@ InstructionQueue::insertNonSpec(const DynInstPtr &new_inst)
     auto iq = findIQ(new_inst);
     assert(iq);
     iq->insert(new_inst);
+    recordSteeringDispatch(iq, new_inst);
 
     // Have this instruction set itself as the producer of its destination
     // register(s).
@@ -1006,6 +1080,24 @@ InstructionQueue::scheduleReadyInsts()
     // Increment the iterator.
     // This will avoid trying to schedule a certain op class if there are no
     // FUs that handle it.
+    /*
+     * Sample physical queue pressure once per scheduling cycle.
+     *
+     * This is observation only and must not influence scheduling.
+     */
+    iqStats.steerOccupancySamples++;
+
+    for (unsigned i = 0; i < iqs.size(); ++i) {
+        const unsigned used =
+            iqs[i]->numEntries() - iqs[i]->numFreeEntries();
+
+        iqStats.steerOccupancySum[i] += used;
+
+        if (iqs[i]->numFreeEntries() == 0) {
+            iqStats.steerFullCycles[i]++;
+        }
+    }
+
     /*
      * Shadow validation for the future distributed picker.
      *

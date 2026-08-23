@@ -335,6 +335,10 @@ class InstructionQueue
     /** Find a compatible IQ (e.g. to insert the instruction) */
     IQUnit *findIQ(const DynInstPtr &inst);
 
+    /** Record behavior-neutral dispatch steering statistics. */
+    void recordSteeringDispatch(
+        IQUnit *iq, const DynInstPtr &inst);
+
     /** Inserts a new instruction into the IQ. */
     void insert(const DynInstPtr &new_inst);
 
@@ -616,11 +620,28 @@ class InstructionQueue
 
     struct IQStats : public statistics::Group
     {
-        IQStats(CPU *cpu, const unsigned &total_width);
+        IQStats(
+            CPU *cpu,
+            const unsigned &total_width,
+            unsigned num_iqs);
+
         /** Stat for number of instructions added. */
         statistics::Scalar instsAdded;
         /** Stat for number of non-speculative instructions added. */
         statistics::Scalar nonSpecInstsAdded;
+
+        /**
+         * Behavior-neutral steering instrumentation.
+         *
+         * These counters observe physical IQ ownership only. They must
+         * not participate in dispatch or issue decisions.
+         */
+        statistics::Vector steerDispatches;
+        statistics::Vector steerIntAluDispatches;
+        statistics::Vector steerIntMultDispatches;
+        statistics::Vector steerOccupancySum;
+        statistics::Vector steerFullCycles;
+        statistics::Scalar steerOccupancySamples;
 
         statistics::Scalar instsIssued;
         /** Stat for number of integer instructions issued. */
