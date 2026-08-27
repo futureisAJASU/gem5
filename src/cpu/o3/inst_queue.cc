@@ -334,12 +334,16 @@ InstructionQueue::InstructionQueue(CPU *cpu_ptr, IEW *iew_ptr,
     : cpu(cpu_ptr),
       iewStage(iew_ptr),
       iqs(params.instQueues),
+      iqSteeringPolicy(params.iqSteeringPolicy),
+      nextIntAluIQ(0),
       numThreads(params.numThreads),
       totalWidth(params.issueWidth),
       commitToIEWDelay(params.commitToIEWDelay),
       iqStats(cpu, totalWidth, params.instQueues.size()),
       iqIOStats(cpu)
 {
+    assert(iqSteeringPolicy <= 3);
+
     const auto &reg_classes = params.isa[0]->regClasses();
     // Set the number of total physical registers
     // As the vector registers have two addressing modes, they are added twice
@@ -838,13 +842,83 @@ InstructionQueue::hasReadyInsts()
 IQUnit *
 InstructionQueue::findIQ(const DynInstPtr &inst)
 {
-    for (auto iq : iqs) {
-        // If the IQ can store the selected instruction,
-        // return the IQ as valid
-        if (iq->numFreeEntries(inst) > 0) {
-            return iq;
+    const bool steer_int_alu =
+        inst->opClass() == enums::IntAlu &&
+        iqs.size() > 1;
+
+    /*
+     * Policy 0 is the legacy behavior and remains the default.
+     * Non-IntAlu instructions always retain legacy first-fit routing.
+     */
+    if (!steer_int_alu || iqSteeringPolicy == 0) {
+        for (auto iq : iqs) {
+            if (iq->numFreeEntries(inst) > 0) {
+                return iq;
+            }
+        }
+
+        return nullptr;
+    }
+
+    /*
+     * Policy 1: choose the compatible physical IQ with the
+     * smallest raw occupancy. Ties retain physical IQ order.
+     */
+    if (iqSteeringPolicy == 1) {
+        IQUnit *best = nullptr;
+        unsigned best_used = 0;
+
+        for (auto iq : iqs) {
+            if (iq->numFreeEntries(inst) == 0) {
+                continue;
+            }
+
+            const unsigned used =
+                iq->numEntries() - iq->numFreeEntries();
+
+            if (!best || used < best_used) {
+                best = iq;
+                best_used = used;
+            }
+        }
+
+        return best;
+    }
+
+    /*
+     * Policy 2: round-robin among currently compatible,
+     * non-full physical IQs.
+     */
+    if (iqSteeringPolicy == 2) {
+        for (unsigned offset = 0;
+             offset < iqs.size();
+             ++offset) {
+            const unsigned index =
+                (nextIntAluIQ + offset) % iqs.size();
+
+            if (iqs[index]->numFreeEntries(inst) > 0) {
+                nextIntAluIQ =
+                    (index + 1) % iqs.size();
+
+                return iqs[index];
+            }
+        }
+
+        return nullptr;
+    }
+
+    /*
+     * Policy 3: reverse first-fit. In the provisional Little
+     * five-bank topology this means INT1 before INT0 for IntAlu.
+     */
+    assert(iqSteeringPolicy == 3);
+
+    for (auto it = iqs.rbegin(); it != iqs.rend(); ++it) {
+        if ((*it)->numFreeEntries(inst) > 0) {
+            return *it;
         }
     }
+
     return nullptr;
 }
 

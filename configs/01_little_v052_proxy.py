@@ -245,6 +245,7 @@ class LittleV052ProxyCore(BaseCPUCore):
         n_skip: int = -1,
         checker: bool = False,
         distributed_iq: bool = False,
+        int_steering: str = "first-fit",
     ) -> None:
         cpu = ArmO3CPU()
 
@@ -257,6 +258,15 @@ class LittleV052ProxyCore(BaseCPUCore):
         cpu.commitWidth = commit_width
 
         cpu.numROBEntries = rob_entries
+
+        steering_codes = {
+            "first-fit": 0,
+            "least-used": 1,
+            "round-robin": 2,
+            "int1-first": 3,
+        }
+
+        cpu.iqSteeringPolicy = steering_codes[int_steering]
 
         if distributed_iq:
             cpu.instQueues = make_little_distributed_iqs(n_skip)
@@ -320,6 +330,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         n_skip: int,
         checker: bool,
         distributed_iq: bool,
+        int_steering: str,
     ) -> None:
         cores = [
             LittleV052ProxyCore(
@@ -332,6 +343,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 n_skip=n_skip,
                 checker=checker,
                 distributed_iq=distributed_iq,
+                int_steering=int_steering,
             )
         ]
         super().__init__(cores=cores)
@@ -368,6 +380,21 @@ def parse_args() -> argparse.Namespace:
             "INT0 Q10, INT1 Q6, MEM Q12, DIV Q4, FP/SIMD Q6"
         ),
     )
+    parser.add_argument(
+        "--int-steering",
+        choices=[
+            "first-fit",
+            "least-used",
+            "round-robin",
+            "int1-first",
+        ],
+        default="first-fit",
+        help=(
+            "IntAlu steering between compatible distributed IQs. "
+            "Default preserves legacy first-fit behavior."
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -389,6 +416,7 @@ def main() -> None:
         n_skip=args.n_skip,
         checker=args.checker,
         distributed_iq=args.distributed_iq,
+        int_steering=args.int_steering,
     )
 
     # First proxy pass: sizes and associativity only.

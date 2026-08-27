@@ -459,6 +459,20 @@ class InstructionQueue
     /** List of Instruction Queues */
     std::vector<IQUnit *> iqs;
 
+    /**
+     * Experimental steering policy for IntAlu instructions which
+     * can be accepted by more than one physical IQ.
+     *
+     * 0: first-fit
+     * 1: least-used
+     * 2: round-robin
+     * 3: reverse first-fit (INT1-first in the Little topology)
+     */
+    const unsigned iqSteeringPolicy;
+
+    /** Next physical IQ index considered by round-robin steering. */
+    unsigned nextIntAluIQ;
+
     /** The memory dependence unit, which tracks/predicts memory dependences
      *  between instructions.
      */
