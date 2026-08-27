@@ -473,6 +473,13 @@ class InstructionQueue
     /** Next physical IQ index considered by round-robin steering. */
     unsigned nextIntAluIQ;
 
+    /**
+     * If true, scheduling is driven directly from each IQUnit's
+     * bounded local ready-candidate view rather than the legacy
+     * global OpClass ready queues.
+     */
+    const bool useLocalIQPicker;
+
     /** The memory dependence unit, which tracks/predicts memory dependences
      *  between instructions.
      */

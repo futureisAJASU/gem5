@@ -191,6 +191,12 @@ class BaseO3CPU(BaseCPU):
         "0=first-fit, 1=least-used, "
         "2=round-robin, 3=int1-first",
     )
+
+    useLocalIQPicker = Param.Bool(
+        False,
+        "Use per-IQ local ready candidates with "
+        "global age arbitration",
+    )
     numROBEntries = Param.Unsigned(192, "Number of reorder buffer entries")
 
     smtNumFetchingThreads = Param.Unsigned(1, "SMT Number of Fetching Threads")

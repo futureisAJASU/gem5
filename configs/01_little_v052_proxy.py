@@ -246,6 +246,7 @@ class LittleV052ProxyCore(BaseCPUCore):
         checker: bool = False,
         distributed_iq: bool = False,
         int_steering: str = "first-fit",
+        local_iq_picker: bool = False,
     ) -> None:
         cpu = ArmO3CPU()
 
@@ -267,6 +268,12 @@ class LittleV052ProxyCore(BaseCPUCore):
         }
 
         cpu.iqSteeringPolicy = steering_codes[int_steering]
+        cpu.useLocalIQPicker = local_iq_picker
+
+        if local_iq_picker and not distributed_iq:
+            raise ValueError(
+                "local_iq_picker requires distributed_iq"
+            )
 
         if distributed_iq:
             cpu.instQueues = make_little_distributed_iqs(n_skip)
@@ -331,6 +338,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         checker: bool,
         distributed_iq: bool,
         int_steering: str,
+        local_iq_picker: bool,
     ) -> None:
         cores = [
             LittleV052ProxyCore(
@@ -344,6 +352,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 checker=checker,
                 distributed_iq=distributed_iq,
                 int_steering=int_steering,
+                local_iq_picker=local_iq_picker,
             )
         ]
         super().__init__(cores=cores)
@@ -395,6 +404,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
+    parser.add_argument(
+        "--local-iq-picker",
+        action="store_true",
+        help=(
+            "Use true per-IQ bounded ready candidates with "
+            "global age arbitration. Requires --distributed-iq."
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -417,6 +435,7 @@ def main() -> None:
         checker=args.checker,
         distributed_iq=args.distributed_iq,
         int_steering=args.int_steering,
+        local_iq_picker=args.local_iq_picker,
     )
 
     # First proxy pass: sizes and associativity only.

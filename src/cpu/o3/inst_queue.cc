@@ -41,6 +41,7 @@
 
 #include "cpu/o3/inst_queue.hh"
 
+#include <algorithm>
 #include <limits>
 #include <vector>
 
@@ -336,6 +337,7 @@ InstructionQueue::InstructionQueue(CPU *cpu_ptr, IEW *iew_ptr,
       iqs(params.instQueues),
       iqSteeringPolicy(params.iqSteeringPolicy),
       nextIntAluIQ(0),
+      useLocalIQPicker(params.useLocalIQPicker),
       numThreads(params.numThreads),
       totalWidth(params.issueWidth),
       commitToIEWDelay(params.commitToIEWDelay),
@@ -1208,6 +1210,239 @@ InstructionQueue::scheduleReadyInsts()
         }
     }
 
+    if (useLocalIQPicker) {
+        int total_issued = 0;
+
+        /*
+         * A candidate that saw NoFreeFU cannot become issuable again
+         * within this scheduling cycle because FU release occurs on a
+         * later cycle.  Remember it so repeated slot refreshes do not
+         * retry the same blocked instruction.
+         */
+        std::vector<InstSeqNum> fu_blocked;
+
+        while (total_issued < totalWidth) {
+            std::vector<DynInstPtr> candidates;
+
+            /*
+             * Refresh after every successful issue.  Issuing an older
+             * instruction can slide a bounded N-SKIP window forward and
+             * expose a new candidate for another issue slot in the same
+             * cycle.
+             */
+            for (auto iq : iqs) {
+                const auto local = iq->readyCandidates();
+
+                for (const auto &inst : local) {
+                    if (std::find(
+                            fu_blocked.begin(),
+                            fu_blocked.end(),
+                            inst->seqNum) == fu_blocked.end()) {
+                        candidates.push_back(inst);
+                    }
+                }
+            }
+
+            if (candidates.empty()) {
+                break;
+            }
+
+            std::sort(
+                candidates.begin(),
+                candidates.end(),
+                [](const DynInstPtr &a, const DynInstPtr &b) {
+                    return a->seqNum < b->seqNum;
+                });
+
+            bool issued_this_slot = false;
+
+            for (const auto &issuing_inst : candidates) {
+                assert(issuing_inst);
+                assert(!issuing_inst->isIssued());
+                assert(!issuing_inst->isSquashed());
+
+                IQUnit *iq = issuing_inst->iq;
+                assert(iq);
+                assert(iq->isReady(issuing_inst));
+
+                const OpClass op_class =
+                    issuing_inst->opClass();
+
+                if (issuing_inst->isFloating()) {
+                    iqIOStats.fpInstQueueReads++;
+                } else if (issuing_inst->isVector()) {
+                    iqIOStats.vecInstQueueReads++;
+                } else {
+                    iqIOStats.intInstQueueReads++;
+                }
+
+                int nSkipOffset = -1;
+
+                if (iq->nSkipEnabled()) {
+                    nSkipOffset =
+                        iq->issueWindowOffset(issuing_inst);
+
+                    /*
+                     * readyCandidates() is the authoritative bounded
+                     * local view, so every returned candidate must be
+                     * visible.
+                     */
+                    assert(nSkipOffset >= 0);
+                    assert(
+                        nSkipOffset <=
+                        static_cast<int>(iq->nSkip()));
+                }
+
+                int idx = FUPool::NoNeedFU;
+                Cycles op_latency = Cycles(1);
+                ThreadID tid =
+                    issuing_inst->threadNumber;
+
+                auto fu_pool = iq->fuPool();
+
+                if (op_class != No_OpClass) {
+                    idx = fu_pool->getUnit(op_class);
+
+                    if (issuing_inst->isFloating()) {
+                        iqIOStats.fpAluAccesses++;
+                    } else if (issuing_inst->isVector()) {
+                        iqIOStats.vecAluAccesses++;
+                    } else {
+                        iqIOStats.intAluAccesses++;
+                    }
+
+                    if (idx > FUPool::NoFreeFU) {
+                        op_latency =
+                            fu_pool->getOpLatency(op_class);
+                    }
+                }
+
+                if (idx == FUPool::NoFreeFU) {
+                    iqStats.statFuBusy[op_class]++;
+                    iqStats.fuBusy[tid]++;
+                    fu_blocked.push_back(
+                        issuing_inst->seqNum);
+                    continue;
+                }
+
+                assert(
+                    idx > FUPool::NoFreeFU ||
+                    idx == FUPool::NoNeedFU ||
+                    idx == FUPool::NoCapableFU);
+
+                if (op_latency == Cycles(1)) {
+                    i2e_info->size++;
+                    instsToExecute.push_back(
+                        issuing_inst);
+
+                    if (idx >= 0) {
+                        fu_pool->freeUnitNextCycle(idx);
+                    }
+
+                    if (idx == FUPool::NoCapableFU) {
+                        issuing_inst->setNoCapableFU();
+                    }
+                } else {
+                    assert(idx != FUPool::NoCapableFU);
+
+                    const bool pipelined =
+                        fu_pool->isPipelined(op_class);
+
+                    ++wbOutstanding;
+
+                    auto execution =
+                        new FUCompletion(
+                            issuing_inst,
+                            fu_pool,
+                            idx,
+                            this);
+
+                    cpu->schedule(
+                        execution,
+                        cpu->clockEdge(
+                            Cycles(op_latency - 1)));
+
+                    if (!pipelined) {
+                        execution->setFreeFU();
+                    } else {
+                        fu_pool->freeUnitNextCycle(idx);
+                    }
+                }
+
+                DPRINTF(
+                    IQ,
+                    "Local picker issuing PC %s "
+                    "[sn:%llu] opclass:%i\\n",
+                    issuing_inst->pcState(),
+                    issuing_inst->seqNum,
+                    op_class);
+
+                iq->markNotReady(issuing_inst);
+                issuing_inst->setIssued();
+
+                if (iq->nSkipEnabled()) {
+                    assert(nSkipOffset >= 0);
+
+                    iqStats.nSkipIssuedOffset.sample(
+                        nSkipOffset);
+
+                    if (nSkipOffset == 0) {
+                        iqStats.nSkipHeadIssued++;
+                    } else {
+                        iqStats.nSkipBypassIssued++;
+                    }
+                }
+
+                ++total_issued;
+
+#if TRACING_ON
+                issuing_inst->issueTick =
+                    curTick() -
+                    issuing_inst->fetchTick;
+#endif
+
+                if (issuing_inst->firstIssue == -1) {
+                    issuing_inst->firstIssue = curTick();
+                }
+
+                if (!issuing_inst->isMemRef()) {
+                    issuing_inst->clearInIQ();
+                } else {
+                    memDepUnit[tid].issue(
+                        issuing_inst);
+                }
+
+                iqStats.issuedInstType[
+                    tid][op_class]++;
+
+                issued_this_slot = true;
+                break;
+            }
+
+            if (!issued_this_slot) {
+                break;
+            }
+        }
+
+        iqStats.numIssuedDist.sample(total_issued);
+        iqStats.instsIssued += total_issued;
+
+        if (
+            total_issued ||
+            !retryMemInsts.empty() ||
+            !deferredMemInsts.empty()
+        ) {
+            cpu->activityThisCycle();
+        } else {
+            DPRINTF(
+                IQ,
+                "Local picker not able to "
+                "schedule any instructions.\\n");
+        }
+
+        return;
+    }
+
     int total_issued = 0;
     bool nSkipRejectedThisCycle = false;
     ListOrderIt order_it = listOrder.begin();
@@ -1555,6 +1790,14 @@ InstructionQueue::addReadyMemInst(const DynInstPtr &ready_inst)
     assert(ready_inst->iq);
 
     ready_inst->iq->markReady(ready_inst);
+
+    if (useLocalIQPicker) {
+        DPRINTF(IQ, "Memory instruction is locally ready to issue, "
+                "PC %s opclass:%i [sn:%llu].\n",
+                ready_inst->pcState(), op_class, ready_inst->seqNum);
+        return;
+    }
+
     readyInsts[op_class].push(ready_inst);
 
     // Will need to reorder the list if either a queue is not on the list,
@@ -1935,6 +2178,13 @@ InstructionQueue::addIfReady(const DynInstPtr &inst)
         assert(inst->iq);
 
         inst->iq->markReady(inst);
+
+        if (useLocalIQPicker) {
+            DPRINTF(IQ, "Instruction is locally ready to issue, "
+                    "PC %s opclass:%i [sn:%llu].\n",
+                    inst->pcState(), op_class, inst->seqNum);
+            return;
+        }
 
         DPRINTF(IQ, "Instruction is ready to issue, putting it onto "
                 "the ready list, PC %s opclass:%i [sn:%llu].\n",
