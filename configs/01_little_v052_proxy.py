@@ -208,13 +208,49 @@ class LittleFpSimdPool(FUPool):
     ]
 
 
-def make_little_distributed_iqs(n_skip: int):
+def make_little_distributed_iqs(
+    n_skip: int,
+    int0_entries: int = 10,
+    int1_entries: int = 6,
+    mem_entries: int = 12,
+    div_entries: int = 4,
+    fpsimd_entries: int = 6,
+):
+    sizes = {
+        "INT0": int0_entries,
+        "INT1": int1_entries,
+        "MEM": mem_entries,
+        "DIV": div_entries,
+        "FP/SIMD": fpsimd_entries,
+    }
+
+    for name, entries in sizes.items():
+        if entries <= 0:
+            raise ValueError(
+                f"{name} IQ size must be positive, got {entries}"
+            )
+
     iqs = [
-        IQUnit(numEntries=10, fuPool=LittleInt0Pool()),
-        IQUnit(numEntries=6, fuPool=LittleInt1Pool()),
-        IQUnit(numEntries=12, fuPool=LittleMemPool()),
-        IQUnit(numEntries=4, fuPool=LittleDivPool()),
-        IQUnit(numEntries=6, fuPool=LittleFpSimdPool()),
+        IQUnit(
+            numEntries=int0_entries,
+            fuPool=LittleInt0Pool(),
+        ),
+        IQUnit(
+            numEntries=int1_entries,
+            fuPool=LittleInt1Pool(),
+        ),
+        IQUnit(
+            numEntries=mem_entries,
+            fuPool=LittleMemPool(),
+        ),
+        IQUnit(
+            numEntries=div_entries,
+            fuPool=LittleDivPool(),
+        ),
+        IQUnit(
+            numEntries=fpsimd_entries,
+            fuPool=LittleFpSimdPool(),
+        ),
     ]
 
     if n_skip >= 0:
@@ -247,6 +283,11 @@ class LittleV052ProxyCore(BaseCPUCore):
         distributed_iq: bool = False,
         int_steering: str = "first-fit",
         local_iq_picker: bool = False,
+        dist_int0_entries: int = 10,
+        dist_int1_entries: int = 6,
+        dist_mem_entries: int = 12,
+        dist_div_entries: int = 4,
+        dist_fpsimd_entries: int = 6,
     ) -> None:
         cpu = ArmO3CPU()
 
@@ -276,7 +317,14 @@ class LittleV052ProxyCore(BaseCPUCore):
             )
 
         if distributed_iq:
-            cpu.instQueues = make_little_distributed_iqs(n_skip)
+            cpu.instQueues = make_little_distributed_iqs(
+                n_skip=n_skip,
+                int0_entries=dist_int0_entries,
+                int1_entries=dist_int1_entries,
+                mem_entries=dist_mem_entries,
+                div_entries=dist_div_entries,
+                fpsimd_entries=dist_fpsimd_entries,
+            )
         else:
             iq = IQUnit(numEntries=iq_entries)
             if n_skip >= 0:
@@ -339,6 +387,11 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         distributed_iq: bool,
         int_steering: str,
         local_iq_picker: bool,
+        dist_int0_entries: int,
+        dist_int1_entries: int,
+        dist_mem_entries: int,
+        dist_div_entries: int,
+        dist_fpsimd_entries: int,
     ) -> None:
         cores = [
             LittleV052ProxyCore(
@@ -353,6 +406,11 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 distributed_iq=distributed_iq,
                 int_steering=int_steering,
                 local_iq_picker=local_iq_picker,
+                dist_int0_entries=dist_int0_entries,
+                dist_int1_entries=dist_int1_entries,
+                dist_mem_entries=dist_mem_entries,
+                dist_div_entries=dist_div_entries,
+                dist_fpsimd_entries=dist_fpsimd_entries,
             )
         ]
         super().__init__(cores=cores)
@@ -385,9 +443,46 @@ def parse_args() -> argparse.Namespace:
         "--distributed-iq",
         action="store_true",
         help=(
-            "Use provisional five-bank Little scheduler storage: "
-            "INT0 Q10, INT1 Q6, MEM Q12, DIV Q4, FP/SIMD Q6"
+            "Use the provisional five-bank Little scheduler. "
+            "Default sizes are INT0 Q10, INT1 Q6, MEM Q12, "
+            "DIV Q4, FP/SIMD Q6."
         ),
+    )
+
+    parser.add_argument(
+        "--dist-int0",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Distributed INT0 IQ entries (default: 10)",
+    )
+    parser.add_argument(
+        "--dist-int1",
+        type=int,
+        default=6,
+        metavar="N",
+        help="Distributed INT1 IQ entries (default: 6)",
+    )
+    parser.add_argument(
+        "--dist-mem",
+        type=int,
+        default=12,
+        metavar="N",
+        help="Distributed MEM IQ entries (default: 12)",
+    )
+    parser.add_argument(
+        "--dist-div",
+        type=int,
+        default=4,
+        metavar="N",
+        help="Distributed DIV IQ entries (default: 4)",
+    )
+    parser.add_argument(
+        "--dist-fpsimd",
+        type=int,
+        default=6,
+        metavar="N",
+        help="Distributed FP/SIMD IQ entries (default: 6)",
     )
     parser.add_argument(
         "--int-steering",
@@ -436,6 +531,11 @@ def main() -> None:
         distributed_iq=args.distributed_iq,
         int_steering=args.int_steering,
         local_iq_picker=args.local_iq_picker,
+        dist_int0_entries=args.dist_int0,
+        dist_int1_entries=args.dist_int1,
+        dist_mem_entries=args.dist_mem,
+        dist_div_entries=args.dist_div,
+        dist_fpsimd_entries=args.dist_fpsimd,
     )
 
     # First proxy pass: sizes and associativity only.
