@@ -73,6 +73,23 @@ class LittleDivPool(FUPool):
     FUList = [LittleDivFU()]
 
 
+class LittlePairSharedDivFU(FUDesc):
+    """One physical non-pipelined divider shared by a two-core pair."""
+
+    opList = [
+        OpDesc(
+            opClass="IntDiv",
+            opLat=20,
+            pipelined=False,
+        )
+    ]
+    count = 1
+
+
+class LittlePairSharedDivPool(FUPool):
+    FUList = [LittlePairSharedDivFU()]
+
+
 class LittleMemFU(FUDesc):
     opList = [
         OpDesc(opClass="MemRead"),
@@ -215,6 +232,7 @@ def make_little_distributed_iqs(
     mem_entries: int = 12,
     div_entries: int = 4,
     fpsimd_entries: int = 6,
+    div_pool=None,
 ):
     sizes = {
         "INT0": int0_entries,
@@ -245,7 +263,11 @@ def make_little_distributed_iqs(
         ),
         IQUnit(
             numEntries=div_entries,
-            fuPool=LittleDivPool(),
+            fuPool=(
+                div_pool
+                if div_pool is not None
+                else LittleDivPool()
+            ),
         ),
         IQUnit(
             numEntries=fpsimd_entries,
@@ -288,6 +310,7 @@ class LittleV052ProxyCore(BaseCPUCore):
         dist_mem_entries: int = 12,
         dist_div_entries: int = 4,
         dist_fpsimd_entries: int = 6,
+        shared_div_pool=None,
     ) -> None:
         cpu = ArmO3CPU()
 
@@ -324,6 +347,7 @@ class LittleV052ProxyCore(BaseCPUCore):
                 mem_entries=dist_mem_entries,
                 div_entries=dist_div_entries,
                 fpsimd_entries=dist_fpsimd_entries,
+                div_pool=shared_div_pool,
             )
         else:
             iq = IQUnit(numEntries=iq_entries)
@@ -392,7 +416,36 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         dist_mem_entries: int,
         dist_div_entries: int,
         dist_fpsimd_entries: int,
+        num_cores: int,
+        pair_shared_div: bool,
     ) -> None:
+        if num_cores <= 0:
+            raise ValueError(
+                f"num_cores must be positive, got {num_cores}"
+            )
+
+        if pair_shared_div:
+            if num_cores != 2:
+                raise ValueError(
+                    "pair-shared DIV is currently validated only "
+                    "for exactly two cores"
+                )
+            if not distributed_iq:
+                raise ValueError(
+                    "pair-shared DIV requires --distributed-iq"
+                )
+            if not local_iq_picker:
+                raise ValueError(
+                    "pair-shared DIV currently requires "
+                    "--local-iq-picker"
+                )
+
+        shared_div_pool = (
+            LittlePairSharedDivPool()
+            if pair_shared_div
+            else None
+        )
+
         cores = [
             LittleV052ProxyCore(
                 rob_entries=rob_entries,
@@ -411,7 +464,9 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 dist_mem_entries=dist_mem_entries,
                 dist_div_entries=dist_div_entries,
                 dist_fpsimd_entries=dist_fpsimd_entries,
+                shared_div_pool=shared_div_pool,
             )
+            for _ in range(num_cores)
         ]
         super().__init__(cores=cores)
 
@@ -421,6 +476,20 @@ def parse_args() -> argparse.Namespace:
         description="Little Core v0.52 stock-O3 proxy"
     )
     parser.add_argument("--binary", required=True, help="AArch64 static ELF path")
+    parser.add_argument(
+        "--cores",
+        type=int,
+        default=1,
+        help="Number of O3 cores; default preserves the single-core proxy",
+    )
+    parser.add_argument(
+        "--pair-shared-div",
+        action="store_true",
+        help=(
+            "For a two-core distributed-IQ configuration, make both private "
+            "DIV IQs reference one physical 20-cycle non-pipelined divider"
+        ),
+    )
     parser.add_argument("--clock", default="1.4GHz")
     parser.add_argument("--width", type=int, default=3)
     parser.add_argument("--commit-width", type=int, default=3)
@@ -536,6 +605,8 @@ def main() -> None:
         dist_mem_entries=args.dist_mem,
         dist_div_entries=args.dist_div,
         dist_fpsimd_entries=args.dist_fpsimd,
+        num_cores=args.cores,
+        pair_shared_div=args.pair_shared_div,
     )
 
     # First proxy pass: sizes and associativity only.
@@ -558,16 +629,29 @@ def main() -> None:
         cache_hierarchy=cache_hierarchy,
     )
 
-    board.set_se_binary_workload(
-        BinaryResource(
-            local_path=str(binary_path),
-            architecture=ISA.ARM,
+    if args.cores == 1:
+        board.set_se_binary_workload(
+            BinaryResource(
+                local_path=str(binary_path),
+                architecture=ISA.ARM,
+            )
         )
-    )
+    else:
+        board.set_se_multi_binary_workload(
+            [
+                BinaryResource(
+                    local_path=str(binary_path),
+                    architecture=ISA.ARM,
+                )
+                for _ in range(args.cores)
+            ]
+        )
 
     print(
         "Little v0.52 proxy:",
         f"clock={args.clock}",
+        f"cores={args.cores}",
+        f"pair-shared-div={args.pair_shared_div}",
         f"width={args.width}",
         f"commit={args.commit_width}",
         f"ROB={args.rob}",
