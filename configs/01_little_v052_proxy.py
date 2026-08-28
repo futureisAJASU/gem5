@@ -88,6 +88,7 @@ class LittlePairSharedDivFU(FUDesc):
 
 class LittlePairSharedDivPool(FUPool):
     FUList = [LittlePairSharedDivFU()]
+    pairRrArb = True
 
 
 class LittleMemFU(FUDesc):

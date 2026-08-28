@@ -86,7 +86,12 @@ FUPool::~FUPool()
 FUPool::FUPool(const Params &p)
     : SimObject(p),
       lastFreeProcessTick(0),
-      hasProcessedFreeTick(false)
+      hasProcessedFreeTick(false),
+      pairRrArb(p.pairRrArb),
+      rrPreferredRequester(0),
+      rrRequestedSinceGrant{{false, false}},
+      rrReservationTick(0),
+      rrReservationActive(false)
 {
     numFU = 0;
 
@@ -165,12 +170,28 @@ FUPool::isCapable(OpClass capability)
 }
 
 int
-FUPool::getUnit(OpClass capability)
+FUPool::getUnit(OpClass capability, int requester_id)
 {
-    //  If this pool doesn't have the specified capability,
-    //  return this information to the caller
+    // If this pool doesn't have the specified capability,
+    // return this information to the caller.
     if (!capabilityList[capability])
         return NoCapableFU;
+
+    if (pairRrArb) {
+        /*
+         * The current pair-shared proxy is deliberately restricted to
+         * CPU IDs 0 and 1. Private pools ignore requester_id entirely.
+         */
+        assert(requester_id == 0 || requester_id == 1);
+
+        /*
+         * Record demand even while the physical unit is busy. For a
+         * long-latency non-pipelined shared divider this gives the arbiter
+         * the pending-request information it needs when the FU becomes
+         * available again.
+         */
+        rrRequestedSinceGrant[requester_id] = true;
+    }
 
     int fu_idx = fuPerCapList[capability].getFU();
     int start_idx = fu_idx;
@@ -180,12 +201,48 @@ FUPool::getUnit(OpClass capability)
     while (unitBusy[fu_idx]) {
         fu_idx = fuPerCapList[capability].getFU();
         if (fu_idx == start_idx) {
-            // No FU available
+            // No FU available.
             return NoFreeFU;
         }
     }
 
     assert(fu_idx < numFU);
+
+    if (pairRrArb) {
+        const Tick now = curTick();
+
+        if (requester_id != rrPreferredRequester &&
+            rrRequestedSinceGrant[rrPreferredRequester]) {
+            /*
+             * The preferred peer has expressed demand since the previous
+             * grant. Reserve this free opportunity for it.
+             *
+             * Repeated attempts from the non-preferred core during this
+             * same tick remain blocked. If the preferred core does not
+             * actually claim the resource, the reservation expires on
+             * the following tick so a stale request cannot deadlock or
+             * permanently idle the FU.
+             */
+            if (!rrReservationActive) {
+                rrReservationActive = true;
+                rrReservationTick = now;
+                return NoFreeFU;
+            }
+
+            if (rrReservationTick == now) {
+                return NoFreeFU;
+            }
+        }
+
+        /*
+         * A real grant rotates priority to the other core. Request history
+         * starts fresh from this grant; attempts made later while the unit
+         * is busy will repopulate the two request bits.
+         */
+        rrPreferredRequester = 1 - requester_id;
+        rrRequestedSinceGrant = {false, false};
+        rrReservationActive = false;
+    }
 
     unitBusy[fu_idx] = true;
 

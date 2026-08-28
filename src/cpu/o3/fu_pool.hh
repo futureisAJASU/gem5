@@ -105,6 +105,21 @@ class FUPool : public SimObject
     bool hasProcessedFreeTick;
 
     /**
+     * Optional two-requester arbitration for a physical FU pool shared
+     * across one two-core pair.
+     *
+     * The request bits remember which cores attempted to acquire this
+     * resource after the previous grant. This makes the arbitration
+     * work-conserving when only one core is active while preserving
+     * round-robin service when both cores contend.
+     */
+    const bool pairRrArb;
+    int rrPreferredRequester;
+    std::array<bool, 2> rrRequestedSinceGrant;
+    Tick rrReservationTick;
+    bool rrReservationActive;
+
+    /**
      * Class that implements a circular queue to hold FU indices. The hope is
      * that FUs that have been just used will be moved to the end of the queue
      * by iterating through it, thus leaving free units at the head of the
@@ -190,7 +205,7 @@ class FUPool : public SimObject
      * capability, NoFreeFU if there is no free FU, and the FU's index
      * otherwise.
      */
-    int getUnit(OpClass capability);
+    int getUnit(OpClass capability, int requester_id = -1);
 
     /** Frees a FU at the end of this cycle. */
     void freeUnitNextCycle(int fu_idx);

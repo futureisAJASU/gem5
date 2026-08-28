@@ -47,6 +47,10 @@ class FUPool(SimObject):
     cxx_class = "gem5::o3::FUPool"
     cxx_header = "cpu/o3/fu_pool.hh"
     FUList = VectorParam.FUDesc("list of FU's for this pool")
+    pairRrArb = Param.Bool(
+        False,
+        "Enable two-requester round-robin arbitration for a shared FU pool",
+    )
 
 
 class DefaultFUPool(FUPool):

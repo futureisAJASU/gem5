@@ -1301,7 +1301,7 @@ InstructionQueue::scheduleReadyInsts()
                 auto fu_pool = iq->fuPool();
 
                 if (op_class != No_OpClass) {
-                    idx = fu_pool->getUnit(op_class);
+                    idx = fu_pool->getUnit(op_class, cpu->cpuId());
 
                     if (issuing_inst->isFloating()) {
                         iqIOStats.fpAluAccesses++;
@@ -1511,7 +1511,7 @@ InstructionQueue::scheduleReadyInsts()
 
         auto fu_pool = iq->fuPool();
         if (op_class != No_OpClass) {
-            idx = fu_pool->getUnit(op_class);
+            idx = fu_pool->getUnit(op_class, cpu->cpuId());
             if (issuing_inst->isFloating()) {
                 iqIOStats.fpAluAccesses++;
             } else if (issuing_inst->isVector()) {
