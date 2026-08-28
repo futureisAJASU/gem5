@@ -90,6 +90,21 @@ class FUPool : public SimObject
     std::vector<int> unitsToBeFreed;
 
     /**
+     * A FUPool may be referenced by more than one IEW stage when a
+     * physical execution resource is shared across cores.
+     *
+     * IEW::tick() calls processFreeUnits() once per IEW.  Without a
+     * global-tick guard, a second IEW referencing the same pool could
+     * process units queued by the first IEW during the same global
+     * cycle, turning freeUnitNextCycle() into a same-cycle release.
+     *
+     * Private pools are unaffected because they are naturally visited
+     * only once per global cycle.
+     */
+    Tick lastFreeProcessTick;
+    bool hasProcessedFreeTick;
+
+    /**
      * Class that implements a circular queue to hold FU indices. The hope is
      * that FUs that have been just used will be moved to the end of the queue
      * by iterating through it, thus leaving free units at the head of the

@@ -39,6 +39,7 @@
  */
 
 #include "cpu/o3/fu_pool.hh"
+#include "sim/core.hh"
 
 #include <sstream>
 
@@ -83,7 +84,9 @@ FUPool::~FUPool()
 
 // Constructor
 FUPool::FUPool(const Params &p)
-    : SimObject(p)
+    : SimObject(p),
+      lastFreeProcessTick(0),
+      hasProcessedFreeTick(false)
 {
     numFU = 0;
 
@@ -199,6 +202,20 @@ FUPool::freeUnitNextCycle(int fu_idx)
 void
 FUPool::processFreeUnits()
 {
+    /*
+     * A shared FUPool can be visited by multiple IEW stages during the
+     * same global tick.  Free at most once per tick so requests added
+     * after the first visit retain the documented next-cycle semantics.
+     */
+    const Tick now = curTick();
+
+    if (hasProcessedFreeTick && lastFreeProcessTick == now) {
+        return;
+    }
+
+    lastFreeProcessTick = now;
+    hasProcessedFreeTick = true;
+
     while (!unitsToBeFreed.empty()) {
         int fu_idx = unitsToBeFreed.back();
         unitsToBeFreed.pop_back();
