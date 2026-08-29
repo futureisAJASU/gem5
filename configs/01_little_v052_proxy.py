@@ -363,6 +363,12 @@ class LittleV052ProxyCore(BaseCPUCore):
         cpu.numPhysIntRegs = int_regs
         cpu.numPhysFloatRegs = fp_regs
 
+        # AArch64 scalar FP/NEON architectural state is carried by the
+        # vector register class.  Keep the historical fp_regs argument
+        # for compatibility, but apply the intended FP/vector physical
+        # rename budget to VecRegClass as well.
+        cpu.numPhysVecRegs = fp_regs
+
         self._checker_enabled = checker
 
         if checker:
