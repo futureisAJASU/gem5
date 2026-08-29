@@ -226,6 +226,61 @@ class LittleFpSimdPool(FUPool):
     ]
 
 
+# Pair-shared FP/SIMD execution backend.
+#
+# Scalar physical domains:
+#   FP-Simple    x2 / pair
+#   FP-MulFMA    x2 / pair
+#   FP-DivSqrt   x2 / pair
+#
+# SIMD x4 and Matrix x1 remain provisional.
+# Physical Vec rename registers remain private per CPU.
+class LittlePairSharedFpSimpleFU(FUDesc):
+    opList = [
+        OpDesc(opClass="FloatAdd", opLat=2),
+        OpDesc(opClass="FloatCmp", opLat=2),
+        OpDesc(opClass="FloatCvt", opLat=2),
+        OpDesc(opClass="Bf16Cvt", opLat=2),
+    ]
+    count = 2
+
+
+class LittlePairSharedFpMulFmaFU(FUDesc):
+    opList = [
+        OpDesc(opClass="FloatMult", opLat=4),
+        OpDesc(opClass="FloatMultAcc", opLat=5),
+        OpDesc(opClass="FloatMisc", opLat=3),
+    ]
+    count = 2
+
+
+class LittlePairSharedFpDivSqrtFU(FUDesc):
+    opList = [
+        OpDesc(
+            opClass="FloatDiv",
+            opLat=12,
+            pipelined=False,
+        ),
+        OpDesc(
+            opClass="FloatSqrt",
+            opLat=24,
+            pipelined=False,
+        ),
+    ]
+    count = 2
+
+
+class LittlePairSharedFpSimdPool(FUPool):
+    FUList = [
+        LittlePairSharedFpSimpleFU(),
+        LittlePairSharedFpMulFmaFU(),
+        LittlePairSharedFpDivSqrtFU(),
+        LittleSimdFU(),
+        LittleMatrixFU(),
+    ]
+    pairRrArb = True
+
+
 def make_little_distributed_iqs(
     n_skip: int,
     int0_entries: int = 10,
@@ -234,6 +289,8 @@ def make_little_distributed_iqs(
     div_entries: int = 4,
     fpsimd_entries: int = 6,
     div_pool=None,
+    fpsimd_pool=None,
+    pair_requester_id: int = -1,
 ):
     sizes = {
         "INT0": int0_entries,
@@ -269,10 +326,24 @@ def make_little_distributed_iqs(
                 if div_pool is not None
                 else LittleDivPool()
             ),
+            fuRequesterId=(
+                pair_requester_id
+                if div_pool is not None
+                else -1
+            ),
         ),
         IQUnit(
             numEntries=fpsimd_entries,
-            fuPool=LittleFpSimdPool(),
+            fuPool=(
+                fpsimd_pool
+                if fpsimd_pool is not None
+                else LittleFpSimdPool()
+            ),
+            fuRequesterId=(
+                pair_requester_id
+                if fpsimd_pool is not None
+                else -1
+            ),
         ),
     ]
 
@@ -312,6 +383,8 @@ class LittleV052ProxyCore(BaseCPUCore):
         dist_div_entries: int = 4,
         dist_fpsimd_entries: int = 6,
         shared_div_pool=None,
+        shared_fpsimd_pool=None,
+        pair_requester_id: int = -1,
     ) -> None:
         cpu = ArmO3CPU()
 
@@ -349,6 +422,8 @@ class LittleV052ProxyCore(BaseCPUCore):
                 div_entries=dist_div_entries,
                 fpsimd_entries=dist_fpsimd_entries,
                 div_pool=shared_div_pool,
+                fpsimd_pool=shared_fpsimd_pool,
+                pair_requester_id=pair_requester_id,
             )
         else:
             iq = IQUnit(numEntries=iq_entries)
@@ -425,6 +500,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         dist_fpsimd_entries: int,
         num_cores: int,
         pair_shared_div: bool,
+        pair_shared_fpsimd: bool = False,
     ) -> None:
         if num_cores <= 0:
             raise ValueError(
@@ -447,9 +523,31 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                     "--local-iq-picker"
                 )
 
+        if pair_shared_fpsimd:
+            if num_cores != 2:
+                raise ValueError(
+                    "pair-shared FP/SIMD is currently validated "
+                    "only for exactly two cores"
+                )
+            if not distributed_iq:
+                raise ValueError(
+                    "pair-shared FP/SIMD requires --distributed-iq"
+                )
+            if not local_iq_picker:
+                raise ValueError(
+                    "pair-shared FP/SIMD requires "
+                    "--local-iq-picker"
+                )
+
         shared_div_pool = (
             LittlePairSharedDivPool()
             if pair_shared_div
+            else None
+        )
+
+        shared_fpsimd_pool = (
+            LittlePairSharedFpSimdPool()
+            if pair_shared_fpsimd
             else None
         )
 
@@ -472,8 +570,10 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 dist_div_entries=dist_div_entries,
                 dist_fpsimd_entries=dist_fpsimd_entries,
                 shared_div_pool=shared_div_pool,
+                shared_fpsimd_pool=shared_fpsimd_pool,
+                pair_requester_id=core_idx,
             )
-            for _ in range(num_cores)
+            for core_idx in range(num_cores)
         ]
         super().__init__(cores=cores)
 
@@ -495,6 +595,14 @@ def parse_args() -> argparse.Namespace:
         help=(
             "For a two-core distributed-IQ configuration, make both private "
             "DIV IQs reference one physical 20-cycle non-pipelined divider"
+        ),
+    )
+    parser.add_argument(
+        "--pair-shared-fpsimd",
+        action="store_true",
+        help=(
+            "For a two-core distributed-IQ configuration, "
+            "share one FP/SIMD execution backend"
         ),
     )
     parser.add_argument("--clock", default="1.4GHz")
@@ -614,6 +722,7 @@ def main() -> None:
         dist_fpsimd_entries=args.dist_fpsimd,
         num_cores=args.cores,
         pair_shared_div=args.pair_shared_div,
+        pair_shared_fpsimd=args.pair_shared_fpsimd,
     )
 
     # First proxy pass: sizes and associativity only.
@@ -659,6 +768,7 @@ def main() -> None:
         f"clock={args.clock}",
         f"cores={args.cores}",
         f"pair-shared-div={args.pair_shared_div}",
+        f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
         f"width={args.width}",
         f"commit={args.commit_width}",
         f"ROB={args.rob}",

@@ -175,6 +175,12 @@ class IQUnit : public SimObject
         return _fuPool;
     }
 
+    int
+    fuRequesterId() const
+    {
+        return _fuRequesterId;
+    }
+
   private:
     /** IQ sharing policy for SMT. */
     SMTQueuePolicy iqPolicy;
@@ -218,6 +224,12 @@ class IQUnit : public SimObject
 
     /** Function unit pool. */
     FUPool *_fuPool;
+
+    /**
+     * Pair-local requester ID used by pair-shared FU pools.
+     * Private pools leave this at -1.
+     */
+    const int _fuRequesterId;
 };
 
 /**

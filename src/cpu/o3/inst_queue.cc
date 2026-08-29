@@ -74,7 +74,8 @@ IQUnit::IQUnit(const IQUnitParams &params)
       _nSkip(params.nSkip),
       _freeEntries(params.numEntries),
       _numEntries(params.numEntries),
-      _fuPool(params.fuPool)
+      _fuPool(params.fuPool),
+      _fuRequesterId(params.fuRequesterId)
 {
     assert(_fuPool);
     // Figure out resource sharing policy
@@ -1321,7 +1322,7 @@ InstructionQueue::scheduleReadyInsts()
                 auto fu_pool = iq->fuPool();
 
                 if (op_class != No_OpClass) {
-                    idx = fu_pool->getUnit(op_class, cpu->cpuId());
+                    idx = fu_pool->getUnit(op_class, iq->fuRequesterId());
 
                     if (issuing_inst->isFloating()) {
                         iqIOStats.fpAluAccesses++;
@@ -1531,7 +1532,7 @@ InstructionQueue::scheduleReadyInsts()
 
         auto fu_pool = iq->fuPool();
         if (op_class != No_OpClass) {
-            idx = fu_pool->getUnit(op_class, cpu->cpuId());
+            idx = fu_pool->getUnit(op_class, iq->fuRequesterId());
             if (issuing_inst->isFloating()) {
                 iqIOStats.fpAluAccesses++;
             } else if (issuing_inst->isVector()) {

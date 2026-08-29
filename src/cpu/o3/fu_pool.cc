@@ -87,11 +87,7 @@ FUPool::FUPool(const Params &p)
     : SimObject(p),
       lastFreeProcessTick(0),
       hasProcessedFreeTick(false),
-      pairRrArb(p.pairRrArb),
-      rrPreferredRequester(0),
-      rrRequestedSinceGrant{{false, false}},
-      rrReservationTick(0),
-      rrReservationActive(false)
+      pairRrArb(p.pairRrArb)
 {
     numFU = 0;
 
@@ -99,6 +95,7 @@ FUPool::FUPool(const Params &p)
 
     maxOpLatencies.fill(Cycles(0));
     pipelined.fill(true);
+    pairRrDomainByCapability.fill(-1);
 
     //
     //  Iterate through the list of FUDescData structures
@@ -108,6 +105,14 @@ FUPool::FUPool(const Params &p)
         //  Don't bother with this if we're not going to create any FU's
         //
         if (i->number) {
+            int pair_rr_domain = -1;
+
+            if (pairRrArb) {
+                pair_rr_domain =
+                    static_cast<int>(pairRrDomains.size());
+                pairRrDomains.emplace_back();
+            }
+
             //
             //  Create the FuncUnit object from this structure
             //   - add the capabilities listed in the FU's operation
@@ -118,6 +123,18 @@ FUPool::FUPool(const Params &p)
             FuncUnit *fu = new FuncUnit;
 
             for (OpDesc *j : i->opDescList) {
+                if (pairRrArb) {
+                    const int old_domain =
+                        pairRrDomainByCapability[j->opClass];
+
+                    assert(
+                        old_domain == -1 ||
+                        old_domain == pair_rr_domain);
+
+                    pairRrDomainByCapability[j->opClass] =
+                        pair_rr_domain;
+                }
+
                 // indicate that this pool has this capability
                 capabilityList.set(j->opClass);
 
@@ -177,20 +194,30 @@ FUPool::getUnit(OpClass capability, int requester_id)
     if (!capabilityList[capability])
         return NoCapableFU;
 
+    PairRrDomainState *rr_state = nullptr;
+
     if (pairRrArb) {
         /*
-         * The current pair-shared proxy is deliberately restricted to
-         * CPU IDs 0 and 1. Private pools ignore requester_id entirely.
+         * Shared pools use an IQ-provided pair-local requester
+         * ID, not gem5's globally unique cpuId().
          */
         assert(requester_id == 0 || requester_id == 1);
 
+        const int domain =
+            pairRrDomainByCapability[capability];
+
+        assert(domain >= 0);
+        assert(
+            domain <
+            static_cast<int>(pairRrDomains.size()));
+
+        rr_state = &pairRrDomains[domain];
+
         /*
-         * Record demand even while the physical unit is busy. For a
-         * long-latency non-pipelined shared divider this gives the arbiter
-         * the pending-request information it needs when the FU becomes
-         * available again.
+         * Preserve pending demand even when every physical unit
+         * in this domain is currently busy.
          */
-        rrRequestedSinceGrant[requester_id] = true;
+        rr_state->requestedSinceGrant[requester_id] = true;
     }
 
     int fu_idx = fuPerCapList[capability].getFU();
@@ -209,39 +236,41 @@ FUPool::getUnit(OpClass capability, int requester_id)
     assert(fu_idx < numFU);
 
     if (pairRrArb) {
+        assert(rr_state);
+
         const Tick now = curTick();
 
-        if (requester_id != rrPreferredRequester &&
-            rrRequestedSinceGrant[rrPreferredRequester]) {
+        if (
+            requester_id != rr_state->preferredRequester &&
+            rr_state->requestedSinceGrant[
+                rr_state->preferredRequester]) {
+
             /*
-             * The preferred peer has expressed demand since the previous
-             * grant. Reserve this free opportunity for it.
-             *
-             * Repeated attempts from the non-preferred core during this
-             * same tick remain blocked. If the preferred core does not
-             * actually claim the resource, the reservation expires on
-             * the following tick so a stale request cannot deadlock or
-             * permanently idle the FU.
+             * Reserve the free opportunity only inside this
+             * physical FUDesc domain.
              */
-            if (!rrReservationActive) {
-                rrReservationActive = true;
-                rrReservationTick = now;
+            if (!rr_state->reservationActive) {
+                rr_state->reservationActive = true;
+                rr_state->reservationTick = now;
                 return NoFreeFU;
             }
 
-            if (rrReservationTick == now) {
+            if (rr_state->reservationTick == now) {
                 return NoFreeFU;
             }
         }
 
         /*
-         * A real grant rotates priority to the other core. Request history
-         * starts fresh from this grant; attempts made later while the unit
-         * is busy will repopulate the two request bits.
+         * A real grant rotates priority only inside this
+         * physical execution domain.
          */
-        rrPreferredRequester = 1 - requester_id;
-        rrRequestedSinceGrant = {false, false};
-        rrReservationActive = false;
+        rr_state->preferredRequester =
+            1 - requester_id;
+
+        rr_state->requestedSinceGrant =
+            {false, false};
+
+        rr_state->reservationActive = false;
     }
 
     unitBusy[fu_idx] = true;

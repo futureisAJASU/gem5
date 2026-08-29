@@ -114,10 +114,27 @@ class FUPool : public SimObject
      * round-robin service when both cores contend.
      */
     const bool pairRrArb;
-    int rrPreferredRequester;
-    std::array<bool, 2> rrRequestedSinceGrant;
-    Tick rrReservationTick;
-    bool rrReservationActive;
+
+    /**
+     * Independent two-requester arbitration state for one
+     * physical FUDesc domain.
+     *
+     * OpClasses implemented by the same FUDesc share one
+     * state. Unrelated physical domains arbitrate independently.
+     */
+    struct PairRrDomainState
+    {
+        int preferredRequester = 0;
+        std::array<bool, 2> requestedSinceGrant{{false, false}};
+        Tick reservationTick = 0;
+        bool reservationActive = false;
+    };
+
+    /** OpClass -> physical FUDesc arbitration domain. */
+    std::array<int, Num_OpClasses> pairRrDomainByCapability;
+
+    /** One RR state per physical FUDesc domain. */
+    std::vector<PairRrDomainState> pairRrDomains;
 
     /**
      * Class that implements a circular queue to hold FU indices. The hope is

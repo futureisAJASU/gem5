@@ -62,6 +62,11 @@ class IQUnit(SimObject):
 
     fuPool = Param.FUPool(DefaultFUPool(), "Functional Unit pool")
 
+    fuRequesterId = Param.Int(
+        -1,
+        "Pair-local requester ID for shared FU arbitration; -1 for private pools",
+    )
+
     numThreads = Param.Unsigned(
         Parent.numThreads, "number of HW thread contexts"
     )
