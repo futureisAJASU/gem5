@@ -828,6 +828,26 @@ InstructionQueue::allFUPools()
 bool
 InstructionQueue::hasReadyInsts()
 {
+    /*
+     * The distributed local picker does not populate the legacy
+     * readyInsts/listOrder structures.  Use the same bounded local
+     * visibility as scheduleReadyInsts() when deciding whether IEW
+     * still has schedulable work.
+     *
+     * This is especially important when a visible ready instruction
+     * is waiting for a busy/shared FU: IEW must remain active so the
+     * request can be retried on a later cycle.
+     */
+    if (useLocalIQPicker) {
+        for (auto iq : iqs) {
+            if (!iq->readyCandidates().empty()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     if (!listOrder.empty()) {
         return true;
     }
