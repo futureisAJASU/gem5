@@ -87,6 +87,7 @@ FUPool::FUPool(const Params &p)
     : SimObject(p),
       lastFreeProcessTick(0),
       hasProcessedFreeTick(false),
+      pairArbEpoch(0),
       pairRrArb(p.pairRrArb)
 {
     numFU = 0;
@@ -151,6 +152,47 @@ FUPool::FUPool(const Params &p)
 
                 if (!j->pipelined)
                     pipelined[j->opClass] = false;
+            }
+
+            /*
+             * For a pair-shared domain consisting of exactly two
+             * fully non-pipelined physical units, grant-count RR is
+             * the wrong fairness unit when op latencies differ.
+             *
+             * Example:
+             *   FloatDiv  = 12 cycles
+             *   FloatSqrt = 24 cycles
+             *
+             * Assign one physical home lane to each requester.
+             * A requester may still steal the peer lane while the
+             * peer has no pending demand.
+             *
+             * The physical indices for one FUDesc are contiguous:
+             *   [numFU, numFU + i->number)
+             */
+            if (pairRrArb && i->number == 2) {
+                bool fully_non_pipelined =
+                    !i->opDescList.empty();
+
+                for (OpDesc *j : i->opDescList) {
+                    if (j->pipelined) {
+                        fully_non_pipelined = false;
+                        break;
+                    }
+                }
+
+                if (fully_non_pipelined) {
+                    assert(pair_rr_domain >= 0);
+
+                    PairRrDomainState &state =
+                        pairRrDomains[pair_rr_domain];
+
+                    state.homeLaneArb = true;
+                    state.homeFuIdx = {
+                        numFU,
+                        numFU + 1,
+                    };
+                }
             }
 
             numFU++;
@@ -218,6 +260,165 @@ FUPool::getUnit(OpClass capability, int requester_id)
          * in this domain is currently busy.
          */
         rr_state->requestedSinceGrant[requester_id] = true;
+
+        /*
+         * Pending and activity are intentionally separate.
+         *
+         * A successful grant may clear pending demand while the
+         * requester is still in the middle of a sustained burst.
+         * Remember that this requester touched the domain during
+         * the current arbitration epoch.
+         */
+        rr_state->lastRequestEpoch[requester_id] =
+            pairArbEpoch;
+
+        rr_state->hasRequestEpoch[requester_id] =
+            true;
+    }
+
+    /*
+     * Home-lane arbitration for a two-unit fully non-pipelined
+     * pair-shared domain.
+     *
+     * Rules:
+     *
+     *  1. Prefer the requester's physical home lane.
+     *  2. If the home lane is busy, the peer lane may be stolen
+     *     only when the peer has no pending demand.
+     *  3. A pending peer request remains remembered until that
+     *     requester receives a grant.
+     *  4. Already-running stolen work is never preempted.
+     *
+     * This intentionally allows a bounded first-arrival delay:
+     * if both lanes were stolen while a peer was idle, a newly
+     * arriving peer must wait for one in-flight non-pipelined op
+     * to complete.  After that admission event, sustained
+     * contention converges to one physical lane per requester.
+     */
+    if (
+        pairRrArb &&
+        rr_state &&
+        rr_state->homeLaneArb) {
+
+        const int peer_id =
+            1 - requester_id;
+
+        const int home_fu =
+            rr_state->homeFuIdx[requester_id];
+
+        const int peer_fu =
+            rr_state->homeFuIdx[peer_id];
+
+        assert(home_fu >= 0);
+        assert(peer_fu >= 0);
+
+        assert(home_fu < numFU);
+        assert(peer_fu < numFU);
+
+        int chosen_fu = NoFreeFU;
+        const Tick now = curTick();
+
+        /*
+         * Protect an owner which requested this domain either in
+         * the current epoch or in the immediately preceding one.
+         *
+         * This one-epoch hysteresis removes the grant-count hole:
+         *
+         *   owner receives grant
+         *     -> pending bit clears
+         *     -> peer must NOT immediately interpret that as idle
+         *
+         * A truly idle owner becomes stealable after one epoch
+         * without any request.
+         */
+        const bool peer_recently_active =
+            rr_state->hasRequestEpoch[peer_id] &&
+            (
+                rr_state->lastRequestEpoch[peer_id] ==
+                    pairArbEpoch ||
+                (
+                    pairArbEpoch > 0 &&
+                    rr_state->lastRequestEpoch[peer_id] ==
+                        pairArbEpoch - 1
+                )
+            );
+
+        if (!unitBusy[home_fu]) {
+            /*
+             * The owner always gets its own free physical lane.
+             */
+            chosen_fu = home_fu;
+        } else if (!unitBusy[peer_fu]) {
+            if (peer_recently_active) {
+                /*
+                 * The peer is still an active owner even if its
+                 * instantaneous pending bit was cleared by a
+                 * recent successful grant.
+                 *
+                 * Do not steal its physical home lane.
+                 */
+                return NoFreeFU;
+            } else if (!rr_state->requestedSinceGrant[peer_id]) {
+                /*
+                 * Work-conserving steal:
+                 *
+                 *   no pending peer demand
+                 *   AND
+                 *   no recent peer activity
+                 */
+                chosen_fu = peer_fu;
+            } else if (!rr_state->reservationActive) {
+                /*
+                 * Give the peer one free-lane opportunity.
+                 *
+                 * This also prevents IEW call ordering inside
+                 * one global tick from letting the first
+                 * requester steal a lane already demanded by
+                 * the second requester.
+                 */
+                rr_state->reservationActive = true;
+                rr_state->reservationTick = now;
+                return NoFreeFU;
+            } else if (rr_state->reservationTick == now) {
+                /*
+                 * Keep the reservation for the remainder of
+                 * this global tick.
+                 */
+                return NoFreeFU;
+            } else {
+                /*
+                 * The peer did not consume the reserved free
+                 * opportunity.
+                 *
+                 * Its remembered request may have disappeared
+                 * due to squash or other speculative recovery.
+                 * Do not let a stale bit permanently disable
+                 * work-conserving stealing.
+                 */
+                rr_state->requestedSinceGrant[peer_id] = false;
+                rr_state->reservationActive = false;
+                chosen_fu = peer_fu;
+            }
+        }
+
+        if (chosen_fu == NoFreeFU)
+            return NoFreeFU;
+
+        /*
+         * Only this requester's pending bit is consumed.
+         *
+         * Unlike grant-count RR, do NOT clear the peer bit:
+         * that bit protects the peer's home lane until the peer
+         * itself receives service.
+         */
+        rr_state->requestedSinceGrant[requester_id] =
+            false;
+
+        rr_state->reservationActive = false;
+
+        unitBusy[chosen_fu] = true;
+
+        return chosen_fu;
     }
 
     int fu_idx = fuPerCapList[capability].getFU();
@@ -301,6 +502,14 @@ FUPool::processFreeUnits()
 
     lastFreeProcessTick = now;
     hasProcessedFreeTick = true;
+
+    /*
+     * The same shared pool may be visited by two IEW stages, but
+     * the guard above ensures this epoch advances exactly once
+     * per global tick.
+     */
+    if (pairRrArb)
+        ++pairArbEpoch;
 
     while (!unitsToBeFreed.empty()) {
         int fu_idx = unitsToBeFreed.back();

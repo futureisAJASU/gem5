@@ -105,6 +105,24 @@ class FUPool : public SimObject
     bool hasProcessedFreeTick;
 
     /**
+     * Monotonic arbitration epoch for pair-shared pools.
+     *
+     * processFreeUnits() is globally guarded so this advances at
+     * most once per global simulation tick even when two IEW stages
+     * reference the same physical FUPool.
+     *
+     * Home-lane arbitration uses the epoch to distinguish:
+     *
+     *   pending demand
+     *
+     * from:
+     *
+     *   an owner which was recently active but happened to receive
+     *   a grant and therefore temporarily cleared its pending bit.
+     */
+    Tick pairArbEpoch;
+
+    /**
      * Optional two-requester arbitration for a physical FU pool shared
      * across one two-core pair.
      *
@@ -128,6 +146,28 @@ class FUPool : public SimObject
         std::array<bool, 2> requestedSinceGrant{{false, false}};
         Tick reservationTick = 0;
         bool reservationActive = false;
+
+        /**
+         * Two-unit fully non-pipelined pair-shared domains use
+         * physical owner lanes instead of grant-count RR.
+         *
+         * Each requester owns one physical FU while both are active.
+         * When the peer has no pending demand, its lane may be stolen.
+         */
+        bool homeLaneArb = false;
+        std::array<int, 2> homeFuIdx{{-1, -1}};
+
+        /**
+         * Per-requester activity history.
+         *
+         * A requester which attempted to acquire this physical
+         * domain in the current or immediately preceding
+         * arbitration epoch is treated as active.  Its home lane
+         * must not be stolen merely because a successful grant
+         * temporarily cleared requestedSinceGrant.
+         */
+        std::array<Tick, 2> lastRequestEpoch{{0, 0}};
+        std::array<bool, 2> hasRequestEpoch{{false, false}};
     };
 
     /** OpClass -> physical FUDesc arbitration domain. */
