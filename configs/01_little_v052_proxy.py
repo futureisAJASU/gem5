@@ -43,6 +43,8 @@ class LittleExplicitCacheHierarchy(
         l1d_assoc: int,
         l1i_assoc: int,
         l2_assoc: int,
+        l1d_mshrs: int,
+        l2_mshrs: int,
         prefetch_enabled: bool,
     ) -> None:
         super().__init__(
@@ -54,6 +56,8 @@ class LittleExplicitCacheHierarchy(
             l2_assoc=l2_assoc,
         )
 
+        self._little_l1d_mshrs = l1d_mshrs
+        self._little_l2_mshrs = l2_mshrs
         self._little_prefetch_enabled = prefetch_enabled
 
     def incorporate_cache(self, board) -> None:
@@ -80,14 +84,14 @@ class LittleExplicitCacheHierarchy(
                 cache.prefetcher = NULL
 
         # ----------------------------------------------------
-        # L1D — current proxy defaults, explicitly stated.
+        # L1D — Stage 2M MSHR validation control.
         # ----------------------------------------------------
         for cache in self.l1dcaches:
             cache.tag_latency = 1
             cache.data_latency = 1
             cache.response_latency = 1
 
-            cache.mshrs = 16
+            cache.mshrs = self._little_l1d_mshrs
             cache.tgts_per_mshr = 20
             cache.demand_mshr_reserve = 1
             cache.write_buffers = 8
@@ -107,7 +111,7 @@ class LittleExplicitCacheHierarchy(
         cache.data_latency = 10
         cache.response_latency = 1
 
-        cache.mshrs = 20
+        cache.mshrs = self._little_l2_mshrs
         cache.tgts_per_mshr = 12
         cache.demand_mshr_reserve = 1
         cache.write_buffers = 8
@@ -721,6 +725,22 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--l1d-mshrs",
+        type=int,
+        default=16,
+        help=(
+            "Stage 2M validation control for L1D MSHR capacity"
+        ),
+    )
+    parser.add_argument(
+        "--l2-mshrs",
+        type=int,
+        default=20,
+        help=(
+            "Stage 2M validation control for shared L2 MSHR capacity"
+        ),
+    )
+    parser.add_argument(
         "--cache-prefetch",
         choices=("stride", "off"),
         default="stride",
@@ -864,6 +884,8 @@ def main() -> None:
         l1d_assoc=4,
         l1i_assoc=4,
         l2_assoc=8,
+        l1d_mshrs=args.l1d_mshrs,
+        l2_mshrs=args.l2_mshrs,
         prefetch_enabled=(args.cache_prefetch == "stride"),
     )
 
@@ -901,6 +923,8 @@ def main() -> None:
         f"pair-shared-div={args.pair_shared_div}",
         f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
         f"cache-prefetch={args.cache_prefetch}",
+        f"l1d-mshrs={args.l1d_mshrs}",
+        f"l2-mshrs={args.l2_mshrs}",
         f"width={args.width}",
         f"commit={args.commit_width}",
         f"ROB={args.rob}",
