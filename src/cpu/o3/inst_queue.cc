@@ -1808,9 +1808,28 @@ InstructionQueue::addReadyMemInst(const DynInstPtr &ready_inst)
     OpClass op_class = ready_inst->opClass();
 
     assert(op_class < Num_OpClasses);
-    assert(ready_inst->iq);
 
-    ready_inst->iq->markReady(ready_inst);
+    /*
+     * Memory instructions may remain in the deferred/cache-retry lists
+     * across a squash.  Squash removes them from their physical IQ and
+     * therefore clears DynInst::iq.
+     *
+     * The legacy global ready path deliberately tolerates this: a
+     * squashed entry may be re-added to readyInsts and is discarded by
+     * scheduleReadyInsts() before its IQ owner is dereferenced.
+     *
+     * The per-IQ readiness mirror must therefore only be updated for
+     * live, non-squashed instructions.
+     */
+    if (ready_inst->isSquashed()) {
+        if (useLocalIQPicker) {
+            ++iqStats.squashedInstsIssued;
+            return;
+        }
+    } else {
+        assert(ready_inst->iq);
+        ready_inst->iq->markReady(ready_inst);
+    }
 
     if (useLocalIQPicker) {
         DPRINTF(IQ, "Memory instruction is locally ready to issue, "
