@@ -2292,6 +2292,8 @@ BaseCache::CacheStats::CacheStats(BaseCache &c)
     ADD_STAT(overallAvgMissLatency, statistics::units::Rate<
                 statistics::units::Tick, statistics::units::Count>::get(),
              "average overall miss latency"),
+    ADD_STAT(mshrPeakAllocated, statistics::units::Count::get(),
+             "maximum number of simultaneously allocated MSHRs"),
     ADD_STAT(blockedCycles, statistics::units::Cycle::get(),
             "number of cycles access was blocked"),
     ADD_STAT(blockedCauses, statistics::units::Count::get(),

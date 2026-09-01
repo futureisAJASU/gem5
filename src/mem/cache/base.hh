@@ -1087,6 +1087,11 @@ class BaseCache : public ClockedObject
         /** The average miss latency for all misses. */
         statistics::Formula overallAvgMissLatency;
 
+        /**
+         * Maximum number of simultaneously allocated MSHRs.
+         */
+        statistics::Scalar mshrPeakAllocated;
+
         /** The total number of cycles blocked for each blocked cause. */
         statistics::Vector blockedCycles;
         /** The number of times this cache blocked for each blocked cause. */
@@ -1177,6 +1182,10 @@ class BaseCache : public ClockedObject
         MSHR *mshr = mshrQueue.allocate(pkt->getBlockAddr(blkSize), blkSize,
                                         pkt, time, order++,
                                         allocOnFill(pkt->cmd));
+
+        if (mshrQueue.numAllocated() > stats.mshrPeakAllocated.value()) {
+            stats.mshrPeakAllocated = mshrQueue.numAllocated();
+        }
 
         if (mshrQueue.isFull()) {
             setBlocked((BlockedCause)MSHRQueue_MSHRs);

@@ -152,6 +152,17 @@ class MSHRQueue : public Queue<MSHR>
     }
 
     /**
+     * Return the number of currently allocated MSHRs.
+     *
+     * This is intentionally read-only and is used by cache statistics
+     * to record peak outstanding miss concurrency.
+     */
+    int numAllocated() const
+    {
+        return allocated;
+    }
+
+    /**
      * Returns true if sufficient mshrs for prefetch.
      * @return True if sufficient mshrs for prefetch.
      */
