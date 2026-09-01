@@ -45,7 +45,7 @@ class LittleExplicitCacheHierarchy(
         l2_assoc: int,
         l1d_mshrs: int,
         l2_mshrs: int,
-        prefetch_enabled: bool,
+        prefetch_mode: str,
     ) -> None:
         super().__init__(
             l1d_size=l1d_size,
@@ -58,7 +58,18 @@ class LittleExplicitCacheHierarchy(
 
         self._little_l1d_mshrs = l1d_mshrs
         self._little_l2_mshrs = l2_mshrs
-        self._little_prefetch_enabled = prefetch_enabled
+
+        if prefetch_mode not in (
+            "stride",
+            "off",
+            "l1d",
+            "l2",
+        ):
+            raise ValueError(
+                f"unsupported cache prefetch mode: {prefetch_mode}"
+            )
+
+        self._little_prefetch_mode = prefetch_mode
 
     def incorporate_cache(self, board) -> None:
         # Keep upstream topology and port wiring exactly intact.
@@ -80,7 +91,7 @@ class LittleExplicitCacheHierarchy(
             cache.sequential_access = False
             cache.writeback_clean = False
 
-            if not self._little_prefetch_enabled:
+            if self._little_prefetch_mode != "stride":
                 cache.prefetcher = NULL
 
         # ----------------------------------------------------
@@ -99,7 +110,10 @@ class LittleExplicitCacheHierarchy(
             cache.sequential_access = False
             cache.writeback_clean = False
 
-            if not self._little_prefetch_enabled:
+            if self._little_prefetch_mode not in (
+                "stride",
+                "l1d",
+            ):
                 cache.prefetcher = NULL
 
         # ----------------------------------------------------
@@ -120,7 +134,10 @@ class LittleExplicitCacheHierarchy(
         cache.writeback_clean = False
         cache.clusivity = "mostly_incl"
 
-        if not self._little_prefetch_enabled:
+        if self._little_prefetch_mode not in (
+            "stride",
+            "l2",
+        ):
             cache.prefetcher = NULL
 
         # ----------------------------------------------------
@@ -742,11 +759,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--cache-prefetch",
-        choices=("stride", "off"),
+        choices=(
+            "stride",
+            "off",
+            "l1d",
+            "l2",
+        ),
         default="stride",
         help=(
-            "Stage 2M cache control: preserve historical "
-            "StridePrefetcher defaults or disable cache prefetching"
+            "Stage 2M cache-prefetch control: "
+            "stride preserves historical L1I+L1D+L2 "
+            "StridePrefetcher defaults; off disables all; "
+            "l1d and l2 enable only the selected data-cache level"
         ),
     )
     parser.add_argument("--clock", default="1.4GHz")
@@ -886,7 +910,7 @@ def main() -> None:
         l2_assoc=8,
         l1d_mshrs=args.l1d_mshrs,
         l2_mshrs=args.l2_mshrs,
-        prefetch_enabled=(args.cache_prefetch == "stride"),
+        prefetch_mode=args.cache_prefetch,
     )
 
     memory = SingleChannelDDR4_2400(size="512MiB")
