@@ -3,6 +3,7 @@ from pathlib import Path
 
 from m5.objects import ArmO3CPU, IQUnit, ArmExtension
 from m5.objects.FUPool import FUPool
+from m5.params import NULL
 from m5.objects.FuncUnit import FUDesc, OpDesc
 
 from gem5.components.boards.simple_board import SimpleBoard
@@ -16,6 +17,120 @@ from gem5.isas import ISA
 from gem5.resources.resource import BinaryResource
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
+
+
+
+class LittleExplicitCacheHierarchy(
+    PrivateL1SharedL2CacheHierarchy
+):
+    """
+    Stage 2M validation hierarchy.
+
+    Preserve the existing gem5 Classic private-L1/shared-L2
+    topology while making all memory-validation-sensitive
+    proxy defaults explicit.
+
+    These values are CONTROL BASELINE values only.
+    They are not frozen Little/LPE architectural choices.
+    """
+
+    def __init__(
+        self,
+        *,
+        l1d_size: str,
+        l1i_size: str,
+        l2_size: str,
+        l1d_assoc: int,
+        l1i_assoc: int,
+        l2_assoc: int,
+        prefetch_enabled: bool,
+    ) -> None:
+        super().__init__(
+            l1d_size=l1d_size,
+            l1i_size=l1i_size,
+            l2_size=l2_size,
+            l1d_assoc=l1d_assoc,
+            l1i_assoc=l1i_assoc,
+            l2_assoc=l2_assoc,
+        )
+
+        self._little_prefetch_enabled = prefetch_enabled
+
+    def incorporate_cache(self, board) -> None:
+        # Keep upstream topology and port wiring exactly intact.
+        super().incorporate_cache(board)
+
+        # ----------------------------------------------------
+        # L1I — current proxy defaults, explicitly stated.
+        # ----------------------------------------------------
+        for cache in self.l1icaches:
+            cache.tag_latency = 1
+            cache.data_latency = 1
+            cache.response_latency = 1
+
+            cache.mshrs = 16
+            cache.tgts_per_mshr = 20
+            cache.demand_mshr_reserve = 1
+            cache.write_buffers = 8
+
+            cache.sequential_access = False
+            cache.writeback_clean = False
+
+            if not self._little_prefetch_enabled:
+                cache.prefetcher = NULL
+
+        # ----------------------------------------------------
+        # L1D — current proxy defaults, explicitly stated.
+        # ----------------------------------------------------
+        for cache in self.l1dcaches:
+            cache.tag_latency = 1
+            cache.data_latency = 1
+            cache.response_latency = 1
+
+            cache.mshrs = 16
+            cache.tgts_per_mshr = 20
+            cache.demand_mshr_reserve = 1
+            cache.write_buffers = 8
+
+            cache.sequential_access = False
+            cache.writeback_clean = False
+
+            if not self._little_prefetch_enabled:
+                cache.prefetcher = NULL
+
+        # ----------------------------------------------------
+        # Shared L2 — current proxy defaults.
+        # ----------------------------------------------------
+        cache = self.l2cache
+
+        cache.tag_latency = 10
+        cache.data_latency = 10
+        cache.response_latency = 1
+
+        cache.mshrs = 20
+        cache.tgts_per_mshr = 12
+        cache.demand_mshr_reserve = 1
+        cache.write_buffers = 8
+
+        cache.sequential_access = False
+        cache.writeback_clean = False
+        cache.clusivity = "mostly_incl"
+
+        if not self._little_prefetch_enabled:
+            cache.prefetcher = NULL
+
+        # ----------------------------------------------------
+        # Interconnect widths.
+        #
+        # gem5 BaseXBar.width is BYTES per port, not bits.
+        #
+        # L2XBar default  : 32 B
+        # Current hierarchy membus: SystemXBar(width=64)
+        #
+        # These are explicitly preserved proxy values.
+        # ----------------------------------------------------
+        self.l2bus.width = 32
+        self.membus.width = 64
 
 
 #
@@ -605,6 +720,15 @@ def parse_args() -> argparse.Namespace:
             "share one FP/SIMD execution backend"
         ),
     )
+    parser.add_argument(
+        "--cache-prefetch",
+        choices=("stride", "off"),
+        default="stride",
+        help=(
+            "Stage 2M cache control: preserve historical "
+            "StridePrefetcher defaults or disable cache prefetching"
+        ),
+    )
     parser.add_argument("--clock", default="1.4GHz")
     parser.add_argument("--width", type=int, default=3)
     parser.add_argument("--commit-width", type=int, default=3)
@@ -725,15 +849,22 @@ def main() -> None:
         pair_shared_fpsimd=args.pair_shared_fpsimd,
     )
 
-    # First proxy pass: sizes and associativity only.
-    # Exact L1/L2 latency, banking, and MSHR policy require a custom hierarchy.
-    cache_hierarchy = PrivateL1SharedL2CacheHierarchy(
+    # Stage 2M control hierarchy.
+    #
+    # The topology is unchanged from PrivateL1SharedL2CacheHierarchy.
+    # Historical implicit gem5 defaults are made explicit so each
+    # memory-hierarchy variable can later be changed independently.
+    #
+    # None of these timing/MSHR/interconnect values are architecturally
+    # frozen yet.
+    cache_hierarchy = LittleExplicitCacheHierarchy(
         l1d_size="64KiB",
         l1i_size="64KiB",
         l2_size="1MiB",
         l1d_assoc=4,
         l1i_assoc=4,
         l2_assoc=8,
+        prefetch_enabled=(args.cache_prefetch == "stride"),
     )
 
     memory = SingleChannelDDR4_2400(size="512MiB")
@@ -769,6 +900,7 @@ def main() -> None:
         f"cores={args.cores}",
         f"pair-shared-div={args.pair_shared_div}",
         f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
+        f"cache-prefetch={args.cache_prefetch}",
         f"width={args.width}",
         f"commit={args.commit_width}",
         f"ROB={args.rob}",
