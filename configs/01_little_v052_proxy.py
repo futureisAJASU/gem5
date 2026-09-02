@@ -46,6 +46,8 @@ class LittleExplicitCacheHierarchy(
         l1d_mshrs: int,
         l2_mshrs: int,
         prefetch_mode: str,
+        prefetch_degree: int,
+        prefetch_on_pf_hit: bool,
     ) -> None:
         super().__init__(
             l1d_size=l1d_size,
@@ -70,6 +72,14 @@ class LittleExplicitCacheHierarchy(
             )
 
         self._little_prefetch_mode = prefetch_mode
+
+        if prefetch_degree <= 0:
+            raise ValueError(
+                f"prefetch_degree must be positive, got {prefetch_degree}"
+            )
+
+        self._little_prefetch_degree = prefetch_degree
+        self._little_prefetch_on_pf_hit = prefetch_on_pf_hit
 
     def incorporate_cache(self, board) -> None:
         # Keep upstream topology and port wiring exactly intact.
@@ -115,6 +125,13 @@ class LittleExplicitCacheHierarchy(
                 "l1d",
             ):
                 cache.prefetcher = NULL
+            else:
+                cache.prefetcher.degree = (
+                    self._little_prefetch_degree
+                )
+                cache.prefetcher.prefetch_on_pf_hit = (
+                    self._little_prefetch_on_pf_hit
+                )
 
         # ----------------------------------------------------
         # Shared L2 — current proxy defaults.
@@ -139,6 +156,13 @@ class LittleExplicitCacheHierarchy(
             "l2",
         ):
             cache.prefetcher = NULL
+        else:
+            cache.prefetcher.degree = (
+                self._little_prefetch_degree
+            )
+            cache.prefetcher.prefetch_on_pf_hit = (
+                self._little_prefetch_on_pf_hit
+            )
 
         # ----------------------------------------------------
         # Interconnect widths.
@@ -773,6 +797,24 @@ def parse_args() -> argparse.Namespace:
             "l1d and l2 enable only the selected data-cache level"
         ),
     )
+    parser.add_argument(
+        "--prefetch-degree",
+        type=int,
+        default=4,
+        help=(
+            "Stage 2M experimental StridePrefetcher degree; "
+            "default 4 preserves gem5 historical behavior"
+        ),
+    )
+    parser.add_argument(
+        "--prefetch-pf-hit",
+        choices=("on", "off"),
+        default="on",
+        help=(
+            "Stage 2M experimental control for "
+            "StridePrefetcher.prefetch_on_pf_hit"
+        ),
+    )
     parser.add_argument("--clock", default="1.4GHz")
     parser.add_argument("--width", type=int, default=3)
     parser.add_argument("--commit-width", type=int, default=3)
@@ -911,6 +953,8 @@ def main() -> None:
         l1d_mshrs=args.l1d_mshrs,
         l2_mshrs=args.l2_mshrs,
         prefetch_mode=args.cache_prefetch,
+        prefetch_degree=args.prefetch_degree,
+        prefetch_on_pf_hit=(args.prefetch_pf_hit == "on"),
     )
 
     memory = SingleChannelDDR4_2400(size="512MiB")
@@ -947,6 +991,8 @@ def main() -> None:
         f"pair-shared-div={args.pair_shared_div}",
         f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
         f"cache-prefetch={args.cache_prefetch}",
+        f"prefetch-degree={args.prefetch_degree}",
+        f"prefetch-pf-hit={args.prefetch_pf_hit}",
         f"l1d-mshrs={args.l1d_mshrs}",
         f"l2-mshrs={args.l2_mshrs}",
         f"width={args.width}",
