@@ -45,6 +45,8 @@ class LittleExplicitCacheHierarchy(
         l2_assoc: int,
         l1d_mshrs: int,
         l2_mshrs: int,
+        l1d_demand_mshr_reserve: int,
+        l2_demand_mshr_reserve: int,
         prefetch_mode: str,
         prefetch_degree: int,
         prefetch_on_pf_hit: bool,
@@ -60,6 +62,24 @@ class LittleExplicitCacheHierarchy(
 
         self._little_l1d_mshrs = l1d_mshrs
         self._little_l2_mshrs = l2_mshrs
+
+        if l1d_demand_mshr_reserve < 0:
+            raise ValueError(
+                "l1d_demand_mshr_reserve must be non-negative"
+            )
+
+        if l2_demand_mshr_reserve < 0:
+            raise ValueError(
+                "l2_demand_mshr_reserve must be non-negative"
+            )
+
+        self._little_l1d_demand_mshr_reserve = (
+            l1d_demand_mshr_reserve
+        )
+
+        self._little_l2_demand_mshr_reserve = (
+            l2_demand_mshr_reserve
+        )
 
         if prefetch_mode not in (
             "stride",
@@ -114,7 +134,9 @@ class LittleExplicitCacheHierarchy(
 
             cache.mshrs = self._little_l1d_mshrs
             cache.tgts_per_mshr = 20
-            cache.demand_mshr_reserve = 1
+            cache.demand_mshr_reserve = (
+                self._little_l1d_demand_mshr_reserve
+            )
             cache.write_buffers = 8
 
             cache.sequential_access = False
@@ -144,7 +166,9 @@ class LittleExplicitCacheHierarchy(
 
         cache.mshrs = self._little_l2_mshrs
         cache.tgts_per_mshr = 12
-        cache.demand_mshr_reserve = 1
+        cache.demand_mshr_reserve = (
+            self._little_l2_demand_mshr_reserve
+        )
         cache.write_buffers = 8
 
         cache.sequential_access = False
@@ -782,6 +806,24 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--l1d-demand-mshr-reserve",
+        type=int,
+        default=1,
+        help=(
+            "MSHR entries protected from new L1D prefetch admission; "
+            "default 1 preserves historical behavior"
+        ),
+    )
+    parser.add_argument(
+        "--l2-demand-mshr-reserve",
+        type=int,
+        default=1,
+        help=(
+            "MSHR entries protected from new L2 prefetch admission; "
+            "default 1 preserves historical behavior"
+        ),
+    )
+    parser.add_argument(
         "--cache-prefetch",
         choices=(
             "stride",
@@ -952,6 +994,12 @@ def main() -> None:
         l2_assoc=8,
         l1d_mshrs=args.l1d_mshrs,
         l2_mshrs=args.l2_mshrs,
+        l1d_demand_mshr_reserve=(
+            args.l1d_demand_mshr_reserve
+        ),
+        l2_demand_mshr_reserve=(
+            args.l2_demand_mshr_reserve
+        ),
         prefetch_mode=args.cache_prefetch,
         prefetch_degree=args.prefetch_degree,
         prefetch_on_pf_hit=(args.prefetch_pf_hit == "on"),
@@ -995,6 +1043,14 @@ def main() -> None:
         f"prefetch-pf-hit={args.prefetch_pf_hit}",
         f"l1d-mshrs={args.l1d_mshrs}",
         f"l2-mshrs={args.l2_mshrs}",
+        (
+            "l1d-demand-mshr-reserve="
+            f"{args.l1d_demand_mshr_reserve}"
+        ),
+        (
+            "l2-demand-mshr-reserve="
+            f"{args.l2_demand_mshr_reserve}"
+        ),
         f"width={args.width}",
         f"commit={args.commit_width}",
         f"ROB={args.rob}",
