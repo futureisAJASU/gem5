@@ -589,6 +589,8 @@ class LittleV052ProxyCore(BaseCPUCore):
         iq_entries: int,
         lq_entries: int,
         sq_entries: int,
+        cache_load_ports: int,
+        cache_store_ports: int,
         width: int = 3,
         commit_width: int = 3,
         int_regs: int = 112,
@@ -656,6 +658,9 @@ class LittleV052ProxyCore(BaseCPUCore):
         cpu.LQEntries = lq_entries
         cpu.SQEntries = sq_entries
 
+        cpu.cacheLoadPorts = cache_load_ports
+        cpu.cacheStorePorts = cache_store_ports
+
         cpu.numPhysIntRegs = int_regs
         cpu.numPhysFloatRegs = fp_regs
 
@@ -707,6 +712,8 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         iq_entries: int,
         lq_entries: int,
         sq_entries: int,
+        cache_load_ports: int,
+        cache_store_ports: int,
         width: int,
         commit_width: int,
         n_skip: int,
@@ -778,6 +785,8 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 iq_entries=iq_entries,
                 lq_entries=lq_entries,
                 sq_entries=sq_entries,
+                cache_load_ports=cache_load_ports,
+                cache_store_ports=cache_store_ports,
                 width=width,
                 commit_width=commit_width,
                 n_skip=n_skip,
@@ -922,6 +931,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iq", type=int, default=40)
     parser.add_argument("--lq", type=int, default=12)
     parser.add_argument("--sq", type=int, default=16)
+
+    parser.add_argument(
+        "--cache-load-ports",
+        type=int,
+        default=200,
+        help="Maximum L1D-bound load packets sent by the LSQ per cycle",
+    )
+    parser.add_argument(
+        "--cache-store-ports",
+        type=int,
+        default=200,
+        help="Maximum L1D-bound store packets sent by the LSQ per cycle",
+    )
     parser.add_argument(
         "--n-skip",
         type=int,
@@ -1018,6 +1040,8 @@ def main() -> None:
         iq_entries=args.iq,
         lq_entries=args.lq,
         sq_entries=args.sq,
+        cache_load_ports=args.cache_load_ports,
+        cache_store_ports=args.cache_store_ports,
         width=args.width,
         commit_width=args.commit_width,
         n_skip=args.n_skip,
