@@ -167,6 +167,24 @@ class QueuedPrefetcher(BasePrefetcher):
     )
 
 
+    # Stage 2M experimental sustained-prefetch rate limiter.
+    # Disabled by default to preserve upstream behavior.
+    rate_limit_enable = Param.Bool(
+        False,
+        "Enable time-based token-bucket prefetch admission control",
+    )
+
+    rate_limit_bucket_capacity = Param.Unsigned(
+        64,
+        "Maximum burst tokens for prefetch admission",
+    )
+
+    rate_limit_refill_cycles = Param.Unsigned(
+        32,
+        "Cycles per one replenished prefetch token",
+    )
+
+
 class StridePrefetcherHashedSetAssociative(TaggedSetAssociative):
     type = "StridePrefetcherHashedSetAssociative"
     cxx_class = "gem5::prefetch::StridePrefetcherHashedSetAssociative"

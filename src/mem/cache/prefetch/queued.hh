@@ -176,6 +176,16 @@ class Queued : public Base
     /** Percentage of requests that can be throttled */
     const unsigned int throttleControlPct;
 
+    /** Stage 2M sustained-prefetch token bucket. */
+    const bool rateLimitEnable;
+    const unsigned rateLimitBucketCapacity;
+    const unsigned rateLimitRefillCycles;
+
+    uint64_t rateLimitTokens;
+    Tick rateLimitLastRefill;
+
+    bool consumeRateLimitToken();
+
     struct QueuedStats : public statistics::Group
     {
         QueuedStats(statistics::Group *parent);
@@ -185,6 +195,7 @@ class Queued : public Base
         statistics::Scalar pfInCache;
         statistics::Scalar pfRemovedDemand;
         statistics::Scalar pfRemovedFull;
+        statistics::Scalar pfRateLimited;
         statistics::Scalar pfSpanPage;
         statistics::Scalar pfUsefulSpanPage;
     } statsQueued;

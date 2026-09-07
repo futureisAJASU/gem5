@@ -50,6 +50,9 @@ class LittleExplicitCacheHierarchy(
         prefetch_mode: str,
         prefetch_degree: int,
         prefetch_on_pf_hit: bool,
+        prefetch_rate_limit: bool,
+        prefetch_rate_bucket: int,
+        prefetch_rate_refill_cycles: int,
     ) -> None:
         super().__init__(
             l1d_size=l1d_size,
@@ -100,6 +103,28 @@ class LittleExplicitCacheHierarchy(
 
         self._little_prefetch_degree = prefetch_degree
         self._little_prefetch_on_pf_hit = prefetch_on_pf_hit
+
+        if prefetch_rate_bucket <= 0:
+            raise ValueError(
+                "prefetch_rate_bucket must be positive"
+            )
+
+        if prefetch_rate_refill_cycles <= 0:
+            raise ValueError(
+                "prefetch_rate_refill_cycles must be positive"
+            )
+
+        self._little_prefetch_rate_limit = (
+            prefetch_rate_limit
+        )
+
+        self._little_prefetch_rate_bucket = (
+            prefetch_rate_bucket
+        )
+
+        self._little_prefetch_rate_refill_cycles = (
+            prefetch_rate_refill_cycles
+        )
 
     def incorporate_cache(self, board) -> None:
         # Keep upstream topology and port wiring exactly intact.
@@ -153,6 +178,18 @@ class LittleExplicitCacheHierarchy(
                 )
                 cache.prefetcher.prefetch_on_pf_hit = (
                     self._little_prefetch_on_pf_hit
+                )
+
+                cache.prefetcher.rate_limit_enable = (
+                    self._little_prefetch_rate_limit
+                )
+
+                cache.prefetcher.rate_limit_bucket_capacity = (
+                    self._little_prefetch_rate_bucket
+                )
+
+                cache.prefetcher.rate_limit_refill_cycles = (
+                    self._little_prefetch_rate_refill_cycles
                 )
 
         # ----------------------------------------------------
@@ -857,6 +894,27 @@ def parse_args() -> argparse.Namespace:
             "StridePrefetcher.prefetch_on_pf_hit"
         ),
     )
+    parser.add_argument(
+        "--prefetch-rate-limit",
+        choices=("on", "off"),
+        default="off",
+        help="Enable Stage 2M PF token-bucket admission control",
+    )
+
+    parser.add_argument(
+        "--prefetch-rate-bucket",
+        type=int,
+        default=64,
+        help="Prefetch token-bucket burst capacity",
+    )
+
+    parser.add_argument(
+        "--prefetch-rate-refill-cycles",
+        type=int,
+        default=32,
+        help="Cycles per replenished prefetch token",
+    )
+
     parser.add_argument("--clock", default="1.4GHz")
     parser.add_argument("--width", type=int, default=3)
     parser.add_argument("--commit-width", type=int, default=3)
@@ -1003,6 +1061,11 @@ def main() -> None:
         prefetch_mode=args.cache_prefetch,
         prefetch_degree=args.prefetch_degree,
         prefetch_on_pf_hit=(args.prefetch_pf_hit == "on"),
+        prefetch_rate_limit=(args.prefetch_rate_limit == "on"),
+        prefetch_rate_bucket=args.prefetch_rate_bucket,
+        prefetch_rate_refill_cycles=(
+            args.prefetch_rate_refill_cycles
+        ),
     )
 
     memory = SingleChannelDDR4_2400(size="512MiB")

@@ -104,8 +104,23 @@ Queued::Queued(const QueuedPrefetcherParams &p)
       latency(p.latency), queueSquash(p.queue_squash),
       queueFilter(p.queue_filter), cacheSnoop(p.cache_snoop),
       tagPrefetch(p.tag_prefetch),
-      throttleControlPct(p.throttle_control_percentage), statsQueued(this)
+      throttleControlPct(p.throttle_control_percentage),
+      rateLimitEnable(p.rate_limit_enable),
+      rateLimitBucketCapacity(p.rate_limit_bucket_capacity),
+      rateLimitRefillCycles(p.rate_limit_refill_cycles),
+      rateLimitTokens(p.rate_limit_bucket_capacity),
+      rateLimitLastRefill(0),
+      statsQueued(this)
 {
+    fatal_if(
+        rateLimitEnable && rateLimitBucketCapacity == 0,
+        "Prefetch token bucket capacity must be non-zero"
+    );
+
+    fatal_if(
+        rateLimitEnable && rateLimitRefillCycles == 0,
+        "Prefetch token refill period must be non-zero"
+    );
 }
 
 Queued::~Queued()
@@ -166,6 +181,49 @@ Queued::getMaxPermittedPrefetches(size_t total) const
             usefulPrefetches / issuedPrefetches;
     }
     return max_pfs;
+}
+
+bool
+Queued::consumeRateLimitToken()
+{
+    if (!rateLimitEnable) {
+        return true;
+    }
+
+    const Tick now = curTick();
+    const Tick refill_ticks =
+        clockPeriod() * rateLimitRefillCycles;
+
+    if (now > rateLimitLastRefill) {
+        const uint64_t elapsed =
+            now - rateLimitLastRefill;
+
+        const uint64_t refills =
+            elapsed / refill_ticks;
+
+        if (refills > 0) {
+            const uint64_t room =
+                rateLimitBucketCapacity - rateLimitTokens;
+
+            if (refills >= room) {
+                rateLimitTokens =
+                    rateLimitBucketCapacity;
+            } else {
+                rateLimitTokens += refills;
+            }
+
+            rateLimitLastRefill +=
+                refills * refill_ticks;
+        }
+    }
+
+    if (rateLimitTokens == 0) {
+        statsQueued.pfRateLimited++;
+        return false;
+    }
+
+    --rateLimitTokens;
+    return true;
 }
 
 void
@@ -276,6 +334,8 @@ Queued::QueuedStats::QueuedStats(statistics::Group *parent)
              "address"),
     ADD_STAT(pfRemovedFull, statistics::units::Count::get(),
              "number of prefetches dropped due to prefetch queue size"),
+    ADD_STAT(pfRateLimited, statistics::units::Count::get(),
+             "number of prefetch candidates dropped by rate limiter"),
     ADD_STAT(pfSpanPage, statistics::units::Count::get(),
              "number of prefetches that crossed the page"),
     ADD_STAT(pfUsefulSpanPage, statistics::units::Count::get(),
@@ -460,6 +520,18 @@ Queued::insert(const PacketPtr &pkt, PrefetchInfo &new_pfi,
         statsQueued.pfInCache++;
         DPRINTF(HWPrefetch, "Dropping redundant in "
                 "cache/MSHR prefetch addr:%#x\n", target_paddr);
+        return;
+    }
+
+    /*
+     * Stage 2M sustained-prefetch rate limiter.
+     *
+     * Drop rather than defer when the token bucket is empty.
+     * This avoids creating a delayed PF backlog which could
+     * alter demand/PF phasing in the same way as an issue-time
+     * occupancy gate.
+     */
+    if (!consumeRateLimitToken()) {
         return;
     }
 
