@@ -49,6 +49,7 @@
 #include <cassert>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "base/addr_range.hh"
 #include "base/compiler.hh"
@@ -536,6 +537,31 @@ class BaseCache : public ClockedObject
      * Performs the access specified by the request.
      * @param pkt The request to perform.
      */
+    /**
+     * Return whether an incoming timing request will actually consume
+     * the cache data array in the current Classic-cache state.
+     *
+     * Stage 2M banking initially models CPU-side demand hits only.
+     * Misses, cache-maintenance traffic, and traffic originating from
+     * another cache retain the historical path.
+     */
+    bool packetUsesDataArray(PacketPtr pkt) const;
+
+    /** Map an L1D cache-line index onto a physical data-array bank. */
+    unsigned dataBankFor(PacketPtr pkt) const;
+
+    /** Schedule the earliest outstanding physical-bank service event. */
+    void scheduleDataBankService();
+
+    /** Service all bank-deferred requests whose reservation is ready. */
+    void processDataBankService();
+
+    /**
+     * Historical BaseCache timing path, called once a physical data-bank
+     * reservation is ready (or immediately when banking is disabled).
+     */
+    void recvTimingReqUnbanked(PacketPtr pkt);
+
     virtual void recvTimingReq(PacketPtr pkt);
 
     /**
@@ -922,6 +948,50 @@ class BaseCache : public ClockedObject
      * Whether tags and data are accessed sequentially.
      */
     const bool sequentialAccess;
+
+    // ------------------------------------------------------------
+    // Stage 2M optional physical data-array banking model.
+    //
+    // This resource is deliberately separate from the O3 LSQ logical
+    // load/store port limits.  Reads and writes share the same physical
+    // data-bank resource.
+    // ------------------------------------------------------------
+
+    const unsigned dataArrayBanks;
+    const Cycles dataArrayBankServiceCycles;
+
+    struct DeferredDataBankReq
+    {
+        Tick when;
+        PacketPtr pkt;
+
+        DeferredDataBankReq(Tick _when, PacketPtr _pkt)
+            : when(_when), pkt(_pkt)
+        {}
+    };
+
+    /** Earliest cycle at which each physical bank can accept again. */
+    std::vector<Tick> dataBankNextFree;
+
+    /** Requests already accepted by the cache but waiting on a bank. */
+    std::vector<DeferredDataBankReq> dataBankDeferred;
+
+    EventFunctionWrapper dataBankServiceEvent;
+
+    struct DataBankStats : public statistics::Group
+    {
+        DataBankStats(BaseCache &cache);
+
+        statistics::Scalar accesses;
+        statistics::Scalar conflicts;
+        statistics::Scalar waitCycles;
+
+        statistics::Vector accessesByBank;
+        statistics::Vector conflictsByBank;
+        statistics::Vector waitCyclesByBank;
+    };
+
+    DataBankStats dataBankStats;
 
     /** The number of targets for each MSHR. */
     const int numTarget;

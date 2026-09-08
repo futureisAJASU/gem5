@@ -79,6 +79,53 @@ BaseCache::CacheResponsePort::CacheResponsePort(const std::string &_name,
 {
 }
 
+BaseCache::DataBankStats::DataBankStats(BaseCache &cache)
+    : statistics::Group(&cache, "dataBank"),
+      ADD_STAT(
+          accesses,
+          statistics::units::Count::get(),
+          "CPU-side demand-hit accesses consuming a physical data bank"
+      ),
+      ADD_STAT(
+          conflicts,
+          statistics::units::Count::get(),
+          "data-array accesses deferred by a same-bank conflict"
+      ),
+      ADD_STAT(
+          waitCycles,
+          statistics::units::Cycle::get(),
+          "total cache cycles spent waiting for a physical data bank"
+      ),
+      ADD_STAT(
+          accessesByBank,
+          statistics::units::Count::get(),
+          "CPU-side demand-hit accesses by physical data bank"
+      ),
+      ADD_STAT(
+          conflictsByBank,
+          statistics::units::Count::get(),
+          "same-bank conflicts by physical data bank"
+      ),
+      ADD_STAT(
+          waitCyclesByBank,
+          statistics::units::Cycle::get(),
+          "conflict wait cycles by physical data bank"
+      )
+{
+    // statistics::Vector must always be initialized with a positive size.
+    // Caches with Stage 2M data banking disabled have dataArrayBanks == 0,
+    // so give their statistics a single dummy slot.  This does NOT enable
+    // a physical bank: packetUsesDataArray() still returns false when
+    // dataArrayBanks == 0, so the dummy entries remain zero.
+    const unsigned stat_banks =
+        std::max(1u, cache.dataArrayBanks);
+
+    accessesByBank.init(stat_banks);
+    conflictsByBank.init(stat_banks);
+    waitCyclesByBank.init(stat_banks);
+}
+
+
 BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
     : ClockedObject(p),
       cpuSidePort (p.name + ".cpu_side_port", *this, "CpuSidePort"),
@@ -103,6 +150,14 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       fillLatency(p.data_latency),
       responseLatency(p.response_latency),
       sequentialAccess(p.sequential_access),
+      dataArrayBanks(p.data_array_banks),
+      dataArrayBankServiceCycles(p.data_array_bank_service_cycles),
+      dataBankNextFree(dataArrayBanks, 0),
+      dataBankServiceEvent(
+          [this]{ processDataBankService(); },
+          name() + ".data_bank_service"
+      ),
+      dataBankStats(*this),
       numTarget(p.tgts_per_mshr),
       forwardSnoops(true),
       clusivity(p.clusivity),
@@ -450,8 +505,160 @@ BaseCache::handleTimingReqMiss(PacketPtr pkt, MSHR *mshr, CacheBlk *blk,
     }
 }
 
+bool
+BaseCache::packetUsesDataArray(PacketPtr pkt) const
+{
+    if (dataArrayBanks == 0) {
+        return false;
+    }
+
+    // G8C initially models only demand traffic originating above this L1.
+    // Cache-to-cache traffic has separate resource semantics and is left
+    // untouched for this validation stage.
+    if (pkt->fromCache()) {
+        return false;
+    }
+
+    if (pkt->req->isCacheMaintenance() ||
+        pkt->req->isUncacheable()) {
+        return false;
+    }
+
+    if (!(pkt->isRead() || pkt->isWrite())) {
+        return false;
+    }
+
+    // Side-effect-free probe.  A data-array reservation is made only if
+    // the request is currently satisfiable as a cache hit.  This avoids
+    // incorrectly charging data-bank bandwidth to tag-only misses.
+    CacheBlk *blk =
+        tags->findBlock({pkt->getAddr(), pkt->isSecure()});
+
+    if (!blk) {
+        return false;
+    }
+
+    return pkt->needsWritable() ?
+        blk->isSet(CacheBlk::WritableBit) :
+        blk->isSet(CacheBlk::ReadableBit);
+}
+
+
+unsigned
+BaseCache::dataBankFor(PacketPtr pkt) const
+{
+    assert(dataArrayBanks != 0);
+    assert(blkSize != 0);
+
+    // For the Stage 2M conventional set-associative L1D and power-of-two
+    // bank counts, cache-line-index modulo banks is equivalent to
+    // cache-set-index modulo banks.
+    const Addr line_index = pkt->getAddr() / blkSize;
+    return line_index % dataArrayBanks;
+}
+
+
+void
+BaseCache::scheduleDataBankService()
+{
+    Tick next = MaxTick;
+
+    for (const auto &req : dataBankDeferred) {
+        if (req.when < next) {
+            next = req.when;
+        }
+    }
+
+    if (next == MaxTick) {
+        return;
+    }
+
+    if (!dataBankServiceEvent.scheduled()) {
+        schedule(dataBankServiceEvent, next);
+    } else if (next < dataBankServiceEvent.when()) {
+        reschedule(dataBankServiceEvent, next);
+    }
+}
+
+
+void
+BaseCache::processDataBankService()
+{
+    // Separate the ready set before invoking the historical cache path.
+    // A response can recursively cause new memory traffic, so mutating the
+    // live deferred vector while iterating over it would be unsafe.
+    std::vector<DeferredDataBankReq> ready;
+    std::vector<DeferredDataBankReq> pending;
+
+    ready.reserve(dataBankDeferred.size());
+    pending.reserve(dataBankDeferred.size());
+
+    for (const auto &req : dataBankDeferred) {
+        if (req.when <= curTick()) {
+            ready.push_back(req);
+        } else {
+            pending.push_back(req);
+        }
+    }
+
+    dataBankDeferred.swap(pending);
+
+    // Requests are retained in arrival order.  Same-bank requests were
+    // already assigned monotonically increasing service ticks; requests to
+    // independent banks may therefore execute on the same cache tick.
+    for (const auto &req : ready) {
+        recvTimingReqUnbanked(req.pkt);
+    }
+
+    scheduleDataBankService();
+}
+
+
 void
 BaseCache::recvTimingReq(PacketPtr pkt)
+{
+    if (!packetUsesDataArray(pkt)) {
+        recvTimingReqUnbanked(pkt);
+        return;
+    }
+
+    const unsigned bank = dataBankFor(pkt);
+    assert(bank < dataBankNextFree.size());
+
+    dataBankStats.accesses++;
+    dataBankStats.accessesByBank[bank]++;
+
+    // Reserving future service slots rather than globally rejecting the
+    // packet is important: a conflict in bank N must not block a request
+    // targeting an independent bank.
+    const Tick service_tick =
+        std::max(curTick(), dataBankNextFree[bank]);
+
+    dataBankNextFree[bank] =
+        service_tick + cyclesToTicks(dataArrayBankServiceCycles);
+
+    if (service_tick == curTick()) {
+        recvTimingReqUnbanked(pkt);
+        return;
+    }
+
+    dataBankStats.conflicts++;
+    dataBankStats.conflictsByBank[bank]++;
+
+    const Cycles bank_wait_cycles(
+        (service_tick - curTick()) / clockPeriod()
+    );
+
+    dataBankStats.waitCycles += bank_wait_cycles;
+    dataBankStats.waitCyclesByBank[bank] += bank_wait_cycles;
+
+    dataBankDeferred.emplace_back(service_tick, pkt);
+    scheduleDataBankService();
+}
+
+
+void
+BaseCache::recvTimingReqUnbanked(PacketPtr pkt)
 {
     // anything that is merely forwarded pays for the forward latency and
     // the delay provided by the crossbar

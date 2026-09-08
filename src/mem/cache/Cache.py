@@ -132,6 +132,20 @@ class BaseCache(ClockedObject):
         False, "Whether to access tags and data sequentially"
     )
 
+    # Optional physical data-array banking model.
+    #
+    # A value of zero disables the model and preserves the historical
+    # Classic Cache behavior exactly.
+    data_array_banks = Param.Unsigned(
+        0,
+        "Number of physical cache data-array banks; 0 disables banking",
+    )
+
+    data_array_bank_service_cycles = Param.Cycles(
+        1,
+        "Minimum service interval of one physical data-array bank",
+    )
+
     cpu_side = ResponsePort("Upstream port closer to the CPU and/or device")
     mem_side = RequestPort("Downstream port closer to memory")
 

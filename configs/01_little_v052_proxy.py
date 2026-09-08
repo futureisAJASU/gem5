@@ -47,6 +47,8 @@ class LittleExplicitCacheHierarchy(
         l2_mshrs: int,
         l1d_demand_mshr_reserve: int,
         l2_demand_mshr_reserve: int,
+        l1d_data_banks: int,
+        l1d_data_bank_service_cycles: int,
         prefetch_mode: str,
         prefetch_degree: int,
         prefetch_on_pf_hit: bool,
@@ -82,6 +84,29 @@ class LittleExplicitCacheHierarchy(
 
         self._little_l2_demand_mshr_reserve = (
             l2_demand_mshr_reserve
+        )
+
+        if l1d_data_banks < 0:
+            raise ValueError(
+                "l1d_data_banks must be non-negative"
+            )
+
+        if (
+            l1d_data_banks != 0
+            and (l1d_data_banks & (l1d_data_banks - 1)) != 0
+        ):
+            raise ValueError(
+                "l1d_data_banks must be zero or a power of two"
+            )
+
+        if l1d_data_bank_service_cycles <= 0:
+            raise ValueError(
+                "l1d_data_bank_service_cycles must be positive"
+            )
+
+        self._little_l1d_data_banks = l1d_data_banks
+        self._little_l1d_data_bank_service_cycles = (
+            l1d_data_bank_service_cycles
         )
 
         if prefetch_mode not in (
@@ -166,6 +191,11 @@ class LittleExplicitCacheHierarchy(
 
             cache.sequential_access = False
             cache.writeback_clean = False
+
+            cache.data_array_banks = self._little_l1d_data_banks
+            cache.data_array_bank_service_cycles = (
+                self._little_l1d_data_bank_service_cycles
+            )
 
             if self._little_prefetch_mode not in (
                 "stride",
@@ -944,6 +974,27 @@ def parse_args() -> argparse.Namespace:
         default=200,
         help="Maximum L1D-bound store packets sent by the LSQ per cycle",
     )
+
+    parser.add_argument(
+        "--l1d-data-banks",
+        type=int,
+        default=0,
+        help=(
+            "Physical L1D data-array banks; "
+            "0 disables the G8C bank model"
+        ),
+    )
+
+    parser.add_argument(
+        "--l1d-data-bank-service-cycles",
+        type=int,
+        default=1,
+        help=(
+            "Minimum service interval of one physical "
+            "L1D data-array bank"
+        ),
+    )
+
     parser.add_argument(
         "--n-skip",
         type=int,
@@ -1081,6 +1132,10 @@ def main() -> None:
         ),
         l2_demand_mshr_reserve=(
             args.l2_demand_mshr_reserve
+        ),
+        l1d_data_banks=args.l1d_data_banks,
+        l1d_data_bank_service_cycles=(
+            args.l1d_data_bank_service_cycles
         ),
         prefetch_mode=args.cache_prefetch,
         prefetch_degree=args.prefetch_degree,
