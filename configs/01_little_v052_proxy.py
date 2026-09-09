@@ -47,6 +47,8 @@ class LittleExplicitCacheHierarchy(
         l2_mshrs: int,
         l1d_demand_mshr_reserve: int,
         l2_demand_mshr_reserve: int,
+        l1d_tag_latency: int,
+        l1d_data_latency: int,
         l1d_data_banks: int,
         l1d_data_bank_service_cycles: int,
         prefetch_mode: str,
@@ -86,6 +88,16 @@ class LittleExplicitCacheHierarchy(
             l2_demand_mshr_reserve
         )
 
+        if l1d_tag_latency <= 0:
+            raise ValueError(
+                "l1d_tag_latency must be positive"
+            )
+
+        if l1d_data_latency <= 0:
+            raise ValueError(
+                "l1d_data_latency must be positive"
+            )
+
         if l1d_data_banks < 0:
             raise ValueError(
                 "l1d_data_banks must be non-negative"
@@ -103,6 +115,9 @@ class LittleExplicitCacheHierarchy(
             raise ValueError(
                 "l1d_data_bank_service_cycles must be positive"
             )
+
+        self._little_l1d_tag_latency = l1d_tag_latency
+        self._little_l1d_data_latency = l1d_data_latency
 
         self._little_l1d_data_banks = l1d_data_banks
         self._little_l1d_data_bank_service_cycles = (
@@ -178,8 +193,8 @@ class LittleExplicitCacheHierarchy(
         # L1D — Stage 2M MSHR validation control.
         # ----------------------------------------------------
         for cache in self.l1dcaches:
-            cache.tag_latency = 1
-            cache.data_latency = 1
+            cache.tag_latency = self._little_l1d_tag_latency
+            cache.data_latency = self._little_l1d_data_latency
             cache.response_latency = 1
 
             cache.mshrs = self._little_l1d_mshrs
@@ -844,6 +859,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--binary", required=True, help="AArch64 static ELF path")
     parser.add_argument(
+        "--program-arg",
+        action="append",
+        default=[],
+        metavar="ARG",
+        help=(
+            "Argument passed to the simulated single-core binary; "
+            "repeat for multiple arguments"
+        ),
+    )
+    parser.add_argument(
         "--cores",
         type=int,
         default=1,
@@ -973,6 +998,26 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=200,
         help="Maximum L1D-bound store packets sent by the LSQ per cycle",
+    )
+
+    parser.add_argument(
+        "--l1d-tag-latency",
+        type=int,
+        default=1,
+        help=(
+            "L1D tag lookup latency in cache cycles; "
+            "Stage 2M G8D control"
+        ),
+    )
+
+    parser.add_argument(
+        "--l1d-data-latency",
+        type=int,
+        default=1,
+        help=(
+            "L1D data-array access latency in cache cycles; "
+            "Stage 2M G8D control"
+        ),
     )
 
     parser.add_argument(
@@ -1133,6 +1178,8 @@ def main() -> None:
         l2_demand_mshr_reserve=(
             args.l2_demand_mshr_reserve
         ),
+        l1d_tag_latency=args.l1d_tag_latency,
+        l1d_data_latency=args.l1d_data_latency,
         l1d_data_banks=args.l1d_data_banks,
         l1d_data_bank_service_cycles=(
             args.l1d_data_bank_service_cycles
@@ -1161,7 +1208,8 @@ def main() -> None:
             BinaryResource(
                 local_path=str(binary_path),
                 architecture=ISA.ARM,
-            )
+            ),
+            arguments=args.program_arg,
         )
     else:
         board.set_se_multi_binary_workload(
