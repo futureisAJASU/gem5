@@ -891,6 +891,26 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--l1i-size-kib",
+        type=int,
+        choices=(32, 64),
+        default=64,
+        help=(
+            "L1I capacity in KiB; Stage 2M G8F control"
+        ),
+    )
+
+    parser.add_argument(
+        "--l1d-size-kib",
+        type=int,
+        choices=(32, 64),
+        default=64,
+        help=(
+            "L1D capacity in KiB; Stage 2M G8F control"
+        ),
+    )
+
+    parser.add_argument(
         "--l1d-mshrs",
         type=int,
         default=16,
@@ -1164,8 +1184,8 @@ def main() -> None:
     # None of these timing/MSHR/interconnect values are architecturally
     # frozen yet.
     cache_hierarchy = LittleExplicitCacheHierarchy(
-        l1d_size="64KiB",
-        l1i_size="64KiB",
+        l1d_size=f"{args.l1d_size_kib}KiB",
+        l1i_size=f"{args.l1i_size_kib}KiB",
         l2_size="1MiB",
         l1d_assoc=4,
         l1i_assoc=4,
