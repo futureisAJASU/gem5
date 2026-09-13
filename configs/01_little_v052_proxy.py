@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from m5.objects import ArmO3CPU, IQUnit, ArmExtension
+from m5.objects import ArmO3CPU, IQUnit, ArmExtension, L2XBar
 from m5.objects.FUPool import FUPool
 from m5.params import NULL
 from m5.objects.FuncUnit import FUDesc, OpDesc
@@ -10,6 +10,9 @@ from gem5.components.boards.simple_board import SimpleBoard
 from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarchy import (
     PrivateL1SharedL2CacheHierarchy,
 )
+from gem5.components.cachehierarchies.classic.caches.l1icache import L1ICache
+from gem5.components.cachehierarchies.classic.caches.l1dcache import L1DCache
+from gem5.components.cachehierarchies.classic.caches.l2cache import L2Cache
 from gem5.components.memory.single_channel import SingleChannelDDR4_2400
 from gem5.components.processors.base_cpu_core import BaseCPUCore
 from gem5.components.processors.base_cpu_processor import BaseCPUProcessor
@@ -24,14 +27,13 @@ class LittleExplicitCacheHierarchy(
     PrivateL1SharedL2CacheHierarchy
 ):
     """
-    Stage 2M validation hierarchy.
+    Explicit Little/LPE configuration hierarchy.
 
     Preserve the existing gem5 Classic private-L1/shared-L2
-    topology while making all memory-validation-sensitive
-    proxy defaults explicit.
+    topology while making memory-hierarchy proxy defaults
+    explicit.
 
-    These values are CONTROL BASELINE values only.
-    They are not frozen Little/LPE architectural choices.
+    These values are explicit Little/LPE configuration controls.
     """
 
     def __init__(
@@ -43,14 +45,19 @@ class LittleExplicitCacheHierarchy(
         l1d_assoc: int,
         l1i_assoc: int,
         l2_assoc: int,
+        l2_topology: str,
         l1d_mshrs: int,
         l2_mshrs: int,
         l1d_demand_mshr_reserve: int,
         l2_demand_mshr_reserve: int,
         l1d_tag_latency: int,
         l1d_data_latency: int,
+        l2_tag_latency: int,
+        l2_data_latency: int,
         l1d_data_banks: int,
         l1d_data_bank_service_cycles: int,
+        l2_data_banks: int,
+        l2_data_bank_service_cycles: int,
         prefetch_mode: str,
         prefetch_degree: int,
         prefetch_on_pf_hit: bool,
@@ -66,6 +73,35 @@ class LittleExplicitCacheHierarchy(
             l1i_assoc=l1i_assoc,
             l2_assoc=l2_assoc,
         )
+
+        if l2_topology not in (
+            "shared4",
+            "pair2",
+            "private4",
+        ):
+            raise ValueError(
+                f"unsupported L2 topology: {l2_topology}"
+            )
+
+        if not l2_size.endswith("KiB"):
+            raise ValueError(
+                "l2_size must use an explicit KiB suffix"
+            )
+
+        try:
+            l2_total_size_kib = int(l2_size[:-3])
+        except ValueError as exc:
+            raise ValueError(
+                f"invalid l2_size: {l2_size}"
+            ) from exc
+
+        if l2_total_size_kib <= 0:
+            raise ValueError(
+                "l2 total capacity must be positive"
+            )
+
+        self._little_l2_topology = l2_topology
+        self._little_l2_total_size_kib = l2_total_size_kib
 
         self._little_l1d_mshrs = l1d_mshrs
         self._little_l2_mshrs = l2_mshrs
@@ -98,6 +134,16 @@ class LittleExplicitCacheHierarchy(
                 "l1d_data_latency must be positive"
             )
 
+        if l2_tag_latency <= 0:
+            raise ValueError(
+                "l2_tag_latency must be positive"
+            )
+
+        if l2_data_latency <= 0:
+            raise ValueError(
+                "l2_data_latency must be positive"
+            )
+
         if l1d_data_banks < 0:
             raise ValueError(
                 "l1d_data_banks must be non-negative"
@@ -119,9 +165,43 @@ class LittleExplicitCacheHierarchy(
         self._little_l1d_tag_latency = l1d_tag_latency
         self._little_l1d_data_latency = l1d_data_latency
 
+        self._little_l2_tag_latency = l2_tag_latency
+        self._little_l2_data_latency = l2_data_latency
+
         self._little_l1d_data_banks = l1d_data_banks
         self._little_l1d_data_bank_service_cycles = (
             l1d_data_bank_service_cycles
+        )
+
+        if l2_data_banks < 0:
+            raise ValueError(
+                "l2_data_banks must be non-negative"
+            )
+
+        if (
+            l2_data_banks != 0
+            and (
+                l2_data_banks
+                & (l2_data_banks - 1)
+            ) != 0
+        ):
+            raise ValueError(
+                "l2_data_banks must be zero "
+                "or a power of two"
+            )
+
+        if l2_data_bank_service_cycles <= 0:
+            raise ValueError(
+                "l2_data_bank_service_cycles "
+                "must be positive"
+            )
+
+        self._little_l2_data_banks = (
+            l2_data_banks
+        )
+
+        self._little_l2_data_bank_service_cycles = (
+            l2_data_bank_service_cycles
         )
 
         if prefetch_mode not in (
@@ -166,10 +246,7 @@ class LittleExplicitCacheHierarchy(
             prefetch_rate_refill_cycles
         )
 
-    def incorporate_cache(self, board) -> None:
-        # Keep upstream topology and port wiring exactly intact.
-        super().incorporate_cache(board)
-
+    def _configure_l1_caches(self) -> None:
         # ----------------------------------------------------
         # L1I — current proxy defaults, explicitly stated.
         # ----------------------------------------------------
@@ -190,7 +267,7 @@ class LittleExplicitCacheHierarchy(
                 cache.prefetcher = NULL
 
         # ----------------------------------------------------
-        # L1D — Stage 2M MSHR validation control.
+        # L1D MSHR controls.
         # ----------------------------------------------------
         for cache in self.l1dcaches:
             cache.tag_latency = self._little_l1d_tag_latency
@@ -207,10 +284,13 @@ class LittleExplicitCacheHierarchy(
             cache.sequential_access = False
             cache.writeback_clean = False
 
-            cache.data_array_banks = self._little_l1d_data_banks
+            cache.data_array_banks = (
+                self._little_l1d_data_banks
+            )
             cache.data_array_bank_service_cycles = (
                 self._little_l1d_data_bank_service_cycles
             )
+            cache.data_array_bank_include_cache_origin = False
 
             if self._little_prefetch_mode not in (
                 "stride",
@@ -228,60 +308,279 @@ class LittleExplicitCacheHierarchy(
                 cache.prefetcher.rate_limit_enable = (
                     self._little_prefetch_rate_limit
                 )
-
                 cache.prefetcher.rate_limit_bucket_capacity = (
                     self._little_prefetch_rate_bucket
                 )
-
                 cache.prefetcher.rate_limit_refill_cycles = (
                     self._little_prefetch_rate_refill_cycles
                 )
 
-        # ----------------------------------------------------
-        # Shared L2 — current proxy defaults.
-        # ----------------------------------------------------
-        cache = self.l2cache
+    def _configure_l2_caches(
+        self,
+        *,
+        caches,
+        mshrs_per_cache: int,
+    ) -> None:
+        for cache in caches:
+            cache.tag_latency = self._little_l2_tag_latency
+            cache.data_latency = self._little_l2_data_latency
+            cache.response_latency = 1
 
-        cache.tag_latency = 10
-        cache.data_latency = 10
-        cache.response_latency = 1
+            cache.mshrs = mshrs_per_cache
+            cache.tgts_per_mshr = 12
+            cache.demand_mshr_reserve = (
+                self._little_l2_demand_mshr_reserve
+            )
+            cache.write_buffers = 8
 
-        cache.mshrs = self._little_l2_mshrs
-        cache.tgts_per_mshr = 12
-        cache.demand_mshr_reserve = (
-            self._little_l2_demand_mshr_reserve
+            cache.sequential_access = False
+            cache.writeback_clean = False
+            cache.clusivity = "mostly_incl"
+
+            cache.data_array_banks = (
+                self._little_l2_data_banks
+            )
+            cache.data_array_bank_service_cycles = (
+                self._little_l2_data_bank_service_cycles
+            )
+
+            # L2 requests normally originate in private L1s.
+            cache.data_array_bank_include_cache_origin = True
+
+            if self._little_prefetch_mode not in (
+                "stride",
+                "l2",
+            ):
+                cache.prefetcher = NULL
+            else:
+                cache.prefetcher.degree = (
+                    self._little_prefetch_degree
+                )
+                cache.prefetcher.prefetch_on_pf_hit = (
+                    self._little_prefetch_on_pf_hit
+                )
+
+    def _connect_walker_to_l2_bus(
+        self,
+        *,
+        cpu_id: int,
+        cpu,
+        bus,
+    ) -> None:
+        walker_ports = (
+            cpu.get_mmu().walkerPorts()
+            if cpu.has_mmu()
+            else []
         )
-        cache.write_buffers = 8
 
-        cache.sequential_access = False
-        cache.writeback_clean = False
-        cache.clusivity = "mostly_incl"
+        if len(walker_ports) > 2:
+            raise RuntimeError(
+                "Unexpected number of walker ports "
+                f"from CPU {cpu_id}: {len(walker_ports)}.\n"
+                "Expected 0, 1, or 2"
+            )
 
-        if self._little_prefetch_mode not in (
-            "stride",
-            "l2",
+        if len(walker_ports) == 0:
+            return
+
+        cpu.connect_walker_ports(
+            bus.cpu_side_ports,
+            bus.cpu_side_ports,
+        )
+
+    def _incorporate_partitioned_l2(
+        self,
+        board,
+        *,
+        group_count: int,
+        core_to_group,
+    ) -> None:
+        num_cores = board.get_processor().get_num_cores()
+
+        if num_cores != 4:
+            raise ValueError(
+                f"{self._little_l2_topology} currently requires "
+                f"exactly 4 cores, got {num_cores}"
+            )
+
+        if len(core_to_group) != num_cores:
+            raise RuntimeError(
+                "L2 topology core mapping length mismatch"
+            )
+
+        if (
+            self._little_l2_total_size_kib
+            % group_count
+            != 0
         ):
-            cache.prefetcher = NULL
-        else:
-            cache.prefetcher.degree = (
-                self._little_prefetch_degree
-            )
-            cache.prefetcher.prefetch_on_pf_hit = (
-                self._little_prefetch_on_pf_hit
+            raise ValueError(
+                "total L2 capacity must divide evenly "
+                "across topology groups"
             )
 
-        # ----------------------------------------------------
-        # Interconnect widths.
-        #
-        # gem5 BaseXBar.width is BYTES per port, not bits.
-        #
-        # L2XBar default  : 32 B
-        # Current hierarchy membus: SystemXBar(width=64)
-        #
-        # These are explicitly preserved proxy values.
-        # ----------------------------------------------------
-        self.l2bus.width = 32
+        if self._little_l2_mshrs % group_count != 0:
+            raise ValueError(
+                "total L2 MSHR budget must divide evenly "
+                "across topology groups"
+            )
+
+        # Physical L2 data-array banking is currently modeled only
+        # for shared4. Partitioned topologies require banking disabled so
+        # a single global bank-count budget is not duplicated per L2.
+        if self._little_l2_data_banks != 0:
+            raise ValueError(
+                "physical L2 data-array banking is supported only "
+                "for shared4; pair2/private4 require "
+                "--l2-data-banks 0"
+            )
+
+        board.connect_system_port(
+            self.membus.cpu_side_ports
+        )
+
+        for _, port in board.get_mem_ports():
+            self.membus.mem_side_ports = port
+
+        self.l1icaches = [
+            L1ICache(
+                size=self._l1i_size,
+                assoc=self._l1i_assoc,
+                writeback_clean=False,
+            )
+            for _ in range(num_cores)
+        ]
+
+        self.l1dcaches = [
+            L1DCache(
+                size=self._l1d_size,
+                assoc=self._l1d_assoc,
+            )
+            for _ in range(num_cores)
+        ]
+
+        per_l2_kib = (
+            self._little_l2_total_size_kib
+            // group_count
+        )
+
+        self.l2buses = [
+            L2XBar()
+            for _ in range(group_count)
+        ]
+
+        self.l2caches = [
+            L2Cache(
+                size=f"{per_l2_kib}KiB",
+                assoc=self._l2_assoc,
+            )
+            for _ in range(group_count)
+        ]
+
+        for group_id in range(group_count):
+            self.l2buses[group_id].mem_side_ports = (
+                self.l2caches[group_id].cpu_side
+            )
+
+            self.membus.cpu_side_ports = (
+                self.l2caches[group_id].mem_side
+            )
+
+        for cpu_id, cpu in enumerate(
+            board.get_processor().get_cores()
+        ):
+            group_id = core_to_group[cpu_id]
+            bus = self.l2buses[group_id]
+
+            cpu.connect_icache(
+                self.l1icaches[cpu_id].cpu_side
+            )
+            cpu.connect_dcache(
+                self.l1dcaches[cpu_id].cpu_side
+            )
+
+            self.l1icaches[cpu_id].mem_side = (
+                bus.cpu_side_ports
+            )
+            self.l1dcaches[cpu_id].mem_side = (
+                bus.cpu_side_ports
+            )
+
+            self._connect_walker_to_l2_bus(
+                cpu_id=cpu_id,
+                cpu=cpu,
+                bus=bus,
+            )
+
+            if (
+                board.get_processor().get_isa()
+                == ISA.X86
+            ):
+                cpu.connect_interrupt(
+                    self.membus.mem_side_ports,
+                    self.membus.cpu_side_ports,
+                )
+            else:
+                cpu.connect_interrupt()
+
+        if board.has_coherent_io():
+            self._setup_io_cache(board)
+
+        mshrs_per_cache = (
+            self._little_l2_mshrs
+            // group_count
+        )
+
+        self._configure_l1_caches()
+
+        self._configure_l2_caches(
+            caches=self.l2caches,
+            mshrs_per_cache=mshrs_per_cache,
+        )
+
+        for bus in self.l2buses:
+            bus.width = 32
+
         self.membus.width = 64
+
+    def incorporate_cache(self, board) -> None:
+        topology = self._little_l2_topology
+
+        if topology == "shared4":
+            # Historical shared4 path. Preserve upstream object
+            # creation and port wiring exactly.
+            super().incorporate_cache(board)
+
+            self._configure_l1_caches()
+
+            self._configure_l2_caches(
+                caches=(self.l2cache,),
+                mshrs_per_cache=self._little_l2_mshrs,
+            )
+
+            self.l2bus.width = 32
+            self.membus.width = 64
+            return
+
+        if topology == "pair2":
+            self._incorporate_partitioned_l2(
+                board,
+                group_count=2,
+                core_to_group=(0, 0, 1, 1),
+            )
+            return
+
+        if topology == "private4":
+            self._incorporate_partitioned_l2(
+                board,
+                group_count=4,
+                core_to_group=(0, 1, 2, 3),
+            )
+            return
+
+        raise RuntimeError(
+            f"unreachable L2 topology: {topology}"
+        )
+
 
 
 #
@@ -869,6 +1168,18 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--core-binary",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help=(
+            "Per-core AArch64 static ELF for multi-core SE; "
+            "repeat exactly --cores times. "
+            "If omitted, --binary is replicated to every core."
+        ),
+    )
+
+    parser.add_argument(
         "--cores",
         type=int,
         default=1,
@@ -896,7 +1207,7 @@ def parse_args() -> argparse.Namespace:
         choices=(32, 64),
         default=64,
         help=(
-            "L1I capacity in KiB; Stage 2M G8F control"
+            "L1I capacity in KiB"
         ),
     )
 
@@ -906,7 +1217,7 @@ def parse_args() -> argparse.Namespace:
         choices=(32, 64),
         default=64,
         help=(
-            "L1D capacity in KiB; Stage 2M G8F control"
+            "L1D capacity in KiB"
         ),
     )
 
@@ -915,15 +1226,40 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=16,
         help=(
-            "Stage 2M validation control for L1D MSHR capacity"
+            "L1D MSHR capacity"
         ),
     )
+    parser.add_argument(
+        "--l2-size-kib",
+        type=int,
+        choices=(1024, 2048, 4096),
+        default=1024,
+        help=(
+            "Total L2 capacity budget in KiB across "
+            "the selected topology"
+        ),
+    )
+
+    parser.add_argument(
+        "--l2-topology",
+        choices=(
+            "shared4",
+            "pair2",
+            "private4",
+        ),
+        default="shared4",
+        help=(
+            "L2 capacity-sharing topology; "
+            "shared4 preserves the historical default"
+        ),
+    )
+
     parser.add_argument(
         "--l2-mshrs",
         type=int,
         default=20,
         help=(
-            "Stage 2M validation control for shared L2 MSHR capacity"
+            "Total L2 MSHR budget across the selected topology"
         ),
     )
     parser.add_argument(
@@ -954,7 +1290,7 @@ def parse_args() -> argparse.Namespace:
         ),
         default="stride",
         help=(
-            "Stage 2M cache-prefetch control: "
+            "Cache-prefetch mode: "
             "stride preserves historical L1I+L1D+L2 "
             "StridePrefetcher defaults; off disables all; "
             "l1d and l2 enable only the selected data-cache level"
@@ -965,7 +1301,7 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=4,
         help=(
-            "Stage 2M experimental StridePrefetcher degree; "
+            "StridePrefetcher degree; "
             "default 4 preserves gem5 historical behavior"
         ),
     )
@@ -974,7 +1310,7 @@ def parse_args() -> argparse.Namespace:
         choices=("on", "off"),
         default="on",
         help=(
-            "Stage 2M experimental control for "
+            "Control for "
             "StridePrefetcher.prefetch_on_pf_hit"
         ),
     )
@@ -982,7 +1318,7 @@ def parse_args() -> argparse.Namespace:
         "--prefetch-rate-limit",
         choices=("on", "off"),
         default="off",
-        help="Enable Stage 2M PF token-bucket admission control",
+        help="Enable PF token-bucket admission control",
     )
 
     parser.add_argument(
@@ -1026,7 +1362,7 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help=(
             "L1D tag lookup latency in cache cycles; "
-            "Stage 2M G8D control"
+            "Explicit cache timing control"
         ),
     )
 
@@ -1036,7 +1372,27 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help=(
             "L1D data-array access latency in cache cycles; "
-            "Stage 2M G8D control"
+            "Explicit cache timing control"
+        ),
+    )
+
+    parser.add_argument(
+        "--l2-tag-latency",
+        type=int,
+        default=10,
+        help=(
+            "L2 tag lookup latency in cycles "
+            "(default: 10)"
+        ),
+    )
+
+    parser.add_argument(
+        "--l2-data-latency",
+        type=int,
+        default=10,
+        help=(
+            "L2 data access latency in cycles "
+            "(default: 10)"
         ),
     )
 
@@ -1046,7 +1402,7 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help=(
             "Physical L1D data-array banks; "
-            "0 disables the G8C bank model"
+            "0 disables the physical L1D data-array bank model"
         ),
     )
 
@@ -1057,6 +1413,26 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Minimum service interval of one physical "
             "L1D data-array bank"
+        ),
+    )
+
+    parser.add_argument(
+        "--l2-data-banks",
+        type=int,
+        default=0,
+        help=(
+            "Physical L2 data-array banks for shared4; "
+            "0 disables the model. pair2/private4 require 0"
+        ),
+    )
+
+    parser.add_argument(
+        "--l2-data-bank-service-cycles",
+        type=int,
+        default=1,
+        help=(
+            "Minimum service interval of one physical "
+            "L2 data-array bank"
         ),
     )
 
@@ -1151,6 +1527,34 @@ def main() -> None:
     if not binary_path.is_file():
         raise FileNotFoundError(f"Binary not found: {binary_path}")
 
+    core_binary_paths = [
+        Path(value).resolve()
+        for value in args.core_binary
+    ]
+
+    if core_binary_paths:
+        if args.cores == 1:
+            raise ValueError(
+                "--core-binary is a multi-core control; "
+                "use --binary for a single core"
+            )
+
+        if len(core_binary_paths) != args.cores:
+            raise ValueError(
+                "--core-binary must be repeated exactly "
+                f"{args.cores} times; got "
+                f"{len(core_binary_paths)}"
+            )
+
+        for core_id, core_path in enumerate(
+            core_binary_paths
+        ):
+            if not core_path.is_file():
+                raise FileNotFoundError(
+                    f"Core {core_id} binary not found: "
+                    f"{core_path}"
+                )
+
     processor = LittleV052ProxyProcessor(
         rob_entries=args.rob,
         iq_entries=args.iq,
@@ -1175,18 +1579,17 @@ def main() -> None:
         pair_shared_fpsimd=args.pair_shared_fpsimd,
     )
 
-    # Stage 2M control hierarchy.
+    # Explicit cache hierarchy controls.
     #
-    # The topology is unchanged from PrivateL1SharedL2CacheHierarchy.
+    # shared4 preserves PrivateL1SharedL2CacheHierarchy.
+    # pair2/private4 use explicit partitioned L2 wiring.
     # Historical implicit gem5 defaults are made explicit so each
-    # memory-hierarchy variable can later be changed independently.
-    #
-    # None of these timing/MSHR/interconnect values are architecturally
-    # frozen yet.
+    # memory-hierarchy variable can be configured independently.
     cache_hierarchy = LittleExplicitCacheHierarchy(
         l1d_size=f"{args.l1d_size_kib}KiB",
         l1i_size=f"{args.l1i_size_kib}KiB",
-        l2_size="1MiB",
+        l2_size=f"{args.l2_size_kib}KiB",
+        l2_topology=args.l2_topology,
         l1d_assoc=4,
         l1i_assoc=4,
         l2_assoc=8,
@@ -1200,9 +1603,15 @@ def main() -> None:
         ),
         l1d_tag_latency=args.l1d_tag_latency,
         l1d_data_latency=args.l1d_data_latency,
+        l2_tag_latency=args.l2_tag_latency,
+        l2_data_latency=args.l2_data_latency,
         l1d_data_banks=args.l1d_data_banks,
         l1d_data_bank_service_cycles=(
             args.l1d_data_bank_service_cycles
+        ),
+        l2_data_banks=args.l2_data_banks,
+        l2_data_bank_service_cycles=(
+            args.l2_data_bank_service_cycles
         ),
         prefetch_mode=args.cache_prefetch,
         prefetch_degree=args.prefetch_degree,
@@ -1232,13 +1641,22 @@ def main() -> None:
             arguments=args.program_arg,
         )
     else:
+        multi_binary_paths = (
+            core_binary_paths
+            if core_binary_paths
+            else [
+                binary_path
+                for _ in range(args.cores)
+            ]
+        )
+
         board.set_se_multi_binary_workload(
             [
                 BinaryResource(
-                    local_path=str(binary_path),
+                    local_path=str(core_path),
                     architecture=ISA.ARM,
                 )
-                for _ in range(args.cores)
+                for core_path in multi_binary_paths
             ]
         )
 
@@ -1252,6 +1670,7 @@ def main() -> None:
         f"prefetch-degree={args.prefetch_degree}",
         f"prefetch-pf-hit={args.prefetch_pf_hit}",
         f"l1d-mshrs={args.l1d_mshrs}",
+        f"l2-topology={args.l2_topology}",
         f"l2-mshrs={args.l2_mshrs}",
         (
             "l1d-demand-mshr-reserve="

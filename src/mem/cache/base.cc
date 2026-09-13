@@ -152,6 +152,9 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       sequentialAccess(p.sequential_access),
       dataArrayBanks(p.data_array_banks),
       dataArrayBankServiceCycles(p.data_array_bank_service_cycles),
+      dataArrayBankIncludeCacheOrigin(
+          p.data_array_bank_include_cache_origin
+      ),
       dataBankNextFree(dataArrayBanks, 0),
       dataBankServiceEvent(
           [this]{ processDataBankService(); },
@@ -512,10 +515,14 @@ BaseCache::packetUsesDataArray(PacketPtr pkt) const
         return false;
     }
 
-    // G8C initially models only demand traffic originating above this L1.
-    // Cache-to-cache traffic has separate resource semantics and is left
-    // untouched for this validation stage.
-    if (pkt->fromCache()) {
+    // G8C initially modelled only requests originating directly above
+    // an L1.  Preserve that behavior by default.  A shared L2 may opt in
+    // to cache-origin requests because ordinary L1->L2 hit traffic has
+    // pkt->fromCache() set.
+    if (
+        pkt->fromCache()
+        && !dataArrayBankIncludeCacheOrigin
+    ) {
         return false;
     }
 

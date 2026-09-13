@@ -960,6 +960,16 @@ class BaseCache : public ClockedObject
     const unsigned dataArrayBanks;
     const Cycles dataArrayBankServiceCycles;
 
+    /**
+     * G8C originally excluded packets originating from another cache,
+     * which is correct for the L1D validation scope.
+     *
+     * A shared L2, however, receives its ordinary hit traffic from
+     * upstream L1 caches.  Keep the historical G8C behavior as the
+     * default and enable cache-origin hit banking only per cache.
+     */
+    const bool dataArrayBankIncludeCacheOrigin;
+
     struct DeferredDataBankReq
     {
         Tick when;

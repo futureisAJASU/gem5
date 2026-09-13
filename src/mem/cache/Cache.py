@@ -146,6 +146,12 @@ class BaseCache(ClockedObject):
         "Minimum service interval of one physical data-array bank",
     )
 
+    data_array_bank_include_cache_origin = Param.Bool(
+        False,
+        "Allow cache-origin CPU-side hit requests to consume "
+        "the physical data-array bank resource",
+    )
+
     cpu_side = ResponsePort("Upstream port closer to the CPU and/or device")
     mem_side = RequestPort("Downstream port closer to memory")
 
