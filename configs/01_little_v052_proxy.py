@@ -976,6 +976,8 @@ class LittleV052ProxyCore(BaseCPUCore):
         cache_load_ports: int,
         cache_store_ports: int,
         width: int = 3,
+        fetch_width: int | None = None,
+        decode_width: int | None = None,
         commit_width: int = 3,
         int_regs: int = 112,
         fp_regs: int = 96,
@@ -993,10 +995,32 @@ class LittleV052ProxyCore(BaseCPUCore):
         shared_fpsimd_pool=None,
         pair_requester_id: int = -1,
     ) -> None:
+        if fetch_width is not None and fetch_width <= 0:
+            raise ValueError(
+                "fetch_width must be positive"
+            )
+
+        if decode_width is not None and decode_width <= 0:
+            raise ValueError(
+                "decode_width must be positive"
+            )
+
+        effective_fetch_width = (
+            width
+            if fetch_width is None
+            else fetch_width
+        )
+
+        effective_decode_width = (
+            width
+            if decode_width is None
+            else decode_width
+        )
+
         cpu = ArmO3CPU()
 
-        cpu.fetchWidth = width
-        cpu.decodeWidth = width
+        cpu.fetchWidth = effective_fetch_width
+        cpu.decodeWidth = effective_decode_width
         cpu.renameWidth = width
         cpu.dispatchWidth = width
         cpu.issueWidth = width
@@ -1099,6 +1123,8 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         cache_load_ports: int,
         cache_store_ports: int,
         width: int,
+        fetch_width: int | None,
+        decode_width: int | None,
         commit_width: int,
         n_skip: int,
         checker: bool,
@@ -1172,6 +1198,8 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 cache_load_ports=cache_load_ports,
                 cache_store_ports=cache_store_ports,
                 width=width,
+                fetch_width=fetch_width,
+                decode_width=decode_width,
                 commit_width=commit_width,
                 n_skip=n_skip,
                 checker=checker,
@@ -1425,6 +1453,27 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--clock", default="1.4GHz")
     parser.add_argument("--width", type=int, default=3)
+
+    parser.add_argument(
+        "--fetch-width",
+        type=int,
+        default=None,
+        help=(
+            "Frontend fetch width; if omitted, inherit --width "
+            "to preserve historical behavior"
+        ),
+    )
+
+    parser.add_argument(
+        "--decode-width",
+        type=int,
+        default=None,
+        help=(
+            "Frontend decode width; if omitted, inherit --width "
+            "to preserve historical behavior"
+        ),
+    )
+
     parser.add_argument("--commit-width", type=int, default=3)
     parser.add_argument("--rob", type=int, default=80)
     parser.add_argument("--iq", type=int, default=40)
@@ -1651,6 +1700,8 @@ def main() -> None:
         cache_load_ports=args.cache_load_ports,
         cache_store_ports=args.cache_store_ports,
         width=args.width,
+        fetch_width=args.fetch_width,
+        decode_width=args.decode_width,
         commit_width=args.commit_width,
         n_skip=args.n_skip,
         checker=args.checker,
@@ -1757,6 +1808,14 @@ def main() -> None:
         "Little v0.52 proxy:",
         f"clock={args.clock}",
         f"cores={args.cores}",
+        (
+            "fetch-width="
+            f"{args.fetch_width if args.fetch_width is not None else args.width}"
+        ),
+        (
+            "decode-width="
+            f"{args.decode_width if args.decode_width is not None else args.width}"
+        ),
         f"pair-shared-div={args.pair_shared_div}",
         f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
         f"cache-prefetch={args.cache_prefetch}",
