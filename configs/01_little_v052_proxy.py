@@ -67,6 +67,11 @@ class LittleExplicitCacheHierarchy(
         prefetch_rate_bucket: int,
         prefetch_rate_refill_cycles: int,
     ) -> None:
+        if l2_assoc <= 0:
+            raise ValueError(
+                "l2_assoc must be positive"
+            )
+
         super().__init__(
             l1d_size=l1d_size,
             l1i_size=l1i_size,
@@ -1259,11 +1264,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--l2-size-kib",
         type=int,
-        choices=(1024, 2048, 4096),
+        choices=(
+            1024,
+            2048,
+            2560,
+            3072,
+            3584,
+            4096,
+        ),
         default=1024,
         help=(
             "Total L2 capacity budget in KiB across "
             "the selected topology"
+        ),
+    )
+
+    parser.add_argument(
+        "--l2-assoc",
+        type=int,
+        default=8,
+        help=(
+            "L2 associativity; default 8 preserves "
+            "historical cache geometry"
         ),
     )
 
@@ -1639,7 +1661,7 @@ def main() -> None:
         l2_topology=args.l2_topology,
         l1d_assoc=4,
         l1i_assoc=4,
-        l2_assoc=8,
+        l2_assoc=args.l2_assoc,
         l1d_mshrs=args.l1d_mshrs,
         l2_mshrs=args.l2_mshrs,
         l1d_demand_mshr_reserve=(
@@ -1722,6 +1744,7 @@ def main() -> None:
         f"prefetch-pf-hit={args.prefetch_pf_hit}",
         f"l1d-mshrs={args.l1d_mshrs}",
         f"l2-topology={args.l2_topology}",
+        f"l2-assoc={args.l2_assoc}",
         f"l2-xbar-width={args.l2_xbar_width}B",
         (
             "l2-xbar-header-latency="
