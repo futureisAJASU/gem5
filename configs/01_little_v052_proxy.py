@@ -52,6 +52,7 @@ class LittleExplicitCacheHierarchy(
         l2_demand_mshr_reserve: int,
         l2_xbar_width: int,
         l2_xbar_header_latency: int,
+        membus_width: int,
         l1d_tag_latency: int,
         l1d_data_latency: int,
         l2_tag_latency: int,
@@ -71,6 +72,13 @@ class LittleExplicitCacheHierarchy(
             raise ValueError(
                 "l2_assoc must be positive"
             )
+
+        if membus_width <= 0:
+            raise ValueError(
+                "membus_width must be positive"
+            )
+
+        self._little_membus_width = membus_width
 
         super().__init__(
             l1d_size=l1d_size,
@@ -566,8 +574,8 @@ class LittleExplicitCacheHierarchy(
                 self._little_l2_xbar_header_latency
             )
 
-        # Keep the memory-side interconnect fixed during G8I.
-        self.membus.width = 64
+        # Configure the common downstream memory-side interconnect.
+        self.membus.width = self._little_membus_width
 
     def incorporate_cache(self, board) -> None:
         topology = self._little_l2_topology
@@ -589,8 +597,8 @@ class LittleExplicitCacheHierarchy(
                 self._little_l2_xbar_header_latency
             )
 
-            # Keep the memory-side interconnect fixed during G8I.
-            self.membus.width = 64
+            # Configure the common downstream memory-side interconnect.
+            self.membus.width = self._little_membus_width
             return
 
         if topology == "pair2":
@@ -1350,6 +1358,17 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--membus-width",
+        type=int,
+        default=64,
+        help=(
+            "Common downstream memory-side interconnect "
+            "datapath width in bytes per port; "
+            "default 64 preserves historical behavior"
+        ),
+    )
+
+    parser.add_argument(
         "--cache-prefetch",
         choices=(
             "stride",
@@ -1674,6 +1693,7 @@ def main() -> None:
         l2_xbar_header_latency=(
             args.l2_xbar_header_latency
         ),
+        membus_width=args.membus_width,
         l1d_tag_latency=args.l1d_tag_latency,
         l1d_data_latency=args.l1d_data_latency,
         l2_tag_latency=args.l2_tag_latency,
@@ -1750,6 +1770,7 @@ def main() -> None:
             "l2-xbar-header-latency="
             f"{args.l2_xbar_header_latency}cy"
         ),
+        f"membus-width={args.membus_width}B",
         f"l2-mshrs={args.l2_mshrs}",
         (
             "l1d-demand-mshr-reserve="
