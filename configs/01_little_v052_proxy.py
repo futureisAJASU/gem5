@@ -51,6 +51,7 @@ class LittleExplicitCacheHierarchy(
         l1d_demand_mshr_reserve: int,
         l2_demand_mshr_reserve: int,
         l2_xbar_width: int,
+        l2_xbar_header_latency: int,
         l1d_tag_latency: int,
         l1d_data_latency: int,
         l2_tag_latency: int,
@@ -131,6 +132,15 @@ class LittleExplicitCacheHierarchy(
             )
 
         self._little_l2_xbar_width = l2_xbar_width
+
+        if l2_xbar_header_latency <= 0:
+            raise ValueError(
+                "l2_xbar_header_latency must be positive"
+            )
+
+        self._little_l2_xbar_header_latency = (
+            l2_xbar_header_latency
+        )
 
         if l1d_tag_latency <= 0:
             raise ValueError(
@@ -547,6 +557,9 @@ class LittleExplicitCacheHierarchy(
 
         for bus in self.l2buses:
             bus.width = self._little_l2_xbar_width
+            bus.header_latency = (
+                self._little_l2_xbar_header_latency
+            )
 
         # Keep the memory-side interconnect fixed during G8I.
         self.membus.width = 64
@@ -567,6 +580,9 @@ class LittleExplicitCacheHierarchy(
             )
 
             self.l2bus.width = self._little_l2_xbar_width
+            self.l2bus.header_latency = (
+                self._little_l2_xbar_header_latency
+            )
 
             # Keep the memory-side interconnect fixed during G8I.
             self.membus.width = 64
@@ -1302,6 +1318,16 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--l2-xbar-header-latency",
+        type=int,
+        default=1,
+        help=(
+            "L2-side crossbar header occupancy in cycles; "
+            "default 1 preserves historical L2XBar behavior"
+        ),
+    )
+
+    parser.add_argument(
         "--cache-prefetch",
         choices=(
             "stride",
@@ -1623,6 +1649,9 @@ def main() -> None:
             args.l2_demand_mshr_reserve
         ),
         l2_xbar_width=args.l2_xbar_width,
+        l2_xbar_header_latency=(
+            args.l2_xbar_header_latency
+        ),
         l1d_tag_latency=args.l1d_tag_latency,
         l1d_data_latency=args.l1d_data_latency,
         l2_tag_latency=args.l2_tag_latency,
@@ -1694,6 +1723,10 @@ def main() -> None:
         f"l1d-mshrs={args.l1d_mshrs}",
         f"l2-topology={args.l2_topology}",
         f"l2-xbar-width={args.l2_xbar_width}B",
+        (
+            "l2-xbar-header-latency="
+            f"{args.l2_xbar_header_latency}cy"
+        ),
         f"l2-mshrs={args.l2_mshrs}",
         (
             "l1d-demand-mshr-reserve="
