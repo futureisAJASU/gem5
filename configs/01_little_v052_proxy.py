@@ -979,6 +979,11 @@ class LittleV052ProxyCore(BaseCPUCore):
         fetch_width: int | None = None,
         decode_width: int | None = None,
         commit_width: int = 3,
+        bp_local_size: int = 2048,
+        bp_local_history_size: int = 2048,
+        bp_global_size: int = 8192,
+        bp_choice_size: int = 8192,
+        btb_entries: int = 4096,
         int_regs: int = 112,
         fp_regs: int = 96,
         n_skip: int = -1,
@@ -1017,7 +1022,35 @@ class LittleV052ProxyCore(BaseCPUCore):
             else decode_width
         )
 
+        predictor_sizes = {
+            "bp_local_size": bp_local_size,
+            "bp_local_history_size": bp_local_history_size,
+            "bp_global_size": bp_global_size,
+            "bp_choice_size": bp_choice_size,
+            "btb_entries": btb_entries,
+        }
+
+        for name, value in predictor_sizes.items():
+            if value <= 0:
+                raise ValueError(
+                    f"{name} must be positive"
+                )
+
+            if value & (value - 1):
+                raise ValueError(
+                    f"{name} must be a power of two"
+                )
+
         cpu = ArmO3CPU()
+
+        tournament = cpu.branchPred.conditionalBranchPred
+
+        tournament.localPredictorSize = bp_local_size
+        tournament.localHistoryTableSize = bp_local_history_size
+        tournament.globalPredictorSize = bp_global_size
+        tournament.choicePredictorSize = bp_choice_size
+
+        cpu.branchPred.btb.numEntries = btb_entries
 
         cpu.fetchWidth = effective_fetch_width
         cpu.decodeWidth = effective_decode_width
@@ -1126,6 +1159,11 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         fetch_width: int | None,
         decode_width: int | None,
         commit_width: int,
+        bp_local_size: int,
+        bp_local_history_size: int,
+        bp_global_size: int,
+        bp_choice_size: int,
+        btb_entries: int,
         n_skip: int,
         checker: bool,
         distributed_iq: bool,
@@ -1201,6 +1239,11 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 fetch_width=fetch_width,
                 decode_width=decode_width,
                 commit_width=commit_width,
+                bp_local_size=bp_local_size,
+                bp_local_history_size=bp_local_history_size,
+                bp_global_size=bp_global_size,
+                bp_choice_size=bp_choice_size,
+                btb_entries=btb_entries,
                 n_skip=n_skip,
                 checker=checker,
                 distributed_iq=distributed_iq,
@@ -1475,6 +1518,42 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument("--commit-width", type=int, default=3)
+
+    parser.add_argument(
+        "--bp-local-size",
+        type=int,
+        default=2048,
+        help="TournamentBP local predictor entries",
+    )
+
+    parser.add_argument(
+        "--bp-local-history-size",
+        type=int,
+        default=2048,
+        help="TournamentBP local history table entries",
+    )
+
+    parser.add_argument(
+        "--bp-global-size",
+        type=int,
+        default=8192,
+        help="TournamentBP global predictor entries",
+    )
+
+    parser.add_argument(
+        "--bp-choice-size",
+        type=int,
+        default=8192,
+        help="TournamentBP choice predictor entries",
+    )
+
+    parser.add_argument(
+        "--btb-entries",
+        type=int,
+        default=4096,
+        help="SimpleBTB entry count",
+    )
+
     parser.add_argument("--rob", type=int, default=80)
     parser.add_argument("--iq", type=int, default=40)
     parser.add_argument("--lq", type=int, default=12)
@@ -1703,6 +1782,11 @@ def main() -> None:
         fetch_width=args.fetch_width,
         decode_width=args.decode_width,
         commit_width=args.commit_width,
+        bp_local_size=args.bp_local_size,
+        bp_local_history_size=args.bp_local_history_size,
+        bp_global_size=args.bp_global_size,
+        bp_choice_size=args.bp_choice_size,
+        btb_entries=args.btb_entries,
         n_skip=args.n_skip,
         checker=args.checker,
         distributed_iq=args.distributed_iq,
@@ -1816,6 +1900,11 @@ def main() -> None:
             "decode-width="
             f"{args.decode_width if args.decode_width is not None else args.width}"
         ),
+        f"bp-local-size={args.bp_local_size}",
+        f"bp-local-history-size={args.bp_local_history_size}",
+        f"bp-global-size={args.bp_global_size}",
+        f"bp-choice-size={args.bp_choice_size}",
+        f"btb-entries={args.btb_entries}",
         f"pair-shared-div={args.pair_shared_div}",
         f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
         f"cache-prefetch={args.cache_prefetch}",
