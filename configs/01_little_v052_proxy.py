@@ -979,6 +979,7 @@ class LittleV052ProxyCore(BaseCPUCore):
         fetch_width: int | None = None,
         decode_width: int | None = None,
         commit_width: int = 3,
+        bp_inst_shift: int = 0,
         bp_local_size: int = 2048,
         bp_local_history_size: int = 2048,
         bp_global_size: int = 8192,
@@ -1022,6 +1023,11 @@ class LittleV052ProxyCore(BaseCPUCore):
             else decode_width
         )
 
+        if bp_inst_shift not in (0, 2):
+            raise ValueError(
+                "bp_inst_shift must be 0 or 2"
+            )
+
         predictor_sizes = {
             "bp_local_size": bp_local_size,
             "bp_local_history_size": bp_local_history_size,
@@ -1042,6 +1048,16 @@ class LittleV052ProxyCore(BaseCPUCore):
                 )
 
         cpu = ArmO3CPU()
+
+        # Preserve generic/historical shift=0 when requested,
+        # while allowing an explicit AArch64-aware shift=2.
+        #
+        # BranchPredictor child objects use Parent.instShiftAmt,
+        # so this single architectural control should propagate to:
+        #   - TournamentBP PC indexing
+        #   - SimpleBTB indexing
+        #   - indirect predictor PC indexing
+        cpu.branchPred.instShiftAmt = bp_inst_shift
 
         tournament = cpu.branchPred.conditionalBranchPred
 
@@ -1159,6 +1175,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         fetch_width: int | None,
         decode_width: int | None,
         commit_width: int,
+        bp_inst_shift: int,
         bp_local_size: int,
         bp_local_history_size: int,
         bp_global_size: int,
@@ -1239,6 +1256,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 fetch_width=fetch_width,
                 decode_width=decode_width,
                 commit_width=commit_width,
+                bp_inst_shift=bp_inst_shift,
                 bp_local_size=bp_local_size,
                 bp_local_history_size=bp_local_history_size,
                 bp_global_size=bp_global_size,
@@ -1520,6 +1538,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--commit-width", type=int, default=3)
 
     parser.add_argument(
+        "--bp-inst-shift",
+        type=int,
+        choices=(0, 2),
+        default=0,
+        help=(
+            "Branch-predictor instruction-address shift; "
+            "0 preserves historical generic behavior, "
+            "2 removes AArch64 4-byte alignment bits"
+        ),
+    )
+
+    parser.add_argument(
         "--bp-local-size",
         type=int,
         default=2048,
@@ -1782,6 +1812,7 @@ def main() -> None:
         fetch_width=args.fetch_width,
         decode_width=args.decode_width,
         commit_width=args.commit_width,
+        bp_inst_shift=args.bp_inst_shift,
         bp_local_size=args.bp_local_size,
         bp_local_history_size=args.bp_local_history_size,
         bp_global_size=args.bp_global_size,
@@ -1900,6 +1931,7 @@ def main() -> None:
             "decode-width="
             f"{args.decode_width if args.decode_width is not None else args.width}"
         ),
+        f"bp-inst-shift={args.bp_inst_shift}",
         f"bp-local-size={args.bp_local_size}",
         f"bp-local-history-size={args.bp_local_history_size}",
         f"bp-global-size={args.bp_global_size}",
