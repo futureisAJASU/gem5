@@ -416,6 +416,12 @@ InstructionQueue::IQStats::IQStats(
                "Scheduler samples where physical IQ occupancy was <= 3/4"),
       ADD_STAT(steerOccupancySamples, statistics::units::Cycle::get(),
                "Number of physical IQ occupancy samples"),
+      ADD_STAT(dispatchWrite1Cycles, statistics::units::Cycle::get(),
+               "Cycles with exactly one dispatch write into each physical IQ"),
+      ADD_STAT(dispatchWrite2Cycles, statistics::units::Cycle::get(),
+               "Cycles with exactly two dispatch writes into each physical IQ"),
+      ADD_STAT(dispatchWrite3PlusCycles, statistics::units::Cycle::get(),
+               "Cycles with three or more dispatch writes into each physical IQ"),
       ADD_STAT(instsIssued, statistics::units::Count::get(),
                "Number of instructions issued"),
       ADD_STAT(intInstsIssued, statistics::units::Count::get(),
@@ -489,6 +495,10 @@ InstructionQueue::IQStats::IQStats(
     steerAtOrBelowHalfCycles.init(num_iqs).flags(statistics::total);
     steerAtOrBelowThreeQuarterCycles.init(num_iqs).flags(statistics::total);
 
+    dispatchWrite1Cycles.init(num_iqs).flags(statistics::total);
+    dispatchWrite2Cycles.init(num_iqs).flags(statistics::total);
+    dispatchWrite3PlusCycles.init(num_iqs).flags(statistics::total);
+
     for (unsigned i = 0; i < num_iqs; ++i) {
         const std::string iq_name = "IQ" + std::to_string(i);
 
@@ -500,6 +510,9 @@ InstructionQueue::IQStats::IQStats(
         steerEmptyCycles.subname(i, iq_name);
         steerAtOrBelowHalfCycles.subname(i, iq_name);
         steerAtOrBelowThreeQuarterCycles.subname(i, iq_name);
+        dispatchWrite1Cycles.subname(i, iq_name);
+        dispatchWrite2Cycles.subname(i, iq_name);
+        dispatchWrite3PlusCycles.subname(i, iq_name);
     }
 
     steerOccupancySamples
@@ -959,6 +972,37 @@ InstructionQueue::findIQ(const DynInstPtr &inst)
 }
 
 void
+InstructionQueue::beginDispatchCycle()
+{
+    if (dispatchWritesThisCycle.size() != iqs.size()) {
+        dispatchWritesThisCycle.assign(iqs.size(), 0);
+    } else {
+        std::fill(
+            dispatchWritesThisCycle.begin(),
+            dispatchWritesThisCycle.end(),
+            0);
+    }
+}
+
+void
+InstructionQueue::endDispatchCycle()
+{
+    assert(dispatchWritesThisCycle.size() == iqs.size());
+
+    for (unsigned i = 0; i < dispatchWritesThisCycle.size(); ++i) {
+        const unsigned writes = dispatchWritesThisCycle[i];
+
+        if (writes == 1) {
+            iqStats.dispatchWrite1Cycles[i]++;
+        } else if (writes == 2) {
+            iqStats.dispatchWrite2Cycles[i]++;
+        } else if (writes >= 3) {
+            iqStats.dispatchWrite3PlusCycles[i]++;
+        }
+    }
+}
+
+void
 InstructionQueue::recordSteeringDispatch(
     IQUnit *iq, const DynInstPtr &inst)
 {
@@ -972,6 +1016,12 @@ InstructionQueue::recordSteeringDispatch(
     }
 
     assert(iq_index < iqs.size());
+
+    if (dispatchWritesThisCycle.size() != iqs.size()) {
+        dispatchWritesThisCycle.assign(iqs.size(), 0);
+    }
+
+    dispatchWritesThisCycle[iq_index]++;
 
     iqStats.steerDispatches[iq_index]++;
 

@@ -351,6 +351,13 @@ class InstructionQueue
     void recordSteeringDispatch(
         IQUnit *iq, const DynInstPtr &inst);
 
+    /**
+     * Behavior-neutral observation hooks for same-cycle physical-IQ
+     * enqueue multiplicity.
+     */
+    void beginDispatchCycle();
+    void endDispatchCycle();
+
     /** Inserts a new instruction into the IQ. */
     void insert(const DynInstPtr &new_inst);
 
@@ -484,6 +491,9 @@ class InstructionQueue
 
     /** Next physical IQ index considered by round-robin steering. */
     unsigned nextIntAluIQ;
+
+    /** Dispatch writes observed per physical IQ in the current IEW cycle. */
+    std::vector<unsigned> dispatchWritesThisCycle;
 
     /**
      * If true, scheduling is driven directly from each IQUnit's
@@ -678,6 +688,11 @@ class InstructionQueue
         statistics::Vector steerAtOrBelowHalfCycles;
         statistics::Vector steerAtOrBelowThreeQuarterCycles;
         statistics::Scalar steerOccupancySamples;
+
+        /** Behavior-neutral same-cycle physical-IQ enqueue observations. */
+        statistics::Vector dispatchWrite1Cycles;
+        statistics::Vector dispatchWrite2Cycles;
+        statistics::Vector dispatchWrite3PlusCycles;
 
         statistics::Scalar instsIssued;
         /** Stat for number of integer instructions issued. */

@@ -1462,6 +1462,9 @@ IEW::tick()
         fu_pool->processFreeUnits();
     }
 
+    // Behavior-neutral observation boundary for physical-IQ writes.
+    instQueue.beginDispatchCycle();
+
     // Check stall and squash signals, dispatch any instructions.
     for (ThreadID tid : *activeThreads) {
         DPRINTF(IEW,"Issue: Processing [tid:%i]\n", tid);
@@ -1469,6 +1472,8 @@ IEW::tick()
         checkSignalsAndUpdate(tid);
         dispatch(tid);
     }
+
+    instQueue.endDispatchCycle();
 
     if (exeStatus != Squashing) {
         executeInsts();
