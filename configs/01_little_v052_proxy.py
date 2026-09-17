@@ -893,6 +893,11 @@ def make_little_distributed_iqs(
     mem_entries: int = 12,
     div_entries: int = 4,
     fpsimd_entries: int = 6,
+    int0_write_cap: int = 0,
+    int1_write_cap: int = 0,
+    mem_write_cap: int = 0,
+    div_write_cap: int = 0,
+    fpsimd_write_cap: int = 0,
     div_pool=None,
     fpsimd_pool=None,
     pair_requester_id: int = -1,
@@ -905,6 +910,20 @@ def make_little_distributed_iqs(
         "FP/SIMD": fpsimd_entries,
     }
 
+    write_caps = {
+        "INT0": int0_write_cap,
+        "INT1": int1_write_cap,
+        "MEM": mem_write_cap,
+        "DIV": div_write_cap,
+        "FP/SIMD": fpsimd_write_cap,
+    }
+
+    for name, cap in write_caps.items():
+        if cap < 0:
+            raise ValueError(
+                f"{name} IQ write cap must be non-negative, got {cap}"
+            )
+
     for name, entries in sizes.items():
         if entries <= 0:
             raise ValueError(
@@ -914,18 +933,22 @@ def make_little_distributed_iqs(
     iqs = [
         IQUnit(
             numEntries=int0_entries,
+            dispatchWriteCap=int0_write_cap,
             fuPool=LittleInt0Pool(),
         ),
         IQUnit(
             numEntries=int1_entries,
+            dispatchWriteCap=int1_write_cap,
             fuPool=LittleInt1Pool(),
         ),
         IQUnit(
             numEntries=mem_entries,
+            dispatchWriteCap=mem_write_cap,
             fuPool=LittleMemPool(),
         ),
         IQUnit(
             numEntries=div_entries,
+            dispatchWriteCap=div_write_cap,
             fuPool=(
                 div_pool
                 if div_pool is not None
@@ -939,6 +962,7 @@ def make_little_distributed_iqs(
         ),
         IQUnit(
             numEntries=fpsimd_entries,
+            dispatchWriteCap=fpsimd_write_cap,
             fuPool=(
                 fpsimd_pool
                 if fpsimd_pool is not None
@@ -997,6 +1021,11 @@ class LittleV052ProxyCore(BaseCPUCore):
         dist_mem_entries: int = 12,
         dist_div_entries: int = 4,
         dist_fpsimd_entries: int = 6,
+        dist_int0_write_cap: int = 0,
+        dist_int1_write_cap: int = 0,
+        dist_mem_write_cap: int = 0,
+        dist_div_write_cap: int = 0,
+        dist_fpsimd_write_cap: int = 0,
         shared_div_pool=None,
         shared_fpsimd_pool=None,
         pair_requester_id: int = -1,
@@ -1101,6 +1130,11 @@ class LittleV052ProxyCore(BaseCPUCore):
                 mem_entries=dist_mem_entries,
                 div_entries=dist_div_entries,
                 fpsimd_entries=dist_fpsimd_entries,
+                int0_write_cap=dist_int0_write_cap,
+                int1_write_cap=dist_int1_write_cap,
+                mem_write_cap=dist_mem_write_cap,
+                div_write_cap=dist_div_write_cap,
+                fpsimd_write_cap=dist_fpsimd_write_cap,
                 div_pool=shared_div_pool,
                 fpsimd_pool=shared_fpsimd_pool,
                 pair_requester_id=pair_requester_id,
@@ -1191,6 +1225,11 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         dist_mem_entries: int,
         dist_div_entries: int,
         dist_fpsimd_entries: int,
+        dist_int0_write_cap: int,
+        dist_int1_write_cap: int,
+        dist_mem_write_cap: int,
+        dist_div_write_cap: int,
+        dist_fpsimd_write_cap: int,
         num_cores: int,
         pair_shared_div: bool,
         pair_shared_fpsimd: bool = False,
@@ -1320,6 +1359,11 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 dist_mem_entries=dist_mem_entries,
                 dist_div_entries=dist_div_entries,
                 dist_fpsimd_entries=dist_fpsimd_entries,
+                dist_int0_write_cap=dist_int0_write_cap,
+                dist_int1_write_cap=dist_int1_write_cap,
+                dist_mem_write_cap=dist_mem_write_cap,
+                dist_div_write_cap=dist_div_write_cap,
+                dist_fpsimd_write_cap=dist_fpsimd_write_cap,
                 shared_div_pool=shared_div_pool,
                 shared_fpsimd_pool=shared_fpsimd_pool,
                 pair_requester_id=core_idx,
@@ -1829,6 +1873,42 @@ def parse_args() -> argparse.Namespace:
         help="Distributed FP/SIMD IQ entries (default: 6)",
     )
     parser.add_argument(
+        "--dist-int0-write-cap",
+        type=int,
+        default=0,
+        metavar="N",
+        help="INT0 IQ dispatch writes/cycle; 0=unlimited",
+    )
+    parser.add_argument(
+        "--dist-int1-write-cap",
+        type=int,
+        default=0,
+        metavar="N",
+        help="INT1 IQ dispatch writes/cycle; 0=unlimited",
+    )
+    parser.add_argument(
+        "--dist-mem-write-cap",
+        type=int,
+        default=0,
+        metavar="N",
+        help="MEM IQ dispatch writes/cycle; 0=unlimited",
+    )
+    parser.add_argument(
+        "--dist-div-write-cap",
+        type=int,
+        default=0,
+        metavar="N",
+        help="DIV IQ dispatch writes/cycle; 0=unlimited",
+    )
+    parser.add_argument(
+        "--dist-fpsimd-write-cap",
+        type=int,
+        default=0,
+        metavar="N",
+        help="FP/SIMD IQ dispatch writes/cycle; 0=unlimited",
+    )
+
+    parser.add_argument(
         "--int-steering",
         choices=[
             "first-fit",
@@ -1918,6 +1998,11 @@ def main() -> None:
         dist_mem_entries=args.dist_mem,
         dist_div_entries=args.dist_div,
         dist_fpsimd_entries=args.dist_fpsimd,
+        dist_int0_write_cap=args.dist_int0_write_cap,
+        dist_int1_write_cap=args.dist_int1_write_cap,
+        dist_mem_write_cap=args.dist_mem_write_cap,
+        dist_div_write_cap=args.dist_div_write_cap,
+        dist_fpsimd_write_cap=args.dist_fpsimd_write_cap,
         num_cores=args.cores,
         pair_shared_div=args.pair_shared_div,
         pair_shared_fpsimd=args.pair_shared_fpsimd,

@@ -66,6 +66,10 @@ class IQUnit(SimObject):
         -1,
         "Pair-local requester ID for shared FU arbitration; -1 for private pools",
     )
+    dispatchWriteCap = Param.Unsigned(
+        0,
+        "Maximum dispatch writes accepted per cycle; 0 means unlimited",
+    )
 
     numThreads = Param.Unsigned(
         Parent.numThreads, "number of HW thread contexts"

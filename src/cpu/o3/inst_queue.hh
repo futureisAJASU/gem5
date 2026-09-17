@@ -181,6 +181,12 @@ class IQUnit : public SimObject
         return _fuRequesterId;
     }
 
+    unsigned
+    dispatchWriteCap() const
+    {
+        return _dispatchWriteCap;
+    }
+
   private:
     /** IQ sharing policy for SMT. */
     SMTQueuePolicy iqPolicy;
@@ -196,6 +202,9 @@ class IQUnit : public SimObject
 
     /** Number of younger entries visible beyond the queue head. */
     const unsigned _nSkip;
+
+    /** Maximum same-cycle dispatch writes; zero means unlimited. */
+    const unsigned _dispatchWriteCap;
 
     /** Instructions currently owned by this IQ, in dispatch order. */
     std::list<DynInstPtr> _orderedInsts;
@@ -346,6 +355,11 @@ class InstructionQueue
 
     /** Find a compatible IQ (e.g. to insert the instruction) */
     IQUnit *findIQ(const DynInstPtr &inst);
+
+    bool iqCanAcceptDispatch(
+        unsigned iq_index, const DynInstPtr &inst) const;
+
+    bool hasDispatchSlot(const DynInstPtr &inst) const;
 
     /** Record behavior-neutral dispatch steering statistics. */
     void recordSteeringDispatch(

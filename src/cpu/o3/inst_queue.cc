@@ -72,6 +72,7 @@ IQUnit::IQUnit(const IQUnitParams &params)
       activeThreads(nullptr),
       _enableNSkip(params.enableNSkip),
       _nSkip(params.nSkip),
+      _dispatchWriteCap(params.dispatchWriteCap),
       _freeEntries(params.numEntries),
       _numEntries(params.numEntries),
       _fuPool(params.fuPool),
@@ -839,7 +840,7 @@ InstructionQueue::isFull(ThreadID tid)
 bool
 InstructionQueue::isFull(const DynInstPtr &inst)
 {
-    return numFreeEntries(inst) == 0;
+    return !hasDispatchSlot(inst);
 }
 
 std::vector<FUPool *>
@@ -888,6 +889,44 @@ InstructionQueue::hasReadyInsts()
     return false;
 }
 
+bool
+InstructionQueue::iqCanAcceptDispatch(
+    unsigned iq_index, const DynInstPtr &inst) const
+{
+    assert(inst);
+    assert(iq_index < iqs.size());
+
+    IQUnit *iq = iqs[iq_index];
+
+    if (iq->numFreeEntries(inst) == 0) {
+        return false;
+    }
+
+    const unsigned cap = iq->dispatchWriteCap();
+
+    if (cap == 0) {
+        return true;
+    }
+
+    const unsigned writes =
+        dispatchWritesThisCycle.size() == iqs.size() ?
+        dispatchWritesThisCycle[iq_index] : 0;
+
+    return writes < cap;
+}
+
+bool
+InstructionQueue::hasDispatchSlot(const DynInstPtr &inst) const
+{
+    for (unsigned i = 0; i < iqs.size(); ++i) {
+        if (iqCanAcceptDispatch(i, inst)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 IQUnit *
 InstructionQueue::findIQ(const DynInstPtr &inst)
 {
@@ -895,33 +934,26 @@ InstructionQueue::findIQ(const DynInstPtr &inst)
         inst->opClass() == enums::IntAlu &&
         iqs.size() > 1;
 
-    /*
-     * Policy 0 is the legacy behavior and remains the default.
-     * Non-IntAlu instructions always retain legacy first-fit routing.
-     */
     if (!steer_int_alu || iqSteeringPolicy == 0) {
-        for (auto iq : iqs) {
-            if (iq->numFreeEntries(inst) > 0) {
-                return iq;
+        for (unsigned i = 0; i < iqs.size(); ++i) {
+            if (iqCanAcceptDispatch(i, inst)) {
+                return iqs[i];
             }
         }
 
         return nullptr;
     }
 
-    /*
-     * Policy 1: choose the compatible physical IQ with the
-     * smallest raw occupancy. Ties retain physical IQ order.
-     */
     if (iqSteeringPolicy == 1) {
         IQUnit *best = nullptr;
         unsigned best_used = 0;
 
-        for (auto iq : iqs) {
-            if (iq->numFreeEntries(inst) == 0) {
+        for (unsigned i = 0; i < iqs.size(); ++i) {
+            if (!iqCanAcceptDispatch(i, inst)) {
                 continue;
             }
 
+            IQUnit *iq = iqs[i];
             const unsigned used =
                 iq->numEntries() - iq->numFreeEntries();
 
@@ -934,21 +966,13 @@ InstructionQueue::findIQ(const DynInstPtr &inst)
         return best;
     }
 
-    /*
-     * Policy 2: round-robin among currently compatible,
-     * non-full physical IQs.
-     */
     if (iqSteeringPolicy == 2) {
-        for (unsigned offset = 0;
-             offset < iqs.size();
-             ++offset) {
+        for (unsigned offset = 0; offset < iqs.size(); ++offset) {
             const unsigned index =
                 (nextIntAluIQ + offset) % iqs.size();
 
-            if (iqs[index]->numFreeEntries(inst) > 0) {
-                nextIntAluIQ =
-                    (index + 1) % iqs.size();
-
+            if (iqCanAcceptDispatch(index, inst)) {
+                nextIntAluIQ = (index + 1) % iqs.size();
                 return iqs[index];
             }
         }
@@ -956,15 +980,13 @@ InstructionQueue::findIQ(const DynInstPtr &inst)
         return nullptr;
     }
 
-    /*
-     * Policy 3: reverse first-fit. In the provisional Little
-     * five-bank topology this means INT1 before INT0 for IntAlu.
-     */
     assert(iqSteeringPolicy == 3);
 
-    for (auto it = iqs.rbegin(); it != iqs.rend(); ++it) {
-        if ((*it)->numFreeEntries(inst) > 0) {
-            return *it;
+    for (unsigned offset = 0; offset < iqs.size(); ++offset) {
+        const unsigned index = iqs.size() - 1 - offset;
+
+        if (iqCanAcceptDispatch(index, inst)) {
+            return iqs[index];
         }
     }
 
@@ -1020,6 +1042,13 @@ InstructionQueue::recordSteeringDispatch(
     if (dispatchWritesThisCycle.size() != iqs.size()) {
         dispatchWritesThisCycle.assign(iqs.size(), 0);
     }
+
+    const unsigned cap = iq->dispatchWriteCap();
+
+    assert(
+        cap == 0 ||
+        dispatchWritesThisCycle[iq_index] < cap
+    );
 
     dispatchWritesThisCycle[iq_index]++;
 
