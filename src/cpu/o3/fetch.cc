@@ -53,6 +53,7 @@
 #include "cpu/base.hh"
 #include "cpu/exetrace.hh"
 #include "cpu/nop_static_inst.hh"
+#include "cpu/op_class.hh"
 #include "cpu/o3/cpu.hh"
 #include "cpu/o3/dyn_inst.hh"
 #include "cpu/o3/limits.hh"
@@ -199,6 +200,16 @@ Fetch::FetchStatGroup::FetchStatGroup(CPU *cpu, Fetch *fetch)
       ADD_STAT(status, statistics::units::Cycle::get(), "Fetch status cycles"),
       ADD_STAT(predictedBranches, statistics::units::Count::get(),
                "Number of branches that fetch has predicted taken"),
+      ADD_STAT(earlyIntDivHints, statistics::units::Count::get(),
+               "PM-B2 raw predecode IntDiv hints"),
+      ADD_STAT(earlyIntDivTruth, statistics::units::Count::get(),
+               "PM-B2 fully decoded IntDiv ground-truth instructions"),
+      ADD_STAT(earlyIntDivTruePositives, statistics::units::Count::get(),
+               "PM-B2 raw IntDiv hints matching full decode"),
+      ADD_STAT(earlyIntDivFalsePositives, statistics::units::Count::get(),
+               "PM-B2 raw IntDiv hints not matching full decode"),
+      ADD_STAT(earlyIntDivFalseNegatives, statistics::units::Count::get(),
+               "PM-B2 full-decode IntDiv instructions missed by raw hint"),
       ADD_STAT(
           miscStallCycles, statistics::units::Cycle::get(),
           "Number of cycles fetch has spent waiting on interrupts, or bad "
@@ -1243,7 +1254,37 @@ Fetch::fetch(bool &status_change)
         do {
             if (!(curMacroop || inRom)) {
                 if (dec_ptr->instReady()) {
+                    /*
+                     * PM-B2 A1 classifier-only validation.
+                     *
+                     * Sample the ISA decoder's cheap raw-bit hint before
+                     * full StaticInst decode, then compare against the
+                     * architectural decoder's OpClass ground truth.
+                     *
+                     * This stage is observational only: it does not request
+                     * any FU wake or otherwise alter simulated execution.
+                     */
+                    const bool early_int_div_hint =
+                        dec_ptr->earlyIntDivHint();
+
                     staticInst = dec_ptr->decode(this_pc);
+
+                    const bool truth_int_div =
+                        staticInst->opClass() == IntDivOp;
+
+                    if (early_int_div_hint)
+                        fetchStats.earlyIntDivHints++;
+
+                    if (truth_int_div)
+                        fetchStats.earlyIntDivTruth++;
+
+                    if (early_int_div_hint && truth_int_div) {
+                        fetchStats.earlyIntDivTruePositives++;
+                    } else if (early_int_div_hint) {
+                        fetchStats.earlyIntDivFalsePositives++;
+                    } else if (truth_int_div) {
+                        fetchStats.earlyIntDivFalseNegatives++;
+                    }
 
                     // Increment stat of fetched instructions.
                     cpu->fetchStats[tid]->numInsts++;

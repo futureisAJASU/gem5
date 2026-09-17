@@ -107,6 +107,16 @@ class InstDecoder : public SimObject
     bool instReady() const { return instDone; }
 
     /**
+     * Return a cheap pre-decode hint that the currently ready raw
+     * instruction is an integer divide.
+     *
+     * The default implementation is ISA-neutral and emits no hint.
+     * ISA decoders may override this using raw/pre-decoded bits only;
+     * this hook must not perform or depend on full StaticInst decode.
+     */
+    virtual bool earlyIntDivHint() const { return false; }
+
+    /**
      * Can the decoder accept more data?
      *
      * A CPU model uses this method to determine if the decoder can

@@ -151,6 +151,19 @@ class Decoder : public InstDecoder
 
     void moreBytes(const PCStateBase &pc, Addr fetchPC) override;
 
+    bool
+    earlyIntDivHint() const override
+    {
+        constexpr uint32_t IntDivMask = 0x7FE0F800;
+        constexpr uint32_t IntDivValue = 0x1AC00800;
+
+        if (!instDone || !emi.aarch64 || emi.thumb)
+            return false;
+
+        const uint32_t raw = static_cast<uint32_t>(emi.instBits);
+        return (raw & IntDivMask) == IntDivValue;
+    }
+
     StaticInstPtr decode(PCStateBase &pc) override;
 
   public: // ARM-specific decoder state manipulation

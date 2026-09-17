@@ -559,6 +559,14 @@ class Fetch
         statistics::Vector status;
         /** Stat for total number of predicted branches. */
         statistics::Scalar predictedBranches;
+
+        /** PM-B2 raw AArch64 IntDiv predecode classifier statistics. */
+        statistics::Scalar earlyIntDivHints;
+        statistics::Scalar earlyIntDivTruth;
+        statistics::Scalar earlyIntDivTruePositives;
+        statistics::Scalar earlyIntDivFalsePositives;
+        statistics::Scalar earlyIntDivFalseNegatives;
+
         /** Total number of cycles spent in any other state. */
         statistics::Scalar miscStallCycles;
         /** Total number of cycles spent in waiting for drains. */
