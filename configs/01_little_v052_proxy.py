@@ -1196,6 +1196,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         pair_shared_fpsimd: bool = False,
         div_reactive_power: bool = False,
         div_decode_wake: bool = False,
+        div_raw_wake: bool = False,
         div_idle_threshold: int = 8,
         div_wake_latency: int = 0,
     ) -> None:
@@ -1229,6 +1230,16 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         if div_decode_wake and not div_reactive_power:
             raise ValueError(
                 "--div-decode-wake requires --div-reactive-power"
+            )
+
+        if div_raw_wake and not pair_shared_div:
+            raise ValueError(
+                "--div-raw-wake requires --pair-shared-div"
+            )
+
+        if div_raw_wake and not div_reactive_power:
+            raise ValueError(
+                "--div-raw-wake requires --div-reactive-power"
             )
 
         if pair_shared_div:
@@ -1267,6 +1278,7 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
             LittlePairSharedDivPool(
                 reactivePowerGating=div_reactive_power,
                 predictiveWakeEnabled=div_decode_wake,
+                rawPredictiveWakeEnabled=div_raw_wake,
                 powerIdleThreshold=div_idle_threshold,
                 powerWakeLatency=div_wake_latency,
             )
@@ -1372,6 +1384,14 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Use Decode-stage IntDiv classification to wake the "
             "pair-shared DIV domain before issue demand"
+        ),
+    )
+    parser.add_argument(
+        "--div-raw-wake",
+        action="store_true",
+        help=(
+            "Use raw AArch64 IntDiv predecode classification to wake the "
+            "pair-shared DIV domain before full architectural decode"
         ),
     )
     parser.add_argument(
@@ -1903,6 +1923,7 @@ def main() -> None:
         pair_shared_fpsimd=args.pair_shared_fpsimd,
         div_reactive_power=args.div_reactive_power,
         div_decode_wake=args.div_decode_wake,
+        div_raw_wake=args.div_raw_wake,
         div_idle_threshold=args.div_idle_threshold,
         div_wake_latency=args.div_wake_latency,
     )
@@ -2013,6 +2034,7 @@ def main() -> None:
         f"btb-entries={args.btb_entries}",
         f"pair-shared-div={args.pair_shared_div}",
         f"div-decode-wake={args.div_decode_wake}",
+        f"div-raw-wake={args.div_raw_wake}",
         f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
         f"cache-prefetch={args.cache_prefetch}",
         f"prefetch-degree={args.prefetch_degree}",

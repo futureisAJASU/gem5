@@ -1261,17 +1261,23 @@ Fetch::fetch(bool &status_change)
             if (!(curMacroop || inRom)) {
                 if (dec_ptr->instReady()) {
                     /*
-                     * PM-B2 A1 classifier-only validation.
+                     * PM-B2 raw-predecode classification.
                      *
-                     * Sample the ISA decoder's cheap raw-bit hint before
-                     * full StaticInst decode, then compare against the
-                     * architectural decoder's OpClass ground truth.
-                     *
-                     * This stage is observational only: it does not request
-                     * any FU wake or otherwise alter simulated execution.
+                     * The cheap ISA-specific raw-bit classifier executes
+                     * before full StaticInst decode. A2b may use this result
+                     * as a power-state-only wake hint; A1 accuracy counters
+                     * below still compare it with the full decoder.
                      */
                     const bool early_int_div_hint =
                         dec_ptr->earlyIntDivHint();
+
+                    /*
+                     * PM-B2 A2b: this call is deliberately before
+                     * dec_ptr->decode(). If raw wake is disabled, the
+                     * FUPool route is an immediate no-op.
+                     */
+                    if (early_int_div_hint)
+                        cpu->requestRawFuWake(IntDivOp);
 
                     raw_int_div_hint_for_inst = early_int_div_hint;
 

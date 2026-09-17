@@ -59,7 +59,11 @@ class FUPool(SimObject):
     )
     predictiveWakeEnabled = Param.Bool(
         False,
-        "Enable early predictive wake hints for pair-shared FU domains",
+        "Enable Decode-stage predictive wake hints for pair-shared FU domains",
+    )
+    rawPredictiveWakeEnabled = Param.Bool(
+        False,
+        "Enable raw-predecode predictive wake hints for pair-shared FU domains",
     )
     powerIdleThreshold = Param.Unsigned(
         8,

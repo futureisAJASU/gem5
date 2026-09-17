@@ -369,6 +369,10 @@ class IEW
      * any FU pool implementing that capability.
      */
     void requestDecodeFuWake(OpClass capability);
+
+    /** Forward a PM-B2 raw-predecode wake hint to capable FU pools. */
+    void requestRawFuWake(OpClass capability);
+
     /** Records if the LSQ needs to be updated on the next cycle, so that
      * IEW knows if there will be activity on the next cycle.
      */

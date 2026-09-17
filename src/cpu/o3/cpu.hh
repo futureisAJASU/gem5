@@ -507,6 +507,9 @@ class CPU : public BaseCPU
     /** Forward a Decode-stage execution-class wake hint to IEW. */
     void requestDecodeFuWake(OpClass capability);
 
+    /** Forward a PM-B2 raw-predecode execution-class wake hint to IEW. */
+    void requestRawFuWake(OpClass capability);
+
     /** Changes a stage's status to active within the activity recorder. */
     void
     activateStage(const StageIdx idx)

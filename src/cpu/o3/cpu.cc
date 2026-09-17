@@ -467,6 +467,12 @@ CPU::requestDecodeFuWake(OpClass capability)
 }
 
 void
+CPU::requestRawFuWake(OpClass capability)
+{
+    iew.requestRawFuWake(capability);
+}
+
+void
 CPU::activateThread(ThreadID tid)
 {
     auto active_it = std::find(

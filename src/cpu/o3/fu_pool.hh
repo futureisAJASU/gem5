@@ -144,6 +144,7 @@ class FUPool : public SimObject
      */
     const bool reactivePowerGating;
     const bool predictiveWakeEnabled;
+    const bool rawPredictiveWakeEnabled;
     const unsigned powerIdleThreshold;
     const unsigned powerWakeLatency;
     /**
@@ -256,10 +257,15 @@ class FUPool : public SimObject
         uint64_t wakeRemaining = 0;
 
         /*
-         * A Decode-triggered wake is outstanding until the first
-         * real FU demand arrives or the domain returns to Sleep.
+         * A predictive wake is outstanding until the first real FU
+         * demand arrives or the domain returns to Sleep.
+         *
+         * Ownership records which stage actually caused the
+         * Sleep -> Waking/Awake transition. Later hints do not steal
+         * ownership from the outstanding event.
          */
         bool predictiveWakeOutstanding = false;
+        bool predictiveWakeFromRaw = false;
     };
 
     /** OpClass -> physical FUDesc arbitration domain. */
@@ -291,6 +297,16 @@ class FUPool : public SimObject
     statistics::Scalar decodeWakeExpired;
     statistics::Scalar decodeWakeDemandWhileWaking;
     statistics::Scalar decodeWakeDemandWhileAwake;
+
+    /** PM-B2 raw-predecode predictive-wake statistics. */
+    statistics::Scalar rawWakeHints;
+    statistics::Scalar rawWakeTransitions;
+    statistics::Scalar rawWakeAlreadyAwake;
+    statistics::Scalar rawWakeAlreadyWaking;
+    statistics::Scalar rawWakeDemandMatched;
+    statistics::Scalar rawWakeExpired;
+    statistics::Scalar rawWakeDemandWhileWaking;
+    statistics::Scalar rawWakeDemandWhileAwake;
 
     /**
      * Class that implements a circular queue to hold FU indices. The hope is
@@ -388,6 +404,13 @@ class FUPool : public SimObject
      * allocate a unit, or modify pair arbitration state.
      */
     void requestPredictiveWake(OpClass capability);
+
+    /**
+     * Request a raw-predecode predictive wake for the physical domain.
+     * Semantics are identical to requestPredictiveWake(), but event
+     * ownership and statistics remain separate from PM-B1 Decode wake.
+     */
+    void requestRawPredictiveWake(OpClass capability);
 
     /** Frees a FU at the end of this cycle. */
     void freeUnitNextCycle(int fu_idx);
