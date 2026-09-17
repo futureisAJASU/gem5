@@ -674,6 +674,9 @@ class InstructionQueue
         statistics::Vector steerIntMultDispatches;
         statistics::Vector steerOccupancySum;
         statistics::Vector steerFullCycles;
+        statistics::Vector steerEmptyCycles;
+        statistics::Vector steerAtOrBelowHalfCycles;
+        statistics::Vector steerAtOrBelowThreeQuarterCycles;
         statistics::Scalar steerOccupancySamples;
 
         statistics::Scalar instsIssued;

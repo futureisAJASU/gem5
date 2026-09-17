@@ -408,6 +408,12 @@ InstructionQueue::IQStats::IQStats(
                "Sum of physical IQ occupancy samples"),
       ADD_STAT(steerFullCycles, statistics::units::Cycle::get(),
                "Scheduler samples where each physical IQ was full"),
+      ADD_STAT(steerEmptyCycles, statistics::units::Cycle::get(),
+               "Scheduler samples where each physical IQ was empty"),
+      ADD_STAT(steerAtOrBelowHalfCycles, statistics::units::Cycle::get(),
+               "Scheduler samples where physical IQ occupancy was <= 1/2"),
+      ADD_STAT(steerAtOrBelowThreeQuarterCycles, statistics::units::Cycle::get(),
+               "Scheduler samples where physical IQ occupancy was <= 3/4"),
       ADD_STAT(steerOccupancySamples, statistics::units::Cycle::get(),
                "Number of physical IQ occupancy samples"),
       ADD_STAT(instsIssued, statistics::units::Count::get(),
@@ -479,6 +485,10 @@ InstructionQueue::IQStats::IQStats(
         .init(num_iqs)
         .flags(statistics::total);
 
+    steerEmptyCycles.init(num_iqs).flags(statistics::total);
+    steerAtOrBelowHalfCycles.init(num_iqs).flags(statistics::total);
+    steerAtOrBelowThreeQuarterCycles.init(num_iqs).flags(statistics::total);
+
     for (unsigned i = 0; i < num_iqs; ++i) {
         const std::string iq_name = "IQ" + std::to_string(i);
 
@@ -487,6 +497,9 @@ InstructionQueue::IQStats::IQStats(
         steerIntMultDispatches.subname(i, iq_name);
         steerOccupancySum.subname(i, iq_name);
         steerFullCycles.subname(i, iq_name);
+        steerEmptyCycles.subname(i, iq_name);
+        steerAtOrBelowHalfCycles.subname(i, iq_name);
+        steerAtOrBelowThreeQuarterCycles.subname(i, iq_name);
     }
 
     steerOccupancySamples
@@ -1189,6 +1202,17 @@ InstructionQueue::scheduleReadyInsts()
             iqs[i]->numEntries() - iqs[i]->numFreeEntries();
 
         iqStats.steerOccupancySum[i] += used;
+
+        const unsigned entries = iqs[i]->numEntries();
+
+        if (used == 0)
+            iqStats.steerEmptyCycles[i]++;
+
+        if (used * 2 <= entries)
+            iqStats.steerAtOrBelowHalfCycles[i]++;
+
+        if (used * 4 <= entries * 3)
+            iqStats.steerAtOrBelowThreeQuarterCycles[i]++;
 
         if (iqs[i]->numFreeEntries() == 0) {
             iqStats.steerFullCycles[i]++;
