@@ -98,7 +98,42 @@ FUPool::FUPool(const Params &p)
       ADD_STAT(allIdleSamples, statistics::units::Cycle::get(),
           "Allocation-state samples with no allocated FU"),
       ADD_STAT(perUnitAllocatedSamples, statistics::units::Cycle::get(),
-          "Allocation-state samples where each physical FU was allocated")
+          "Allocation-state samples where each physical FU was allocated"),
+      currentIdleRunLength(0),
+      ADD_STAT(completedIdleRuns, statistics::units::Count::get(),
+          "Completed consecutive allocation-idle runs"),
+      ADD_STAT(idleRuns1To3, statistics::units::Count::get(),
+          "Completed allocation-idle runs of length 1-3 samples"),
+      ADD_STAT(idleRuns4To7, statistics::units::Count::get(),
+          "Completed allocation-idle runs of length 4-7 samples"),
+      ADD_STAT(idleRuns8To15, statistics::units::Count::get(),
+          "Completed allocation-idle runs of length 8-15 samples"),
+      ADD_STAT(idleRuns16To31, statistics::units::Count::get(),
+          "Completed allocation-idle runs of length 16-31 samples"),
+      ADD_STAT(idleRuns32To63, statistics::units::Count::get(),
+          "Completed allocation-idle runs of length 32-63 samples"),
+      ADD_STAT(idleRuns64To127, statistics::units::Count::get(),
+          "Completed allocation-idle runs of length 64-127 samples"),
+      ADD_STAT(idleRuns128Plus, statistics::units::Count::get(),
+          "Completed allocation-idle runs of length at least 128 samples"),
+      ADD_STAT(idleBeyond8Samples, statistics::units::Cycle::get(),
+          "Allocation-idle samples remaining after an 8-sample threshold"),
+      ADD_STAT(idleBeyond16Samples, statistics::units::Cycle::get(),
+          "Allocation-idle samples remaining after a 16-sample threshold"),
+      ADD_STAT(idleBeyond32Samples, statistics::units::Cycle::get(),
+          "Allocation-idle samples remaining after a 32-sample threshold"),
+      ADD_STAT(idleBeyond64Samples, statistics::units::Cycle::get(),
+          "Allocation-idle samples remaining after a 64-sample threshold"),
+      ADD_STAT(completedIdleSamples, statistics::units::Cycle::get(),
+          "Allocation-idle samples belonging to completed idle runs"),
+      ADD_STAT(completedIdleBeyond8Samples, statistics::units::Cycle::get(),
+          "Completed-run idle samples remaining after an 8-sample threshold"),
+      ADD_STAT(completedIdleBeyond16Samples, statistics::units::Cycle::get(),
+          "Completed-run idle samples remaining after a 16-sample threshold"),
+      ADD_STAT(completedIdleBeyond32Samples, statistics::units::Cycle::get(),
+          "Completed-run idle samples remaining after a 32-sample threshold"),
+      ADD_STAT(completedIdleBeyond64Samples, statistics::units::Cycle::get(),
+          "Completed-run idle samples remaining after a 64-sample threshold")
 {
     numFU = 0;
 
@@ -548,10 +583,54 @@ FUPool::processFreeUnits()
         allocationStateSamples++;
         allocatedUnitSum += allocated;
 
-        if (allocated == 0)
+        if (allocated == 0) {
             allIdleSamples++;
-        else
+            ++currentIdleRunLength;
+
+            if (currentIdleRunLength > 8)
+                idleBeyond8Samples++;
+            if (currentIdleRunLength > 16)
+                idleBeyond16Samples++;
+            if (currentIdleRunLength > 32)
+                idleBeyond32Samples++;
+            if (currentIdleRunLength > 64)
+                idleBeyond64Samples++;
+        } else {
             anyAllocatedSamples++;
+
+            if (currentIdleRunLength != 0) {
+                const uint64_t idle_run = currentIdleRunLength;
+
+                completedIdleRuns++;
+                completedIdleSamples += idle_run;
+
+                if (idle_run > 8)
+                    completedIdleBeyond8Samples += idle_run - 8;
+                if (idle_run > 16)
+                    completedIdleBeyond16Samples += idle_run - 16;
+                if (idle_run > 32)
+                    completedIdleBeyond32Samples += idle_run - 32;
+                if (idle_run > 64)
+                    completedIdleBeyond64Samples += idle_run - 64;
+
+                if (currentIdleRunLength <= 3)
+                    idleRuns1To3++;
+                else if (currentIdleRunLength <= 7)
+                    idleRuns4To7++;
+                else if (currentIdleRunLength <= 15)
+                    idleRuns8To15++;
+                else if (currentIdleRunLength <= 31)
+                    idleRuns16To31++;
+                else if (currentIdleRunLength <= 63)
+                    idleRuns32To63++;
+                else if (currentIdleRunLength <= 127)
+                    idleRuns64To127++;
+                else
+                    idleRuns128Plus++;
+
+                currentIdleRunLength = 0;
+            }
+        }
     }
 
     while (!unitsToBeFreed.empty()) {

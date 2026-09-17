@@ -43,6 +43,7 @@
 
 #include <array>
 #include <bitset>
+#include <cstdint>
 #include <list>
 #include <string>
 #include <vector>
@@ -146,6 +147,42 @@ class FUPool : public SimObject
     statistics::Scalar anyAllocatedSamples;
     statistics::Scalar allIdleSamples;
     statistics::Vector perUnitAllocatedSamples;
+
+    /** Current consecutive allocation-idle run length. */
+    uint64_t currentIdleRunLength;
+
+    /** Completed allocation-idle run statistics. */
+    statistics::Scalar completedIdleRuns;
+    statistics::Scalar idleRuns1To3;
+    statistics::Scalar idleRuns4To7;
+    statistics::Scalar idleRuns8To15;
+    statistics::Scalar idleRuns16To31;
+    statistics::Scalar idleRuns32To63;
+    statistics::Scalar idleRuns64To127;
+    statistics::Scalar idleRuns128Plus;
+
+    /**
+     * Idle samples remaining after an idle threshold has elapsed.
+     * For example, a 100-cycle run contributes 84 samples to
+     * idleBeyond16Samples.
+     */
+    statistics::Scalar idleBeyond8Samples;
+    statistics::Scalar idleBeyond16Samples;
+    statistics::Scalar idleBeyond32Samples;
+    statistics::Scalar idleBeyond64Samples;
+
+    /**
+     * Exact accounting over completed idle runs only.
+     *
+     * These counters exclude an idle run still open when simulation
+     * statistics are dumped, making them suitable for recurrent
+     * sleep-threshold and wakeup-policy analysis.
+     */
+    statistics::Scalar completedIdleSamples;
+    statistics::Scalar completedIdleBeyond8Samples;
+    statistics::Scalar completedIdleBeyond16Samples;
+    statistics::Scalar completedIdleBeyond32Samples;
+    statistics::Scalar completedIdleBeyond64Samples;
 
     /**
      * Independent two-requester arbitration state for one
