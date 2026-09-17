@@ -615,6 +615,12 @@ class CPU : public BaseCPU
         /** Stat for total number of cycles the CPU spends descheduled due to a
          * quiesce operation or waiting for an interrupt. */
         statistics::Scalar quiesceCycles;
+
+        /**
+         * PM-B2 raw IntDiv hints whose DynInst was centrally squashed
+         * before reaching the non-squashed Decode hint point.
+         */
+        statistics::Scalar rawIntDivSquashedBeforeDecode;
     } cpuStats;
 
   public:

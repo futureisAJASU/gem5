@@ -351,7 +351,9 @@ CPU::CPUStats::CPUStats(CPU *cpu)
                "to idling"),
       ADD_STAT(quiesceCycles, statistics::units::Cycle::get(),
                "Total number of cycles that CPU has spent quiesced or waiting "
-               "for an interrupt")
+               "for an interrupt"),
+      ADD_STAT(rawIntDivSquashedBeforeDecode, statistics::units::Count::get(),
+               "PM-B2 raw IntDiv hints squashed before Decode survival")
 {
     // Register any of the O3CPU's stats here.
     timesIdled
@@ -362,6 +364,9 @@ CPU::CPUStats::CPUStats(CPU *cpu)
 
     quiesceCycles
         .prereq(quiesceCycles);
+
+    rawIntDivSquashedBeforeDecode
+        .prereq(rawIntDivSquashedBeforeDecode);
 }
 
 void
@@ -1276,6 +1281,22 @@ CPU::squashInstIt(const ListIt &instIt, ThreadID tid)
                 (*instIt)->threadNumber,
                 (*instIt)->seqNum,
                 (*instIt)->pcState());
+
+        /*
+         * PM-B2 A2a lineage accounting.
+         *
+         * squashInstIt() is the common CPU-list squash path used by
+         * removeInstsUntil() and removeInstsNotInROB(). Count a raw
+         * IntDiv exactly once when it is killed before surviving to
+         * the PM-B1 Decode hint point.
+         */
+        if ((*instIt)->hasRawIntDivHint() &&
+            !(*instIt)->hasRawIntDivReachedDecode() &&
+            !(*instIt)->hasRawIntDivSquashAccounted()) {
+
+            ++cpuStats.rawIntDivSquashedBeforeDecode;
+            (*instIt)->setRawIntDivSquashAccounted();
+        }
 
         // Mark it as squashed.
         (*instIt)->setSquashed();

@@ -169,7 +169,9 @@ Decode::DecodeStats::DecodeStats(CPU *cpu)
       ADD_STAT(decodedInsts, statistics::units::Count::get(),
                "Number of instructions handled by decode"),
       ADD_STAT(squashedInsts, statistics::units::Count::get(),
-               "Number of squashed instructions handled by decode")
+               "Number of squashed instructions handled by decode"),
+      ADD_STAT(rawIntDivReachedDecode, statistics::units::Count::get(),
+               "PM-B2 raw IntDiv hints surviving to the Decode hint point")
 {
     status.init(ThreadStatusMax).flags(statistics::pdf | statistics::nozero);
     for (int i = 0; i < ThreadStatusMax; ++i) {
@@ -181,6 +183,7 @@ Decode::DecodeStats::DecodeStats(CPU *cpu)
     controlMispred.prereq(controlMispred);
     decodedInsts.prereq(decodedInsts);
     squashedInsts.prereq(squashedInsts);
+    rawIntDivReachedDecode.prereq(rawIntDivReachedDecode);
 }
 
 void
@@ -680,6 +683,21 @@ Decode::decodeInsts(ThreadID tid)
             --insts_available;
 
             continue;
+        }
+
+        /*
+         * PM-B2 A2a lineage:
+         *
+         * Reaching this point means the DynInst survived the explicit
+         * isSquashed() rejection immediately above and is at the same
+         * processing point used by the PM-B1 Decode-stage wake.
+         */
+        if (inst->hasRawIntDivHint()) {
+            assert(inst->opClass() == enums::IntDiv);
+            assert(!inst->hasRawIntDivReachedDecode());
+
+            inst->setRawIntDivReachedDecode();
+            ++stats.rawIntDivReachedDecode;
         }
 
         /*

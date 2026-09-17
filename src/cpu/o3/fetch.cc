@@ -1252,6 +1252,12 @@ Fetch::fetch(bool &status_change)
         // Extract as many instructions and/or microops as we can from
         // the memory we've processed so far.
         do {
+            /*
+             * PM-B2 A2a: lineage for the raw predecode result belonging
+             * to the instruction built in this iteration.
+             */
+            bool raw_int_div_hint_for_inst = false;
+
             if (!(curMacroop || inRom)) {
                 if (dec_ptr->instReady()) {
                     /*
@@ -1266,6 +1272,8 @@ Fetch::fetch(bool &status_change)
                      */
                     const bool early_int_div_hint =
                         dec_ptr->earlyIntDivHint();
+
+                    raw_int_div_hint_for_inst = early_int_div_hint;
 
                     staticInst = dec_ptr->decode(this_pc);
 
@@ -1316,6 +1324,9 @@ Fetch::fetch(bool &status_change)
 
             DynInstPtr instruction = buildInst(
                     tid, staticInst, curMacroop, this_pc, *next_pc, true);
+
+            if (raw_int_div_hint_for_inst)
+                instruction->setRawIntDivHint();
 
             ppFetch->notify(instruction);
             numInst++;

@@ -320,6 +320,12 @@ class Decode
         statistics::Scalar decodedInsts;
         /** Stat for total number of squashed instructions. */
         statistics::Scalar squashedInsts;
+
+        /**
+         * PM-B2 raw-hinted IntDiv instructions surviving to the
+         * non-squashed Decode processing point.
+         */
+        statistics::Scalar rawIntDivReachedDecode;
     } stats;
 };
 

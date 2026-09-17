@@ -199,6 +199,16 @@ class DynInst : public ExecContext, public RefCounted
     /** The status of this BaseDynInst.  Several bits can be set. */
     std::bitset<NumStatus> status;
 
+    /*
+     * PM-B2 raw-predecode lineage.
+     *
+     * These flags are observational only in A2a. They do not affect
+     * scheduling, execution, or power state.
+     */
+    bool rawIntDivHintFlag = false;
+    bool rawIntDivReachedDecodeFlag = false;
+    bool rawIntDivSquashAccountedFlag = false;
+
   protected:
     /** The result of the instruction; assumes an instruction can have many
      *  destination registers.
@@ -787,6 +797,32 @@ class DynInst : public ExecContext, public RefCounted
 
     /** Returns whether or not this instruction is committed. */
     bool isCommitted() const { return status[Committed]; }
+
+    /**
+     * PM-B2 raw-predecode lineage helpers.
+     */
+    void setRawIntDivHint() { rawIntDivHintFlag = true; }
+    bool hasRawIntDivHint() const { return rawIntDivHintFlag; }
+
+    void setRawIntDivReachedDecode()
+    {
+        rawIntDivReachedDecodeFlag = true;
+    }
+
+    bool hasRawIntDivReachedDecode() const
+    {
+        return rawIntDivReachedDecodeFlag;
+    }
+
+    void setRawIntDivSquashAccounted()
+    {
+        rawIntDivSquashAccountedFlag = true;
+    }
+
+    bool hasRawIntDivSquashAccounted() const
+    {
+        return rawIntDivSquashAccountedFlag;
+    }
 
     /** Sets this instruction as squashed. */
     void setSquashed();
