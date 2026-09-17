@@ -88,7 +88,17 @@ FUPool::FUPool(const Params &p)
       lastFreeProcessTick(0),
       hasProcessedFreeTick(false),
       pairArbEpoch(0),
-      pairRrArb(p.pairRrArb)
+      pairRrArb(p.pairRrArb),
+      ADD_STAT(allocationStateSamples, statistics::units::Cycle::get(),
+          "Global-tick samples of FU allocation state"),
+      ADD_STAT(allocatedUnitSum, statistics::units::Count::get(),
+          "Sum of allocated FU units across allocation-state samples"),
+      ADD_STAT(anyAllocatedSamples, statistics::units::Cycle::get(),
+          "Allocation-state samples with at least one allocated FU"),
+      ADD_STAT(allIdleSamples, statistics::units::Cycle::get(),
+          "Allocation-state samples with no allocated FU"),
+      ADD_STAT(perUnitAllocatedSamples, statistics::units::Cycle::get(),
+          "Allocation-state samples where each physical FU was allocated")
 {
     numFU = 0;
 
@@ -217,6 +227,14 @@ FUPool::FUPool(const Params &p)
 
     for (int i = 0; i < numFU; i++) {
         unitBusy[i] = false;
+    }
+
+    perUnitAllocatedSamples
+        .init(numFU)
+        .flags(statistics::total);
+
+    for (int i = 0; i < numFU; ++i) {
+        perUnitAllocatedSamples.subname(i, funcUnits[i]->name);
     }
 }
 
@@ -510,6 +528,31 @@ FUPool::processFreeUnits()
      */
     if (pairRrArb)
         ++pairArbEpoch;
+
+    /*
+     * Observation only: sample the allocation state before releasing
+     * units scheduled to become free this cycle.  processFreeUnits()
+     * is globally tick-guarded, so shared pools are sampled at most
+     * once per global simulation tick.
+     */
+    if (numFU > 0) {
+        unsigned allocated = 0;
+
+        for (int i = 0; i < numFU; ++i) {
+            if (unitBusy[i]) {
+                ++allocated;
+                perUnitAllocatedSamples[i]++;
+            }
+        }
+
+        allocationStateSamples++;
+        allocatedUnitSum += allocated;
+
+        if (allocated == 0)
+            allIdleSamples++;
+        else
+            anyAllocatedSamples++;
+    }
 
     while (!unitsToBeFreed.empty()) {
         int fu_idx = unitsToBeFreed.back();

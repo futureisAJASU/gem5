@@ -47,6 +47,7 @@
 #include <string>
 #include <vector>
 
+#include "base/statistics.hh"
 #include "cpu/op_class.hh"
 #include "params/FUPool.hh"
 #include "sim/sim_object.hh"
@@ -132,6 +133,19 @@ class FUPool : public SimObject
      * round-robin service when both cores contend.
      */
     const bool pairRrArb;
+
+    /**
+     * Observation-only allocation-state statistics.
+     *
+     * For non-pipelined units, allocation residency is a useful
+     * execution-occupancy proxy.  For pipelined units, it reflects
+     * issue/allocation activity rather than full pipeline residency.
+     */
+    statistics::Scalar allocationStateSamples;
+    statistics::Scalar allocatedUnitSum;
+    statistics::Scalar anyAllocatedSamples;
+    statistics::Scalar allIdleSamples;
+    statistics::Vector perUnitAllocatedSamples;
 
     /**
      * Independent two-requester arbitration state for one
