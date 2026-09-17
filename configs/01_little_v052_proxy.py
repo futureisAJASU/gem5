@@ -1194,10 +1194,30 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
         num_cores: int,
         pair_shared_div: bool,
         pair_shared_fpsimd: bool = False,
+        div_reactive_power: bool = False,
+        div_idle_threshold: int = 8,
+        div_wake_latency: int = 0,
     ) -> None:
         if num_cores <= 0:
             raise ValueError(
                 f"num_cores must be positive, got {num_cores}"
+            )
+
+        if div_reactive_power and not pair_shared_div:
+            raise ValueError(
+                "reactive DIV power modeling requires pair-shared DIV"
+            )
+
+        if div_idle_threshold <= 0:
+            raise ValueError(
+                f"DIV idle threshold must be positive, got "
+                f"{div_idle_threshold}"
+            )
+
+        if div_wake_latency < 0:
+            raise ValueError(
+                f"DIV wake latency must be non-negative, got "
+                f"{div_wake_latency}"
             )
 
         if pair_shared_div:
@@ -1233,7 +1253,11 @@ class LittleV052ProxyProcessor(BaseCPUProcessor):
                 )
 
         shared_div_pool = (
-            LittlePairSharedDivPool()
+            LittlePairSharedDivPool(
+                reactivePowerGating=div_reactive_power,
+                powerIdleThreshold=div_idle_threshold,
+                powerWakeLatency=div_wake_latency,
+            )
             if pair_shared_div
             else None
         )
@@ -1322,6 +1346,32 @@ def parse_args() -> argparse.Namespace:
             "DIV IQs reference one physical 20-cycle non-pipelined divider"
         ),
     )
+    parser.add_argument(
+        "--div-reactive-power",
+        action="store_true",
+        help=(
+            "Enable reactive sleep/wake modeling for the "
+            "pair-shared integer DIV domain"
+        ),
+    )
+    parser.add_argument(
+        "--div-idle-threshold",
+        type=int,
+        default=8,
+        help=(
+            "Consecutive idle samples observed before the shared "
+            "DIV domain becomes sleep-eligible"
+        ),
+    )
+    parser.add_argument(
+        "--div-wake-latency",
+        type=int,
+        default=0,
+        help=(
+            "Reactive shared-DIV wake latency in FU-pool control cycles"
+        ),
+    )
+
     parser.add_argument(
         "--pair-shared-fpsimd",
         action="store_true",
@@ -1831,6 +1881,9 @@ def main() -> None:
         num_cores=args.cores,
         pair_shared_div=args.pair_shared_div,
         pair_shared_fpsimd=args.pair_shared_fpsimd,
+        div_reactive_power=args.div_reactive_power,
+        div_idle_threshold=args.div_idle_threshold,
+        div_wake_latency=args.div_wake_latency,
     )
 
     # Explicit cache hierarchy controls.

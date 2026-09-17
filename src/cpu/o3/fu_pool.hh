@@ -135,6 +135,16 @@ class FUPool : public SimObject
      */
     const bool pairRrArb;
 
+
+    /**
+     * Optional reactive power-state model for pair-shared physical
+     * FUDesc domains.
+     *
+     * Disabled by default so historical execution behavior is preserved.
+     */
+    const bool reactivePowerGating;
+    const unsigned powerIdleThreshold;
+    const unsigned powerWakeLatency;
     /**
      * Observation-only allocation-state statistics.
      *
@@ -191,6 +201,13 @@ class FUPool : public SimObject
      * OpClasses implemented by the same FUDesc share one
      * state. Unrelated physical domains arbitrate independently.
      */
+    enum class ReactivePowerState : uint8_t
+    {
+        Awake,
+        Sleep,
+        Waking,
+    };
+
     struct PairRrDomainState
     {
         int preferredRequester = 0;
@@ -219,6 +236,23 @@ class FUPool : public SimObject
          */
         std::array<Tick, 2> lastRequestEpoch{{0, 0}};
         std::array<bool, 2> hasRequestEpoch{{false, false}};
+
+        /**
+         * Physical FU index range belonging to this FUDesc domain.
+         * FUs created from one FUDesc are contiguous.
+         */
+        int firstFuIdx = -1;
+        int fuCount = 0;
+
+        /**
+         * Reactive power-control state.
+         *
+         * Deliberately independent from the A2b observation-only
+         * idle-run counters.
+         */
+        ReactivePowerState powerState = ReactivePowerState::Awake;
+        uint64_t powerIdleCounter = 0;
+        uint64_t wakeRemaining = 0;
     };
 
     /** OpClass -> physical FUDesc arbitration domain. */
@@ -226,6 +260,18 @@ class FUPool : public SimObject
 
     /** One RR state per physical FUDesc domain. */
     std::vector<PairRrDomainState> pairRrDomains;
+
+    /**
+     * Reactive power-state statistics.
+     *
+     * Aggregated across enabled pair-shared FUDesc domains.
+     */
+    statistics::Scalar reactiveAwakeSamples;
+    statistics::Scalar reactiveSleepSamples;
+    statistics::Scalar reactiveWakingSamples;
+    statistics::Scalar reactiveSleepTransitions;
+    statistics::Scalar reactiveWakeTransitions;
+    statistics::Scalar reactivePowerBlockedRequests;
 
     /**
      * Class that implements a circular queue to hold FU indices. The hope is

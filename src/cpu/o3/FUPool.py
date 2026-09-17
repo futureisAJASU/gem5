@@ -53,6 +53,20 @@ class FUPool(SimObject):
     )
 
 
+    reactivePowerGating = Param.Bool(
+        False,
+        "Enable reactive power-state modeling for pair-shared FU domains",
+    )
+    powerIdleThreshold = Param.Unsigned(
+        8,
+        "Consecutive allocation-idle samples observed before sleep eligibility",
+    )
+    powerWakeLatency = Param.Unsigned(
+        0,
+        "Reactive wake latency in global FU-pool processing cycles",
+    )
+
+
 class DefaultFUPool(FUPool):
     FUList = [
         IntALU(),

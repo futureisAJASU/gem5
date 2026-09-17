@@ -89,6 +89,9 @@ FUPool::FUPool(const Params &p)
       hasProcessedFreeTick(false),
       pairArbEpoch(0),
       pairRrArb(p.pairRrArb),
+      reactivePowerGating(p.reactivePowerGating),
+      powerIdleThreshold(p.powerIdleThreshold),
+      powerWakeLatency(p.powerWakeLatency),
       ADD_STAT(allocationStateSamples, statistics::units::Cycle::get(),
           "Global-tick samples of FU allocation state"),
       ADD_STAT(allocatedUnitSum, statistics::units::Count::get(),
@@ -133,8 +136,23 @@ FUPool::FUPool(const Params &p)
       ADD_STAT(completedIdleBeyond32Samples, statistics::units::Cycle::get(),
           "Completed-run idle samples remaining after a 32-sample threshold"),
       ADD_STAT(completedIdleBeyond64Samples, statistics::units::Cycle::get(),
-          "Completed-run idle samples remaining after a 64-sample threshold")
+          "Completed-run idle samples remaining after a 64-sample threshold"),
+      ADD_STAT(reactiveAwakeSamples, statistics::units::Cycle::get(),
+          "Pair-shared FU-domain samples entering the tick awake"),
+      ADD_STAT(reactiveSleepSamples, statistics::units::Cycle::get(),
+          "Pair-shared FU-domain samples entering the tick asleep"),
+      ADD_STAT(reactiveWakingSamples, statistics::units::Cycle::get(),
+          "Pair-shared FU-domain samples entering the tick waking"),
+      ADD_STAT(reactiveSleepTransitions, statistics::units::Count::get(),
+          "Reactive transitions from awake to sleep"),
+      ADD_STAT(reactiveWakeTransitions, statistics::units::Count::get(),
+          "Demand-triggered transitions out of sleep"),
+      ADD_STAT(reactivePowerBlockedRequests, statistics::units::Count::get(),
+          "getUnit requests blocked because the FU domain was sleeping or waking")
 {
+    assert(!reactivePowerGating || pairRrArb);
+    assert(!reactivePowerGating || powerIdleThreshold > 0);
+
     numFU = 0;
 
     funcUnits.clear();
@@ -157,6 +175,12 @@ FUPool::FUPool(const Params &p)
                 pair_rr_domain =
                     static_cast<int>(pairRrDomains.size());
                 pairRrDomains.emplace_back();
+
+                PairRrDomainState &state =
+                    pairRrDomains[pair_rr_domain];
+
+                state.firstFuIdx = numFU;
+                state.fuCount = i->number;
             }
 
             //
@@ -327,6 +351,37 @@ FUPool::getUnit(OpClass capability, int requester_id)
 
         rr_state->hasRequestEpoch[requester_id] =
             true;
+    }
+
+    /*
+     * Reactive power wake is intentionally handled after pair-demand
+     * bookkeeping but before physical FU arbitration.
+     *
+     * This preserves pending demand while reusing the existing
+     * NoFreeFU scheduling/stall machinery.
+     */
+    if (reactivePowerGating) {
+        assert(pairRrArb);
+        assert(rr_state);
+
+        if (rr_state->powerState == ReactivePowerState::Sleep) {
+            reactiveWakeTransitions++;
+            rr_state->powerIdleCounter = 0;
+
+            if (powerWakeLatency == 0) {
+                rr_state->powerState = ReactivePowerState::Awake;
+                rr_state->wakeRemaining = 0;
+            } else {
+                rr_state->powerState = ReactivePowerState::Waking;
+                rr_state->wakeRemaining = powerWakeLatency;
+                reactivePowerBlockedRequests++;
+                return NoFreeFU;
+            }
+        } else if (
+            rr_state->powerState == ReactivePowerState::Waking) {
+            reactivePowerBlockedRequests++;
+            return NoFreeFU;
+        }
     }
 
     /*
@@ -563,6 +618,79 @@ FUPool::processFreeUnits()
      */
     if (pairRrArb)
         ++pairArbEpoch;
+
+    /*
+     * Reactive power-state clock.
+     *
+     * State residency is sampled at the beginning of the globally
+     * deduplicated FU-pool control tick.  A waking countdown which
+     * reaches zero here makes the domain available to getUnit() later
+     * in the same IEW tick.
+     *
+     * Sleep entry occurs after T consecutive idle samples have been
+     * observed.  The next idle sample is therefore counted in Sleep,
+     * matching the A2b idleBeyondT definition.
+     */
+    if (reactivePowerGating) {
+        assert(pairRrArb);
+
+        for (auto &state : pairRrDomains) {
+            switch (state.powerState) {
+              case ReactivePowerState::Awake:
+                reactiveAwakeSamples++;
+                break;
+
+              case ReactivePowerState::Sleep:
+                reactiveSleepSamples++;
+                break;
+
+              case ReactivePowerState::Waking:
+                reactiveWakingSamples++;
+                break;
+            }
+
+            if (state.powerState == ReactivePowerState::Waking) {
+                assert(state.wakeRemaining > 0);
+
+                --state.wakeRemaining;
+
+                if (state.wakeRemaining == 0) {
+                    state.powerState = ReactivePowerState::Awake;
+                    state.powerIdleCounter = 0;
+                }
+            }
+
+            if (state.powerState == ReactivePowerState::Awake) {
+                assert(state.firstFuIdx >= 0);
+                assert(state.fuCount > 0);
+                assert(state.firstFuIdx + state.fuCount <= numFU);
+
+                unsigned domain_allocated = 0;
+
+                for (
+                    int fu_idx = state.firstFuIdx;
+                    fu_idx < state.firstFuIdx + state.fuCount;
+                    ++fu_idx) {
+                    if (unitBusy[fu_idx])
+                        ++domain_allocated;
+                }
+
+                if (domain_allocated == 0) {
+                    ++state.powerIdleCounter;
+
+                    if (state.powerIdleCounter >= powerIdleThreshold) {
+                        state.powerState = ReactivePowerState::Sleep;
+                        state.powerIdleCounter = 0;
+                        reactiveSleepTransitions++;
+                    }
+                } else {
+                    state.powerIdleCounter = 0;
+                }
+            } else {
+                state.powerIdleCounter = 0;
+            }
+        }
+    }
 
     /*
      * Observation only: sample the allocation state before releasing
