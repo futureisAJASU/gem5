@@ -57,6 +57,10 @@ class FUPool(SimObject):
         False,
         "Enable reactive power-state modeling for pair-shared FU domains",
     )
+    predictiveWakeEnabled = Param.Bool(
+        False,
+        "Enable early predictive wake hints for pair-shared FU domains",
+    )
     powerIdleThreshold = Param.Unsigned(
         8,
         "Consecutive allocation-idle samples observed before sleep eligibility",

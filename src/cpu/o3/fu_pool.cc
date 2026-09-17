@@ -90,6 +90,8 @@ FUPool::FUPool(const Params &p)
       pairArbEpoch(0),
       pairRrArb(p.pairRrArb),
       reactivePowerGating(p.reactivePowerGating),
+
+      predictiveWakeEnabled(p.predictiveWakeEnabled),
       powerIdleThreshold(p.powerIdleThreshold),
       powerWakeLatency(p.powerWakeLatency),
       ADD_STAT(allocationStateSamples, statistics::units::Cycle::get(),
@@ -148,10 +150,28 @@ FUPool::FUPool(const Params &p)
       ADD_STAT(reactiveWakeTransitions, statistics::units::Count::get(),
           "Demand-triggered transitions out of sleep"),
       ADD_STAT(reactivePowerBlockedRequests, statistics::units::Count::get(),
-          "getUnit requests blocked because the FU domain was sleeping or waking")
+          "getUnit requests blocked because the FU domain was sleeping or waking"),
+      ADD_STAT(decodeWakeHints, statistics::units::Count::get(),
+          "Accepted Decode-stage predictive wake hints"),
+      ADD_STAT(decodeWakeTransitions, statistics::units::Count::get(),
+          "Decode-stage predictive transitions out of sleep"),
+      ADD_STAT(decodeWakeAlreadyAwake, statistics::units::Count::get(),
+          "Decode-stage wake hints received while the FU domain was awake"),
+      ADD_STAT(decodeWakeAlreadyWaking, statistics::units::Count::get(),
+          "Decode-stage wake hints received while the FU domain was already waking"),
+      ADD_STAT(decodeWakeDemandMatched, statistics::units::Count::get(),
+          "Predictive wake events followed by FU demand before expiry"),
+      ADD_STAT(decodeWakeExpired, statistics::units::Count::get(),
+          "Predictive wake events returning to sleep before FU demand"),
+      ADD_STAT(decodeWakeDemandWhileWaking, statistics::units::Count::get(),
+          "Matched predictive events first demanded while waking"),
+      ADD_STAT(decodeWakeDemandWhileAwake, statistics::units::Count::get(),
+          "Matched predictive events first demanded after becoming awake")
 {
     assert(!reactivePowerGating || pairRrArb);
     assert(!reactivePowerGating || powerIdleThreshold > 0);
+    assert(!predictiveWakeEnabled || reactivePowerGating);
+    assert(!predictiveWakeEnabled || pairRrArb);
 
     numFU = 0;
 
@@ -305,6 +325,67 @@ FUPool::isCapable(OpClass capability)
     return capabilityList[capability];
 }
 
+void
+FUPool::requestPredictiveWake(OpClass capability)
+{
+    /*
+     * Predictive wake is deliberately separate from getUnit().
+     *
+     * It changes only the reactive power-control state. It does not
+     * create FU demand, allocate a unit, or touch RR/home-lane state.
+     */
+    if (!predictiveWakeEnabled)
+        return;
+
+    assert(reactivePowerGating);
+    assert(pairRrArb);
+
+    if (!capabilityList[capability])
+        return;
+
+    const int domain = pairRrDomainByCapability[capability];
+
+    assert(domain >= 0);
+    assert(domain < static_cast<int>(pairRrDomains.size()));
+
+    PairRrDomainState &state = pairRrDomains[domain];
+
+    decodeWakeHints++;
+
+    switch (state.powerState) {
+      case ReactivePowerState::Awake:
+        decodeWakeAlreadyAwake++;
+        return;
+
+      case ReactivePowerState::Waking:
+        /*
+         * Idempotent: repeated hints must never restart wake latency.
+         */
+        decodeWakeAlreadyWaking++;
+        return;
+
+      case ReactivePowerState::Sleep:
+        decodeWakeTransitions++;
+
+        assert(!state.predictiveWakeOutstanding);
+        state.predictiveWakeOutstanding = true;
+
+        state.powerIdleCounter = 0;
+
+        if (powerWakeLatency == 0) {
+            state.powerState = ReactivePowerState::Awake;
+            state.wakeRemaining = 0;
+        } else {
+            state.powerState = ReactivePowerState::Waking;
+            state.wakeRemaining = powerWakeLatency;
+        }
+
+        return;
+    }
+
+    panic("Unknown reactive FU power state");
+}
+
 int
 FUPool::getUnit(OpClass capability, int requester_id)
 {
@@ -363,6 +444,23 @@ FUPool::getUnit(OpClass capability, int requester_id)
     if (reactivePowerGating) {
         assert(pairRrArb);
         assert(rr_state);
+
+        if (predictiveWakeEnabled &&
+            rr_state->predictiveWakeOutstanding) {
+
+            decodeWakeDemandMatched++;
+
+            if (rr_state->powerState == ReactivePowerState::Waking) {
+                decodeWakeDemandWhileWaking++;
+            } else if (
+                rr_state->powerState == ReactivePowerState::Awake) {
+                decodeWakeDemandWhileAwake++;
+            } else {
+                panic("Predictive wake outstanding while domain is asleep");
+            }
+
+            rr_state->predictiveWakeOutstanding = false;
+        }
 
         if (rr_state->powerState == ReactivePowerState::Sleep) {
             reactiveWakeTransitions++;
@@ -679,6 +777,12 @@ FUPool::processFreeUnits()
                     ++state.powerIdleCounter;
 
                     if (state.powerIdleCounter >= powerIdleThreshold) {
+                        if (predictiveWakeEnabled &&
+                            state.predictiveWakeOutstanding) {
+                            decodeWakeExpired++;
+                            state.predictiveWakeOutstanding = false;
+                        }
+
                         state.powerState = ReactivePowerState::Sleep;
                         state.powerIdleCounter = 0;
                         reactiveSleepTransitions++;

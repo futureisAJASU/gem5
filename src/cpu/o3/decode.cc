@@ -682,6 +682,15 @@ Decode::decodeInsts(ThreadID tid)
             continue;
         }
 
+        /*
+         * PM-B1: DynInst already carries its decoded OpClass here.
+         * This is an early pipeline-stage power-state hint only.
+         * Actual FU demand remains at issue.
+         */
+        if (inst->opClass() == enums::IntDiv) {
+            cpu->requestDecodeFuWake(inst->opClass());
+        }
+
         // Also check if instructions have no source registers.  Mark
         // them as ready to issue at any time.  Not sure if this check
         // should exist here or at a later stage; however it doesn't matter

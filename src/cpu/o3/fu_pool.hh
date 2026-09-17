@@ -143,6 +143,7 @@ class FUPool : public SimObject
      * Disabled by default so historical execution behavior is preserved.
      */
     const bool reactivePowerGating;
+    const bool predictiveWakeEnabled;
     const unsigned powerIdleThreshold;
     const unsigned powerWakeLatency;
     /**
@@ -253,6 +254,12 @@ class FUPool : public SimObject
         ReactivePowerState powerState = ReactivePowerState::Awake;
         uint64_t powerIdleCounter = 0;
         uint64_t wakeRemaining = 0;
+
+        /*
+         * A Decode-triggered wake is outstanding until the first
+         * real FU demand arrives or the domain returns to Sleep.
+         */
+        bool predictiveWakeOutstanding = false;
     };
 
     /** OpClass -> physical FUDesc arbitration domain. */
@@ -272,6 +279,18 @@ class FUPool : public SimObject
     statistics::Scalar reactiveSleepTransitions;
     statistics::Scalar reactiveWakeTransitions;
     statistics::Scalar reactivePowerBlockedRequests;
+
+    /** Decode-stage predictive-wake statistics. */
+    statistics::Scalar decodeWakeHints;
+    statistics::Scalar decodeWakeTransitions;
+    statistics::Scalar decodeWakeAlreadyAwake;
+    statistics::Scalar decodeWakeAlreadyWaking;
+
+    /** PM-B1 predictive-event outcome statistics. */
+    statistics::Scalar decodeWakeDemandMatched;
+    statistics::Scalar decodeWakeExpired;
+    statistics::Scalar decodeWakeDemandWhileWaking;
+    statistics::Scalar decodeWakeDemandWhileAwake;
 
     /**
      * Class that implements a circular queue to hold FU indices. The hope is
@@ -360,6 +379,15 @@ class FUPool : public SimObject
      * otherwise.
      */
     int getUnit(OpClass capability, int requester_id = -1);
+
+    /**
+     * Request an early predictive wake for the physical domain
+     * implementing the supplied capability.
+     *
+     * This is a power-state hint only. It must not create demand,
+     * allocate a unit, or modify pair arbitration state.
+     */
+    void requestPredictiveWake(OpClass capability);
 
     /** Frees a FU at the end of this cycle. */
     void freeUnitNextCycle(int fu_idx);

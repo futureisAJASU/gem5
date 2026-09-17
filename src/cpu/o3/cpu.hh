@@ -504,6 +504,9 @@ class CPU : public BaseCPU
     /** Records that there was time buffer activity this cycle. */
     void activityThisCycle() { activityRec.activity(); }
 
+    /** Forward a Decode-stage execution-class wake hint to IEW. */
+    void requestDecodeFuWake(OpClass capability);
+
     /** Changes a stage's status to active within the activity recorder. */
     void
     activateStage(const StageIdx idx)

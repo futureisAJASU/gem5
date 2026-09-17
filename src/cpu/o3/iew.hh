@@ -363,6 +363,12 @@ class IEW
 
     /** Vector of pointers to the functional unit pools. */
     std::vector<FUPool *> fuPools;
+
+    /**
+     * Forward an early Decode-stage execution-class wake hint to
+     * any FU pool implementing that capability.
+     */
+    void requestDecodeFuWake(OpClass capability);
     /** Records if the LSQ needs to be updated on the next cycle, so that
      * IEW knows if there will be activity on the next cycle.
      */

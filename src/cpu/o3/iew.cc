@@ -1427,6 +1427,15 @@ IEW::writebackInsts()
 }
 
 void
+IEW::requestDecodeFuWake(OpClass capability)
+{
+    for (FUPool *fu_pool : fuPools) {
+        if (fu_pool->isCapable(capability))
+            fu_pool->requestPredictiveWake(capability);
+    }
+}
+
+void
 IEW::tick()
 {
     wbNumInst = 0;
