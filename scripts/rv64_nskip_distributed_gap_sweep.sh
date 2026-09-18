@@ -5,16 +5,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 OUT_ROOT="${OUT_ROOT:-rv64_nskip_distributed_gap}"
+JOBS="${JOBS:-$(nproc)}"
 GEM5="build/RISCV/gem5.opt"
 CFG="configs/02_little_v052_rv64_proxy.py"
 GAPS=(0 1 2 3 4 5 6 7 8)
 CONFIGS=(stock N0 N1 N2 N4)
 
-if [[ ! -x "$GEM5" ]]; then
-  echo "ERROR: $GEM5 missing" >&2
-  exit 2
-fi
+echo "[0/2] Rebuild gem5/RISCV so the run cannot use a stale binary"
+scons "$GEM5" -j"$JOBS"
 
+echo "[1/2] Build directed RV64 GAP binaries"
 bash scripts/build_benchmarks_rv64.sh
 
 COMMON=(
@@ -59,6 +59,12 @@ run_one() {
     cat "$out.stdout" >&2
     exit 1
   fi
+
+  if [[ "$cfg" != "stock" ]] &&
+     ! grep -q 'nSkipLocalHiddenReady' "$out/stats.txt"; then
+    echo "ERROR: local N-SKIP visibility stats missing; refusing stale/instrumentation-mismatched binary" >&2
+    exit 3
+  fi
 }
 
 for gap in "${GAPS[@]}"; do
@@ -71,7 +77,7 @@ done
 
 echo
 echo "=== RV64 P21313 distributed N-SKIP GAP sweep ==="
-printf "%3s %-6s %14s %12s %12s %12s %12s %8s\n"   "GAP" "cfg" "simTicks" "rejects" "blocked" "head" "bypass" "maxOff"
+printf "%3s %-6s %14s %12s %12s %12s %12s %8s\n"   "GAP" "cfg" "simTicks" "hidden" "noVisCy" "head" "bypass" "maxOff"
 
 for gap in "${GAPS[@]}"; do
   for cfg in "${CONFIGS[@]}"; do
