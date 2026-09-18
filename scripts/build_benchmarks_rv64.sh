@@ -23,3 +23,17 @@ COMMON=(
 
 file benchmarks/bin/independent_int_rv64
 file benchmarks/bin/rv64_intdiv_smoke
+
+
+"${CC}" \
+  -O2 \
+  -static \
+  -nostdlib \
+  -nostartfiles \
+  -march=rv64imafd \
+  -mabi=lp64d \
+  -Wl,-e,_start \
+  -o benchmarks/bin/rv64_div_fairness \
+  benchmarks/src/rv64_div_fairness.S
+
+file benchmarks/bin/rv64_div_fairness
