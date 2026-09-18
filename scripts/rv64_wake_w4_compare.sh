@@ -68,6 +68,11 @@ grep -E 'earlyIntDiv(Hints|Truth|TruePositives|FalsePositives|FalseNegatives)' \
   "$OUT_ROOT/raw/stats.txt" || true
 
 echo
+echo "=== raw lineage (raw case) ==="
+grep -E 'rawIntDivReachedDecode|rawIntDivSquashedBeforeDecode' \
+  "$OUT_ROOT/raw/stats.txt" || true
+
+echo
 echo "=== predictive lifecycle (decode/raw) ==="
 for name in decode raw; do
   echo "--- $name ---"
