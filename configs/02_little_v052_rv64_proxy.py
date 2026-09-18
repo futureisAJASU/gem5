@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from m5.objects import RiscvO3CPU, IQUnit, L2XBar
+from m5.objects import RiscvO3CPU, RiscvISA, IQUnit, L2XBar
 from m5.objects.FUPool import FUPool
 from m5.params import NULL
 from m5.objects.FuncUnit import FUDesc, OpDesc
@@ -1079,11 +1079,12 @@ class LittleV052Rv64Core(BaseCPUCore):
         cpu = RiscvO3CPU()
 
         # Initial cross-ISA gate targets scalar RV64IMAFD-class execution.
-        # gem5 enables RVV by default; turn it off so vector capability does
-        # not silently broaden the validation ISA.  Compressed instructions
-        # remain supported because the static Linux runtime may contain RVC.
-        for isa in cpu.isa:
-            isa.enable_rvv = False
+        # BaseCPU creates ISA objects later in createThreads(), so mutating
+        # cpu.isa here would be a no-op while the vector is still empty.
+        # Install the ISA object explicitly before BaseCPUCore calls
+        # createThreads(). Compressed instructions remain supported because
+        # the static Linux runtime may contain RVC.
+        cpu.isa = [RiscvISA(enable_rvv=False)]
 
         # RV64 may contain 16-bit compressed instructions, so shift=1 is
         # the conservative ISA-facing default.  shift=2 may be selected
