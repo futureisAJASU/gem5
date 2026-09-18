@@ -135,6 +135,16 @@ class FUPool : public SimObject
      */
     const bool pairRrArb;
 
+    /**
+     * Observation-only pair arbitration statistics.
+     *
+     * These counters never participate in grant selection. They are used
+     * by the RV64 cross-ISA replication gate to validate sustained
+     * two-requester fairness without changing execution semantics.
+     */
+    statistics::Vector pairRequesterGrants;
+    statistics::Vector pairContendedRequesterGrants;
+    statistics::Scalar pairContendedGrants;
 
     /**
      * Optional reactive power-state model for pair-shared physical
