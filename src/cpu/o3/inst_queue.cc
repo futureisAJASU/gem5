@@ -1384,13 +1384,13 @@ InstructionQueue::scheduleReadyInsts()
             }
         }
 
-        nSkipLocalHiddenReadySamples += hidden_ready;
+        iqStats.nSkipLocalHiddenReadySamples += hidden_ready;
 
         if (any_hidden_ready)
-            nSkipLocalHiddenReadyCycles++;
+            iqStats.nSkipLocalHiddenReadyCycles++;
 
         if (any_iq_hidden_with_no_visible)
-            nSkipLocalNoVisibleReadyCycles++;
+            iqStats.nSkipLocalNoVisibleReadyCycles++;
 
         /*
          * A candidate that saw NoFreeFU cannot become issuable again
