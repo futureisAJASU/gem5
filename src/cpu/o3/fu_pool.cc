@@ -105,6 +105,12 @@ FUPool::FUPool(const Params &p)
           "Allocation-state samples with no allocated FU"),
       ADD_STAT(perUnitAllocatedSamples, statistics::units::Cycle::get(),
           "Allocation-state samples where each physical FU was allocated"),
+      ADD_STAT(pairRequesterGrants, statistics::units::Count::get(),
+          "Successful pair-shared FU grants by requester"),
+      ADD_STAT(pairContendedRequesterGrants, statistics::units::Count::get(),
+          "Successful pair-shared FU grants while both requesters were pending"),
+      ADD_STAT(pairContendedGrants, statistics::units::Count::get(),
+          "Successful pair-shared FU grants under two-requester contention"),
       currentIdleRunLength(0),
       ADD_STAT(completedIdleRuns, statistics::units::Count::get(),
           "Completed consecutive allocation-idle runs"),
@@ -334,6 +340,18 @@ FUPool::FUPool(const Params &p)
     for (int i = 0; i < numFU; ++i) {
         perUnitAllocatedSamples.subname(i, funcUnits[i]->name);
     }
+
+    pairRequesterGrants
+        .init(2)
+        .flags(statistics::total);
+    pairRequesterGrants.subname(0, "requester0");
+    pairRequesterGrants.subname(1, "requester1");
+
+    pairContendedRequesterGrants
+        .init(2)
+        .flags(statistics::total);
+    pairContendedRequesterGrants.subname(0, "requester0");
+    pairContendedRequesterGrants.subname(1, "requester1");
 }
 
 bool
@@ -715,6 +733,17 @@ FUPool::getUnit(OpClass capability, int requester_id)
          * that bit protects the peer's home lane until the peer
          * itself receives service.
          */
+        const bool both_pending =
+            rr_state->requestedSinceGrant[0] &&
+            rr_state->requestedSinceGrant[1];
+
+        pairRequesterGrants[requester_id]++;
+
+        if (both_pending) {
+            pairContendedRequesterGrants[requester_id]++;
+            pairContendedGrants++;
+        }
+
         rr_state->requestedSinceGrant[requester_id] =
             false;
 
@@ -769,6 +798,17 @@ FUPool::getUnit(OpClass capability, int requester_id)
          * A real grant rotates priority only inside this
          * physical execution domain.
          */
+        const bool both_pending =
+            rr_state->requestedSinceGrant[0] &&
+            rr_state->requestedSinceGrant[1];
+
+        pairRequesterGrants[requester_id]++;
+
+        if (both_pending) {
+            pairContendedRequesterGrants[requester_id]++;
+            pairContendedGrants++;
+        }
+
         rr_state->preferredRequester =
             1 - requester_id;
 
