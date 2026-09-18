@@ -87,6 +87,30 @@ class Decoder : public InstDecoder
     //when there is control flow.
     void moreBytes(const PCStateBase &pc, Addr fetchPC) override;
 
+    /**
+     * PM-B2 RV64 raw resource hint for the shared integer divider.
+     *
+     * gem5 maps DIV/DIVU/REM/REMU and the RV64 W variants to IntDivOp,
+     * so the classifier must cover all eight operations.  It checks:
+     *   funct7 == 0000001
+     *   funct3[2] == 1          (100..111)
+     *   opcode == OP or OP-32   (bit 3 is the only difference)
+     *
+     * This remains a power-state hint only; full decode is authoritative.
+     */
+    bool
+    earlyIntDivHint() const override
+    {
+        constexpr uint32_t IntDivMask = 0xFE004077;
+        constexpr uint32_t IntDivValue = 0x02004033;
+
+        if (!instDone)
+            return false;
+
+        const uint32_t raw = static_cast<uint32_t>(emi.instBits);
+        return (raw & IntDivMask) == IntDivValue;
+    }
+
     StaticInstPtr decode(PCStateBase &nextPC) override;
 };
 
