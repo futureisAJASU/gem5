@@ -77,8 +77,8 @@ for gap in "${GAPS[@]}"; do
   for cfg in "${CONFIGS[@]}"; do
     stats="$OUT_ROOT/gap${gap}/${cfg}/stats.txt"
     ticks="$(awk '$1=="simTicks"{print $2; exit}' "$stats")"
-    rejects="$(awk '/\.nSkipWindowRejects /{s+=$2} END{print s+0}' "$stats")"
-    blocked="$(awk '/\.nSkipBlockedCycles /{s+=$2} END{print s+0}' "$stats")"
+    hidden="$(awk '/\.nSkipLocalHiddenReadySamples /{s+=$2} END{print s+0}' "$stats")"
+    novis="$(awk '/\.nSkipLocalNoVisibleReadyCycles /{s+=$2} END{print s+0}' "$stats")"
     head="$(awk '/\.nSkipHeadIssued /{s+=$2} END{print s+0}' "$stats")"
     bypass="$(awk '/\.nSkipBypassIssued /{s+=$2} END{print s+0}' "$stats")"
     maxoff="$(awk '
@@ -89,7 +89,7 @@ for gap in "${GAPS[@]}"; do
       }
       END {print m+0}
     ' "$stats")"
-    printf "%3s %-6s %14s %12s %12s %12s %12s %8s\n"       "$gap" "$cfg" "$ticks" "$rejects" "$blocked" "$head" "$bypass" "$maxoff"
+    printf "%3s %-6s %14s %12s %12s %12s %12s %8s\n"       "$gap" "$cfg" "$ticks" "$hidden" "$novis" "$head" "$bypass" "$maxoff"
   done
 done
 
