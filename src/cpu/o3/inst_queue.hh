@@ -740,8 +740,27 @@ class InstructionQueue
         /**
          * Zero-issue cycles which observed at least one ready candidate
          * outside the enabled N-SKIP window.
+         *
+         * Legacy/global picker statistic. The true local-IQ picker does not
+         * "reject" candidates after discovery, so separate behavior-neutral
+         * local-visibility observations are maintained below.
          */
         statistics::Scalar nSkipBlockedCycles;
+
+        /**
+         * Sum of scheduler-ready instructions hidden beyond local Head..Head+N
+         * at the start of a scheduling cycle.
+         */
+        statistics::Scalar nSkipLocalHiddenReadySamples;
+
+        /** Scheduling cycles with at least one ready instruction hidden. */
+        statistics::Scalar nSkipLocalHiddenReadyCycles;
+
+        /**
+         * Scheduling cycles where at least one IQ had ready instructions but
+         * no ready instruction visible inside its local N-SKIP window.
+         */
+        statistics::Scalar nSkipLocalNoVisibleReadyCycles;
 
         /** Instructions issued from offset zero. */
         statistics::Scalar nSkipHeadIssued;
