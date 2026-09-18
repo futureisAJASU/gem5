@@ -1078,6 +1078,13 @@ class LittleV052Rv64Core(BaseCPUCore):
 
         cpu = RiscvO3CPU()
 
+        # Initial cross-ISA gate targets scalar RV64IMAFD-class execution.
+        # gem5 enables RVV by default; turn it off so vector capability does
+        # not silently broaden the validation ISA.  Compressed instructions
+        # remain supported because the static Linux runtime may contain RVC.
+        for isa in cpu.isa:
+            isa.enable_rvv = False
+
         # RV64 may contain 16-bit compressed instructions, so shift=1 is
         # the conservative ISA-facing default.  shift=2 may be selected
         # only for binaries independently verified to be 32-bit-only.
