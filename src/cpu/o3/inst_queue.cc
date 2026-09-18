@@ -449,6 +449,12 @@ InstructionQueue::IQStats::IQStats(
                "Ready candidates rejected outside the N-SKIP window"),
       ADD_STAT(nSkipBlockedCycles, statistics::units::Cycle::get(),
                "Zero-issue cycles with an N-SKIP window rejection"),
+      ADD_STAT(nSkipLocalHiddenReadySamples, statistics::units::Count::get(),
+               "Ready instructions hidden beyond local N-SKIP windows at scheduling-cycle entry"),
+      ADD_STAT(nSkipLocalHiddenReadyCycles, statistics::units::Cycle::get(),
+               "Scheduling cycles with at least one ready instruction hidden beyond a local N-SKIP window"),
+      ADD_STAT(nSkipLocalNoVisibleReadyCycles, statistics::units::Cycle::get(),
+               "Scheduling cycles where an IQ had hidden ready work but no visible ready candidate"),
       ADD_STAT(nSkipHeadIssued, statistics::units::Count::get(),
                "N-SKIP instructions issued from the queue head"),
       ADD_STAT(nSkipBypassIssued, statistics::units::Count::get(),
@@ -560,6 +566,15 @@ InstructionQueue::IQStats::IQStats(
 
     nSkipBlockedCycles
         .prereq(nSkipBlockedCycles);
+
+    nSkipLocalHiddenReadySamples
+        .prereq(nSkipLocalHiddenReadySamples);
+
+    nSkipLocalHiddenReadyCycles
+        .prereq(nSkipLocalHiddenReadyCycles);
+
+    nSkipLocalNoVisibleReadyCycles
+        .prereq(nSkipLocalNoVisibleReadyCycles);
 
     nSkipHeadIssued
         .prereq(nSkipHeadIssued);
@@ -1336,6 +1351,46 @@ InstructionQueue::scheduleReadyInsts()
 
     if (useLocalIQPicker) {
         int total_issued = 0;
+
+        /*
+         * Behavior-neutral local N-SKIP visibility observation.
+         *
+         * The local picker truncates candidate discovery at Head..Head+N,
+         * so legacy nSkipWindowRejects/nSkipBlockedCycles intentionally stay
+         * zero here. Sample the hidden scheduler-ready work directly instead.
+         */
+        uint64_t hidden_ready = 0;
+        bool any_hidden_ready = false;
+        bool any_iq_hidden_with_no_visible = false;
+
+        for (auto iq : iqs) {
+            if (!iq->nSkipEnabled())
+                continue;
+
+            const auto visible = iq->readyCandidates();
+            const unsigned ready = iq->readyCount();
+
+            assert(visible.size() <= ready);
+
+            if (ready > visible.size()) {
+                const uint64_t hidden =
+                    static_cast<uint64_t>(ready - visible.size());
+
+                hidden_ready += hidden;
+                any_hidden_ready = true;
+
+                if (visible.empty())
+                    any_iq_hidden_with_no_visible = true;
+            }
+        }
+
+        nSkipLocalHiddenReadySamples += hidden_ready;
+
+        if (any_hidden_ready)
+            nSkipLocalHiddenReadyCycles++;
+
+        if (any_iq_hidden_with_no_visible)
+            nSkipLocalNoVisibleReadyCycles++;
 
         /*
          * A candidate that saw NoFreeFU cannot become issuable again
