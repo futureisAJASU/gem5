@@ -7,11 +7,12 @@ cd "$ROOT"
 JOBS="${JOBS:-$(nproc)}"
 OUT_ROOT="${OUT_ROOT:-a64_r2_historical_exact}"
 HIST_ROOT="${HIST_ROOT:-/tmp/gem5-r2-historical-547a4323}"
-HIST_BUILD="/tmp/embench-aarch64-build"
-HIST_GEM5="$HIST_ROOT/build/ARM/gem5.opt"
-HIST_CFG="$HIST_ROOT/configs/01_little_v052_proxy.py"
-CUR_GEM5="$ROOT/build/ARM/gem5.opt"
-CUR_CFG="$ROOT/configs/01_little_v052_proxy.py"
+HIST_BUILD="${HIST_BUILD:-/tmp/embench-aarch64-build}"
+HIST_GEM5="${HIST_GEM5:-$HIST_ROOT/build/ARM/gem5.opt}"
+HIST_CFG="${HIST_CFG:-$HIST_ROOT/configs/01_little_v052_proxy.py}"
+CUR_GEM5="${CUR_GEM5:-$ROOT/build/ARM/gem5.opt}"
+CUR_CFG="${CUR_CFG:-$ROOT/configs/01_little_v052_proxy.py}"
+SKIP_CURRENT_BUILD="${SKIP_CURRENT_BUILD:-0}"
 
 HIST_COMMIT="547a4323adefdff81e490caa5a5e00dc4cd7126d"
 EXPECTED_HIST_GEM5_SHA="0b5f20709d8f94cf568f2899d5794e89bd8f729d7bfef421d5f6b70c4f9ba0d0"
@@ -131,8 +132,18 @@ done
 
 echo "historical_inputs_exact=YES"
 
-echo "[1/5] Build current gem5/ARM"
-scons build/ARM/gem5.opt -j"$JOBS"
+echo "[1/5] Prepare current gem5/ARM"
+if [[ "$SKIP_CURRENT_BUILD" == "1" ]]; then
+  [[ -x "$CUR_GEM5" ]] || {
+    echo "ERROR: SKIP_CURRENT_BUILD=1 but current gem5 is missing: $CUR_GEM5" >&2
+    exit 10
+  }
+  echo "current_gem5_build=SKIPPED"
+  echo "current_gem5=$CUR_GEM5"
+  echo "current_gem5_sha=$(sha256sum "$CUR_GEM5" | awk '{print $1}')"
+else
+  scons build/ARM/gem5.opt -j"$JOBS"
+fi
 
 rm -rf "$OUT_ROOT"
 mkdir -p "$OUT_ROOT"
