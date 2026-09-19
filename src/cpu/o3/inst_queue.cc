@@ -455,6 +455,10 @@ InstructionQueue::IQStats::IQStats(
                "Scheduling cycles with at least one ready instruction hidden beyond a local N-SKIP window"),
       ADD_STAT(nSkipLocalNoVisibleReadyCycles, statistics::units::Cycle::get(),
                "Scheduling cycles where an IQ had hidden ready work but no visible ready candidate"),
+      ADD_STAT(nSkipLocalHiddenReadySamplesByIQ, statistics::units::Count::get(),
+               "Ready instructions hidden beyond local N-SKIP windows by physical IQ"),
+      ADD_STAT(nSkipLocalNoVisibleReadyCyclesByIQ, statistics::units::Cycle::get(),
+               "Cycles with hidden ready work but no visible ready candidate by physical IQ"),
       ADD_STAT(nSkipHeadIssued, statistics::units::Count::get(),
                "N-SKIP instructions issued from the queue head"),
       ADD_STAT(nSkipBypassIssued, statistics::units::Count::get(),
@@ -506,6 +510,13 @@ InstructionQueue::IQStats::IQStats(
     dispatchWrite2Cycles.init(num_iqs).flags(statistics::total);
     dispatchWrite3PlusCycles.init(num_iqs).flags(statistics::total);
 
+    nSkipLocalHiddenReadySamplesByIQ
+        .init(num_iqs)
+        .flags(statistics::total);
+    nSkipLocalNoVisibleReadyCyclesByIQ
+        .init(num_iqs)
+        .flags(statistics::total);
+
     for (unsigned i = 0; i < num_iqs; ++i) {
         const std::string iq_name = "IQ" + std::to_string(i);
 
@@ -520,6 +531,8 @@ InstructionQueue::IQStats::IQStats(
         dispatchWrite1Cycles.subname(i, iq_name);
         dispatchWrite2Cycles.subname(i, iq_name);
         dispatchWrite3PlusCycles.subname(i, iq_name);
+        nSkipLocalHiddenReadySamplesByIQ.subname(i, iq_name);
+        nSkipLocalNoVisibleReadyCyclesByIQ.subname(i, iq_name);
     }
 
     steerOccupancySamples
@@ -1363,7 +1376,9 @@ InstructionQueue::scheduleReadyInsts()
         bool any_hidden_ready = false;
         bool any_iq_hidden_with_no_visible = false;
 
-        for (auto iq : iqs) {
+        for (unsigned iq_index = 0; iq_index < iqs.size(); ++iq_index) {
+            auto iq = iqs[iq_index];
+
             if (!iq->nSkipEnabled())
                 continue;
 
@@ -1378,9 +1393,12 @@ InstructionQueue::scheduleReadyInsts()
 
                 hidden_ready += hidden;
                 any_hidden_ready = true;
+                iqStats.nSkipLocalHiddenReadySamplesByIQ[iq_index] += hidden;
 
-                if (visible.empty())
+                if (visible.empty()) {
                     any_iq_hidden_with_no_visible = true;
+                    iqStats.nSkipLocalNoVisibleReadyCyclesByIQ[iq_index]++;
+                }
             }
         }
 
