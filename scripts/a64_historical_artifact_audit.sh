@@ -33,8 +33,10 @@ EXPECTED_MATMULT_SHA="36320e01eaf9d3e25cd38f7df0c9c76f545e220c5f6b3b6c8b936e92a7
 
 build_id() {
   local f="$1"
+  # Do not exit awk early: with pipefail that can SIGPIPE readelf and
+  # terminate the script at the first ELF.
   readelf -n "$f" 2>/dev/null |
-    awk '/Build ID:/ {print $3; exit}'
+    awk '/Build ID:/ && !seen {print $3; seen=1}'
 }
 
 compiler_comment() {
