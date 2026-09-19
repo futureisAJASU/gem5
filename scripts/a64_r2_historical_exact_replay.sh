@@ -219,7 +219,6 @@ echo "historical_cycle_exact=YES"
 P21313_COMMON=(
   --distributed-iq
   --local-iq-picker
-  --int-steering first-fit
   --dist-int0 10
   --dist-int1 6
   --dist-mem 12
@@ -241,8 +240,10 @@ run_current() {
   local args=(--bp-inst-shift 2)
   local narg=()
 
-  if [[ "$profile" == "p21313_s2" ]]; then
-    args+=("${P21313_COMMON[@]}")
+  if [[ "$profile" == "p21313_ff_s2" ]]; then
+    args+=("${P21313_COMMON[@]}" --int-steering first-fit)
+  elif [[ "$profile" == "p21313_i1f_s2" ]]; then
+    args+=("${P21313_COMMON[@]}" --int-steering int1-first)
   elif [[ "$profile" != "central_s2" ]]; then
     echo "ERROR: bad profile $profile" >&2
     exit 2
@@ -285,9 +286,11 @@ for w in "${WORKLOADS[@]}"; do
     echo "  current $w / central_s2 / $m"
     run_current "$w" central_s2 "$m"
   done
-  for m in stock N4 N5; do
-    echo "  current $w / p21313_s2 / $m"
-    run_current "$w" p21313_s2 "$m"
+  for p in p21313_ff_s2 p21313_i1f_s2; do
+    for m in stock N4 N5; do
+      echo "  current $w / $p / $m"
+      run_current "$w" "$p" "$m"
+    done
   done
 done
 
@@ -348,8 +351,12 @@ for w in workloads:
             m:read(root/"current"/w/"central_s2"/m/"roi.stats")
             for m in ["stock","N4"]
         },
-        "p21313_s2":{
-            m:read(root/"current"/w/"p21313_s2"/m/"roi.stats")
+        "p21313_ff_s2":{
+            m:read(root/"current"/w/"p21313_ff_s2"/m/"roi.stats")
+            for m in ["stock","N4","N5"]
+        },
+        "p21313_i1f_s2":{
+            m:read(root/"current"/w/"p21313_i1f_s2"/m/"roi.stats")
             for m in ["stock","N4","N5"]
         },
     }
@@ -362,8 +369,9 @@ for w in workloads:
     if len(insts)!=1:
         raise SystemExit(f"ERROR: current simInsts mismatch {w}: {sorted(insts)}")
     if cur[w]["central_s2"]["N4"]["maxOff"]>4: raise SystemExit(f"ERROR offset {w} central N4")
-    if cur[w]["p21313_s2"]["N4"]["maxOff"]>4: raise SystemExit(f"ERROR offset {w} P N4")
-    if cur[w]["p21313_s2"]["N5"]["maxOff"]>5: raise SystemExit(f"ERROR offset {w} P N5")
+    for p in ["p21313_ff_s2","p21313_i1f_s2"]:
+        if cur[w][p]["N4"]["maxOff"]>4: raise SystemExit(f"ERROR offset {w} {p} N4")
+        if cur[w][p]["N5"]["maxOff"]>5: raise SystemExit(f"ERROR offset {w} {p} N5")
 
 def gap(d,mode):
     return (d[mode]["cycles"]/d["stock"]["cycles"]-1)*100
@@ -374,40 +382,45 @@ def gm(vals):
 print()
 print("=== A64 R2 EXACT-HISTORICAL-BINARY RESULT ===")
 print(
-    f"{'workload':18s} {'histN4%':>9s} {'C2_N4%':>9s} {'P2_N4%':>9s} "
-    f"{'P2_N5%':>9s} {'C2-P2':>9s} {'N4->N5':>9s} "
-    f"{'Pstock/C2':>10s} {'PN4/C2':>9s}"
+    f"{'workload':18s} {'histN4%':>9s} {'C2_N4%':>9s} "
+    f"{'FF_N4%':>9s} {'I1F_N4%':>9s} {'I1F_N5%':>9s} "
+    f"{'C2-I1F':>9s} {'N4->N5':>9s} {'I1Fstk/C2':>10s} {'I1FN4/C2':>10s}"
 )
 
 for w in workloads:
     h=gap(hist[w],"N4")
-    c=gap(cur[w]["central_s2"],"N4")
-    p4=gap(cur[w]["p21313_s2"],"N4")
-    p5=gap(cur[w]["p21313_s2"],"N5")
+    c4=gap(cur[w]["central_s2"],"N4")
+    ff4=gap(cur[w]["p21313_ff_s2"],"N4")
+    i4=gap(cur[w]["p21313_i1f_s2"],"N4")
+    i5=gap(cur[w]["p21313_i1f_s2"],"N5")
     cstock=cur[w]["central_s2"]["stock"]["cycles"]
-    pstock=cur[w]["p21313_s2"]["stock"]["cycles"]
-    pn4=cur[w]["p21313_s2"]["N4"]["cycles"]
+    istock=cur[w]["p21313_i1f_s2"]["stock"]["cycles"]
+    in4=cur[w]["p21313_i1f_s2"]["N4"]["cycles"]
     print(
-        f"{w:18s} {h:9.3f} {c:9.3f} {p4:9.3f} {p5:9.3f} "
-        f"{c-p4:9.3f} {p4-p5:9.3f} "
-        f"{(pstock/cstock-1)*100:10.3f} {(pn4/cstock-1)*100:9.3f}"
+        f"{w:18s} {h:9.3f} {c4:9.3f} {ff4:9.3f} {i4:9.3f} {i5:9.3f} "
+        f"{c4-i4:9.3f} {i4-i5:9.3f} "
+        f"{(istock/cstock-1)*100:10.3f} {(in4/cstock-1)*100:10.3f}"
     )
 
 hist_gm=gm([hist[w]["N4"]["cycles"]/hist[w]["stock"]["cycles"] for w in workloads])
 c_gm=gm([cur[w]["central_s2"]["N4"]["cycles"]/cur[w]["central_s2"]["stock"]["cycles"] for w in workloads])
-p4_gm=gm([cur[w]["p21313_s2"]["N4"]["cycles"]/cur[w]["p21313_s2"]["stock"]["cycles"] for w in workloads])
-p5_gm=gm([cur[w]["p21313_s2"]["N5"]["cycles"]/cur[w]["p21313_s2"]["stock"]["cycles"] for w in workloads])
-pstock_abs=gm([cur[w]["p21313_s2"]["stock"]["cycles"]/cur[w]["central_s2"]["stock"]["cycles"] for w in workloads])
-pn4_abs=gm([cur[w]["p21313_s2"]["N4"]["cycles"]/cur[w]["central_s2"]["stock"]["cycles"] for w in workloads])
+ff4_gm=gm([cur[w]["p21313_ff_s2"]["N4"]["cycles"]/cur[w]["p21313_ff_s2"]["stock"]["cycles"] for w in workloads])
+i4_gm=gm([cur[w]["p21313_i1f_s2"]["N4"]["cycles"]/cur[w]["p21313_i1f_s2"]["stock"]["cycles"] for w in workloads])
+i5_gm=gm([cur[w]["p21313_i1f_s2"]["N5"]["cycles"]/cur[w]["p21313_i1f_s2"]["stock"]["cycles"] for w in workloads])
+ffstock_abs=gm([cur[w]["p21313_ff_s2"]["stock"]["cycles"]/cur[w]["central_s2"]["stock"]["cycles"] for w in workloads])
+istock_abs=gm([cur[w]["p21313_i1f_s2"]["stock"]["cycles"]/cur[w]["central_s2"]["stock"]["cycles"] for w in workloads])
+in4_abs=gm([cur[w]["p21313_i1f_s2"]["N4"]["cycles"]/cur[w]["central_s2"]["stock"]["cycles"] for w in workloads])
 
 print()
 print("=== Aggregate ===")
-print(f"historical exact old-stack N4:         {(hist_gm-1)*100:+.3f}%")
-print(f"current central shift2 N4:             {(c_gm-1)*100:+.3f}%")
-print(f"current P21313 shift2 N4:              {(p4_gm-1)*100:+.3f}%")
-print(f"current P21313 shift2 N5:              {(p5_gm-1)*100:+.3f}%")
-print(f"P21313 stock vs central shift2 stock:  {(pstock_abs-1)*100:+.3f}%")
-print(f"P21313 N4 vs central shift2 stock:     {(pn4_abs-1)*100:+.3f}%")
+print(f"historical exact old-stack N4:             {(hist_gm-1)*100:+.3f}%")
+print(f"current central shift2 N4:                 {(c_gm-1)*100:+.3f}%")
+print(f"P21313 first-fit shift2 N4:                {(ff4_gm-1)*100:+.3f}%")
+print(f"P21313 int1-first shift2 N4:               {(i4_gm-1)*100:+.3f}%")
+print(f"P21313 int1-first shift2 N5:               {(i5_gm-1)*100:+.3f}%")
+print(f"P21313 first-fit stock vs central stock:   {(ffstock_abs-1)*100:+.3f}%")
+print(f"P21313 int1-first stock vs central stock:  {(istock_abs-1)*100:+.3f}%")
+print(f"P21313 int1-first N4 vs central stock:     {(in4_abs-1)*100:+.3f}%")
 print("historical_cycle_exact=YES")
 print("current_exact_historical_binaries=YES")
 print("All current simInsts match per workload; issued offsets obey N4/N5 bounds.")
@@ -419,7 +432,7 @@ with (root/"summary.csv").open("w",newline="") as f:
         for m in ["stock","N4"]:
             d=hist[w][m]
             wr.writerow([w,"historical","central",m,d["cycles"],d["insts"],f"{gap(hist[w],m):.9f}",d["maxOff"],d["hidden"],d["noVis"]])
-        for p in ["central_s2","p21313_s2"]:
+        for p in ["central_s2","p21313_ff_s2","p21313_i1f_s2"]:
             for m,d in cur[w][p].items():
                 wr.writerow([w,"current",p,m,d["cycles"],d["insts"],f"{gap(cur[w][p],m):.9f}",d["maxOff"],d["hidden"],d["noVis"]])
 PY
@@ -441,6 +454,7 @@ done >"$OUT_ROOT/historical_binary_sha256.txt"
   echo "current_runs_use_exact_historical_binaries=YES"
   echo "current_bp_inst_shift=2"
   echo "current_P21313=2,1,3,1,3"
+  echo "current_P21313_steering=first-fit,int1-first"
   echo "roi=first stats section between historical embedded reset/dump triggers"
 } >"$OUT_ROOT/manifest.txt"
 
