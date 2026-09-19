@@ -7,6 +7,9 @@ HIST_ROOT="/tmp/gem5-r2-historical-547a4323"
 EXPECTED_GEM5_SHA="0b5f20709d8f94cf568f2899d5794e89bd8f729d7bfef421d5f6b70c4f9ba0d0"
 EXPECTED_CONFIG_SHA="db7d16fe6c6ddcb70c78b8dd9080a85968173f2d06021580106468a4b8f4b570"
 JOBS="${JOBS:-$(nproc)}"
+HOST_CC="${HOST_CC:-gcc}"
+HOST_CXX="${HOST_CXX:-g++}"
+CLEAN_HIST_BUILD="${CLEAN_HIST_BUILD:-1}"
 
 echo "=== RECONSTRUCT HISTORICAL A64 GEM5 STACK ==="
 echo "source_repo=$SOURCE_REPO"
@@ -43,6 +46,12 @@ fi
 echo "config_exact=YES"
 
 echo "=== BUILD ARM GEM5 AT EXACT HISTORICAL COMMIT ==="
+echo "host_cc=$HOST_CC ($($HOST_CC --version | head -n 1))"
+echo "host_cxx=$HOST_CXX ($($HOST_CXX --version | head -n 1))"
+if [[ "$CLEAN_HIST_BUILD" == "1" ]]; then
+  echo "historical_build_tree=clean"
+  rm -rf "$HIST_ROOT/build/ARM"
+fi
 # IMPORTANT: gem5's SConstruct resolves relative build targets against
 # SCons GetLaunchDir(), not merely the directory selected by -C.
 # Therefore invoke scons *from inside* the historical worktree; using
@@ -50,7 +59,7 @@ echo "=== BUILD ARM GEM5 AT EXACT HISTORICAL COMMIT ==="
 # caller's build/ directory.
 (
   cd "$HIST_ROOT"
-  scons build/ARM/gem5.opt -j"$JOBS"
+  scons build/ARM/gem5.opt -j"$JOBS" CC="$HOST_CC" CXX="$HOST_CXX"
 )
 
 gem5="$HIST_ROOT/build/ARM/gem5.opt"
