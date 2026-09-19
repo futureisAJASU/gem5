@@ -6,7 +6,7 @@ cd "$ROOT"
 
 JOBS="${JOBS:-$(nproc)}"
 OUT_ROOT="${OUT_ROOT:-a64_r2_historical_exact}"
-HIST_ROOT="/home/ubuntu/gem5"
+HIST_ROOT="${HIST_ROOT:-/tmp/gem5-r2-historical-547a4323}"
 HIST_BUILD="/tmp/embench-aarch64-build"
 HIST_GEM5="$HIST_ROOT/build/ARM/gem5.opt"
 HIST_CFG="$HIST_ROOT/configs/01_little_v052_proxy.py"
