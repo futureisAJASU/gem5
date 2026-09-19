@@ -125,7 +125,7 @@ WORKLOADS=(
 )
 
 for w in "${WORKLOADS[@]}"; do
-  bin="$EMBENCH_BUILD/benchmarks/$w/$w"
+  bin="$EMBENCH_BUILD/src/$w/$w"
   if [[ ! -x "$bin" ]]; then
     echo "ERROR: missing Embench binary: $bin" >&2
     exit 3
