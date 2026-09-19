@@ -762,6 +762,10 @@ class InstructionQueue
          */
         statistics::Scalar nSkipLocalNoVisibleReadyCycles;
 
+        /** Per-IQ breakdown of local hidden-ready observations. */
+        statistics::Vector nSkipLocalHiddenReadySamplesByIQ;
+        statistics::Vector nSkipLocalNoVisibleReadyCyclesByIQ;
+
         /** Instructions issued from offset zero. */
         statistics::Scalar nSkipHeadIssued;
 
