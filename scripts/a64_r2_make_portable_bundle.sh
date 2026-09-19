@@ -54,6 +54,7 @@ for w in "${WORKLOADS[@]}"; do
 done
 
 {
+  echo "host_arch=$(uname -m)"
   echo "source_repo=$ROOT"
   echo "source_head=$(git rev-parse HEAD)"
   echo "historical_head=$(git -C "$HIST_ROOT" rev-parse HEAD)"
