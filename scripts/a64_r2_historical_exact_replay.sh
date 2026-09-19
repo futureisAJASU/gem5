@@ -54,7 +54,11 @@ declare -A HIST_N4_CYCLES=(
 )
 
 build_id() {
-  readelf -n "$1" 2>/dev/null | awk '/Build ID:/ {print $3; exit}'
+  # Consume the full readelf stream. Under "set -o pipefail", exiting awk
+  # early can SIGPIPE readelf and abort the entire script even though a
+  # valid Build ID was found.
+  readelf -n "$1" 2>/dev/null |
+    awk '/Build ID:/ && !seen {print $3; seen=1}'
 }
 
 extract_first_roi() {
