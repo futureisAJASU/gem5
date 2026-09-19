@@ -3,7 +3,7 @@ set -euo pipefail
 
 SOURCE_REPO="/home/ubuntu/gem5"
 HIST_COMMIT="547a4323adefdff81e490caa5a5e00dc4cd7126d"
-HIST_ROOT="/tmp/gem5-r2-historical-547a4323"
+HIST_ROOT="${HIST_ROOT:-$HOME/gem5-r2-historical-547a4323}"
 EXPECTED_GEM5_SHA="0b5f20709d8f94cf568f2899d5794e89bd8f729d7bfef421d5f6b70c4f9ba0d0"
 EXPECTED_CONFIG_SHA="db7d16fe6c6ddcb70c78b8dd9080a85968173f2d06021580106468a4b8f4b570"
 JOBS="${JOBS:-$(nproc)}"
