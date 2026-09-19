@@ -38,6 +38,7 @@ for gap in 0 1 2 3 4 5 6 7 8; do
   echo "  GAP $gap"
   out="$OUT_ROOT/gap${gap}"
   rm -rf "$out"
+  mkdir -p "$OUT_ROOT"
   "$GEM5" --outdir="$out"     "$CFG"     --binary "benchmarks/bin/rv64_gap_${gap}"     "${COMMON[@]}"     >"$out.stdout" 2>"$out.stderr"
 
   grep -q 'SIMULATION_EXIT_CODE=0' "$out.stdout"
