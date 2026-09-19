@@ -43,9 +43,23 @@ fi
 echo "config_exact=YES"
 
 echo "=== BUILD ARM GEM5 AT EXACT HISTORICAL COMMIT ==="
-scons -C "$HIST_ROOT" build/ARM/gem5.opt -j"$JOBS"
+# IMPORTANT: gem5's SConstruct resolves relative build targets against
+# SCons GetLaunchDir(), not merely the directory selected by -C.
+# Therefore invoke scons *from inside* the historical worktree; using
+# "scons -C $HIST_ROOT build/ARM/gem5.opt" can place the artifact in the
+# caller's build/ directory.
+(
+  cd "$HIST_ROOT"
+  scons build/ARM/gem5.opt -j"$JOBS"
+)
 
 gem5="$HIST_ROOT/build/ARM/gem5.opt"
+if [[ ! -x "$gem5" ]]; then
+  echo "ERROR: historical build completed but expected artifact is missing: $gem5" >&2
+  echo "Nearby gem5.opt candidates:" >&2
+  find "$HIST_ROOT" -maxdepth 4 -type f -name gem5.opt -print >&2 || true
+  exit 4
+fi
 gem5_sha="$(sha256sum "$gem5" | awk '{print $1}')"
 echo "gem5_sha=$gem5_sha"
 echo "gem5_sha_expected=$EXPECTED_GEM5_SHA"
