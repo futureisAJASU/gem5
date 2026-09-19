@@ -9,6 +9,7 @@ CC="${RISCV64_CC:-riscv64-linux-gnu-gcc}"
 CROSS_PREFIX="${RISCV64_CROSS_PREFIX:-riscv64-linux-gnu-}"
 EMBENCH_DIR="${EMBENCH_DIR:-$ROOT/benchmarks/external/embench-iot}"
 EMBENCH_BUILD="${EMBENCH_BUILD:-$EMBENCH_DIR/bd-rv64-gem5}"
+EMBENCH_LOGS="${EMBENCH_LOGS:-$EMBENCH_DIR/logs-rv64-gem5}"
 EMBENCH_COMMIT="0466a18e4f6b47e19598d7c6ba72916d54b68f65"
 M5LIB="$ROOT/util/m5/build/riscv/out/libm5.a"
 
@@ -97,7 +98,7 @@ USER_LIBS="$M5LIB -lm"
 
 (
   cd "$EMBENCH_DIR"
-  python3 build_all.py     --builddir="$EMBENCH_BUILD"     --logdir="$EMBENCH_BUILD/logs"     --arch=riscv64linux     --chip=generic     --board=gem5     --cc="$CC"     --ld="$CC"     --cflags="$CFLAGS"     --ldflags="$LDFLAGS"     --user-libs="$USER_LIBS"     --cpu-mhz=1     --warmup-heat=1     --timeout=120     --clean
+  python3 build_all.py     --builddir="$EMBENCH_BUILD"     --logdir="$EMBENCH_LOGS"     --arch=riscv64linux     --chip=generic     --board=gem5     --cc="$CC"     --ld="$CC"     --cflags="$CFLAGS"     --ldflags="$LDFLAGS"     --user-libs="$USER_LIBS"     --cpu-mhz=1     --warmup-heat=1     --timeout=120     --clean
 )
 
 WORKLOADS=(
