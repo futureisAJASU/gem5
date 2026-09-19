@@ -85,3 +85,37 @@ if file benchmarks/bin/rv64_fma16_stress | grep -q 'RVC'; then
   echo "ERROR: rv64_fma16_stress unexpectedly advertises RVC" >&2
   exit 4
 fi
+
+
+# Historical AArch64 VMAC/SIMD experiment dimensions reconstructed for RV64:
+# nominal densities 25%, 37.5%, 43.75%; burst persistence 16..8192.
+for spec in "d25:2500" "d37p5:3750" "d43p75:4375"; do
+  tag="${spec%%:*}"
+  density_bp="${spec##*:}"
+
+  for burst in 16 32 64 128 256 512 1024 2048 4096 8192; do
+    out="benchmarks/bin/rv64_fma_bd_${tag}_b${burst}"
+
+    "${CC}" \
+      -O2 \
+      -static \
+      -nostdlib \
+      -nostartfiles \
+      -march=rv64imafd \
+      -mabi=lp64d \
+      -DBURST="${burst}" \
+      -DDENSITY_BP="${density_bp}" \
+      -Wl,-e,_start \
+      -o "${out}" \
+      benchmarks/src/rv64_fma_burst_density.S
+
+    if file "${out}" | grep -q 'RVC'; then
+      echo "ERROR: ${out} unexpectedly advertises RVC" >&2
+      exit 4
+    fi
+  done
+done
+
+echo "Built 30 RV64 FMA burst-density binaries (3 densities x 10 burst sizes)."
+file benchmarks/bin/rv64_fma_bd_d25_b16
+file benchmarks/bin/rv64_fma_bd_d43p75_b8192
