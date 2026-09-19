@@ -41,9 +41,18 @@ build_id() {
 
 compiler_comment() {
   local f="$1"
+  # Consume the complete stream for the same pipefail/SIGPIPE reason.
   readelf -p .comment "$f" 2>/dev/null |
-    sed -n 's/.*]  //p' |
-    head -n 1
+    awk '
+      !seen {
+        line=$0
+        sub(/^.*]  /, "", line)
+        if (line != $0) {
+          print line
+          seen=1
+        }
+      }
+    '
 }
 
 echo "=== A64 HISTORICAL ARTIFACT AUDIT ==="
