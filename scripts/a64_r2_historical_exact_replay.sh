@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-JOBS="${JOBS:-$(nproc)}"
-HOST_CC="${HOST_CC:-gcc}"
-HOST_CXX="${HOST_CXX:-g++}"
+JOBS="${JOBS:-2}"
+HOST_CC="${HOST_CC:-$(command -v gcc-14 || command -v gcc)}"
+HOST_CXX="${HOST_CXX:-$(command -v g++-14 || command -v g++)}"
 CLEAN_CURRENT_BUILD="${CLEAN_CURRENT_BUILD:-1}"
 OUT_ROOT="${OUT_ROOT:-a64_r2_historical_exact}"
 HIST_ROOT="${HIST_ROOT:-$HOME/gem5-r2-historical-547a4323}"
