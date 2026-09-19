@@ -13,6 +13,7 @@ HIST_CFG="$HIST_ROOT/configs/01_little_v052_proxy.py"
 CUR_GEM5="$ROOT/build/ARM/gem5.opt"
 CUR_CFG="$ROOT/configs/01_little_v052_proxy.py"
 
+HIST_COMMIT="547a4323adefdff81e490caa5a5e00dc4cd7126d"
 EXPECTED_HIST_GEM5_SHA="0b5f20709d8f94cf568f2899d5794e89bd8f729d7bfef421d5f6b70c4f9ba0d0"
 EXPECTED_HIST_CFG_SHA="db7d16fe6c6ddcb70c78b8dd9080a85968173f2d06021580106468a4b8f4b570"
 
@@ -85,17 +86,32 @@ for f in "$HIST_GEM5" "$HIST_CFG"; do
   [[ -f "$f" ]] || { echo "ERROR: missing historical artifact: $f" >&2; exit 10; }
 done
 
-hist_gem5_sha="$(sha256sum "$HIST_GEM5" | awk '{print $1}')"
-hist_cfg_sha="$(sha256sum "$HIST_CFG" | awk '{print $1}')"
-if [[ "$hist_gem5_sha" != "$EXPECTED_HIST_GEM5_SHA" ]]; then
-  echo "ERROR: historical gem5 SHA mismatch" >&2
-  echo "got=$hist_gem5_sha expected=$EXPECTED_HIST_GEM5_SHA" >&2
+hist_head="$(git -C "$HIST_ROOT" rev-parse HEAD)"
+if [[ "$hist_head" != "$HIST_COMMIT" ]]; then
+  echo "ERROR: historical worktree HEAD mismatch" >&2
+  echo "got=$hist_head expected=$HIST_COMMIT" >&2
   exit 10
 fi
+
+hist_gem5_sha="$(sha256sum "$HIST_GEM5" | awk '{print $1}')"
+hist_cfg_sha="$(sha256sum "$HIST_CFG" | awk '{print $1}')"
+
 if [[ "$hist_cfg_sha" != "$EXPECTED_HIST_CFG_SHA" ]]; then
   echo "ERROR: historical config SHA mismatch" >&2
   echo "got=$hist_cfg_sha expected=$EXPECTED_HIST_CFG_SHA" >&2
   exit 10
+fi
+
+echo "historical_head_exact=YES"
+echo "historical_config_exact=YES"
+echo "historical_gem5_sha=$hist_gem5_sha"
+echo "historical_gem5_sha_expected=$EXPECTED_HIST_GEM5_SHA"
+if [[ "$hist_gem5_sha" == "$EXPECTED_HIST_GEM5_SHA" ]]; then
+  echo "historical_gem5_binary_exact=YES"
+else
+  echo "historical_gem5_binary_exact=NO"
+  echo "NOTE: rebuilt binary SHA differs; build path/tool metadata may affect bytes."
+  echo "NOTE: exact archived stock/N4 cycles below are the required behavioral gate."
 fi
 
 for w in "${WORKLOADS[@]}"; do
@@ -109,7 +125,7 @@ for w in "${WORKLOADS[@]}"; do
   fi
 done
 
-echo "historical_stack_exact=YES"
+echo "historical_inputs_exact=YES"
 
 echo "[1/5] Build current gem5/ARM"
 scons build/ARM/gem5.opt -j"$JOBS"
@@ -389,7 +405,9 @@ for w in "${WORKLOADS[@]}"; do
 done >"$OUT_ROOT/historical_binary_sha256.txt"
 
 {
-  echo "historical_gem5_sha=$EXPECTED_HIST_GEM5_SHA"
+  echo "historical_commit=$HIST_COMMIT"
+  echo "historical_gem5_sha_actual=$hist_gem5_sha"
+  echo "historical_gem5_sha_expected=$EXPECTED_HIST_GEM5_SHA"
   echo "historical_config_sha=$EXPECTED_HIST_CFG_SHA"
   echo "current_head=$(git rev-parse HEAD)"
   echo "current_gem5_sha=$(sha256sum "$CUR_GEM5" | awk '{print $1}')"
