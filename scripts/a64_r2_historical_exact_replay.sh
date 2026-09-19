@@ -5,6 +5,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 JOBS="${JOBS:-$(nproc)}"
+HOST_CC="${HOST_CC:-gcc}"
+HOST_CXX="${HOST_CXX:-g++}"
+CLEAN_CURRENT_BUILD="${CLEAN_CURRENT_BUILD:-1}"
 OUT_ROOT="${OUT_ROOT:-a64_r2_historical_exact}"
 HIST_ROOT="${HIST_ROOT:-/tmp/gem5-r2-historical-547a4323}"
 HIST_BUILD="${HIST_BUILD:-/tmp/embench-aarch64-build}"
@@ -142,7 +145,13 @@ if [[ "$SKIP_CURRENT_BUILD" == "1" ]]; then
   echo "current_gem5=$CUR_GEM5"
   echo "current_gem5_sha=$(sha256sum "$CUR_GEM5" | awk '{print $1}')"
 else
-  scons build/ARM/gem5.opt -j"$JOBS"
+  echo "host_cc=$HOST_CC ($($HOST_CC --version | head -n 1))"
+  echo "host_cxx=$HOST_CXX ($($HOST_CXX --version | head -n 1))"
+  if [[ "$CLEAN_CURRENT_BUILD" == "1" ]]; then
+    echo "current_build_tree=clean"
+    rm -rf "$ROOT/build/ARM"
+  fi
+  scons build/ARM/gem5.opt -j"$JOBS" CC="$HOST_CC" CXX="$HOST_CXX"
 fi
 
 rm -rf "$OUT_ROOT"
