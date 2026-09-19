@@ -52,8 +52,22 @@ cat >"$ARCHDIR/arch.cfg" <<'EOF'
 # Toolchain and ISA flags are supplied explicitly on build_all.py CLI.
 EOF
 
+# Embench 1.0's linker helper unconditionally scans the generated build
+# directories for arch/chip/board support objects.  If an arch/chip source
+# directory contains only a .cfg file, compile_support() never creates the
+# corresponding build directory and create_link_binlist() later raises
+# FileNotFoundError.  Empty support translation units make those directories
+# exist without changing benchmark behavior.
+cat >"$ARCHDIR/archsupport.c" <<'EOF'
+/* Intentionally empty: creates Embench's RV64 arch support build directory. */
+EOF
+
 cat >"$CHIPDIR/chip.cfg" <<'EOF'
 # Generated generic RV64 Linux chip configuration.
+EOF
+
+cat >"$CHIPDIR/chipsupport.c" <<'EOF'
+/* Intentionally empty: creates Embench's generic chip support build directory. */
 EOF
 
 cat >"$BOARDDIR/board.cfg" <<'EOF'
