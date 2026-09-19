@@ -50,7 +50,7 @@ extract_first_roi() {
 run_one() {
   local workload="$1"
   local mode="$2"
-  local bin="$EMBENCH_BUILD/benchmarks/$workload/$workload"
+  local bin="$EMBENCH_BUILD/src/$workload/$workload"
   local out="$OUT_ROOT/$workload/$mode"
   local narg=()
 
@@ -208,7 +208,7 @@ PY
   echo "warmup_heat=1"
   "${RISCV64_CC:-riscv64-linux-gnu-gcc}" --version | head -n 1 | sed 's/^/compiler=/'
   for w in "${WORKLOADS[@]}"; do
-    bin="$EMBENCH_BUILD/benchmarks/$w/$w"
+    bin="$EMBENCH_BUILD/src/$w/$w"
     echo "$w=$(sha256sum "$bin" | awk '{print $1}')"
   done
 } >"$OUT_ROOT/manifest.txt"
