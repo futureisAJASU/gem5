@@ -16,22 +16,27 @@ BIN128="$ROOT/benchmarks/bin/rv64_l2_ws128"
 BIN1024="$ROOT/benchmarks/bin/rv64_l2_ws1024"
 BIN2048="$ROOT/benchmarks/bin/rv64_l2_ws2048"
 
-echo "[0/5] Build current gem5/RISCV"
-scons build/RISCV/gem5.opt -j"$JOBS"
+if [[ "$REUSE_RESULTS" == "1" ]]; then
+  echo "[0/5] Reuse mode: skip gem5 rebuild"
+  echo "[1/5] Reuse mode: skip benchmark rebuild"
+else
+  echo "[0/5] Build current gem5/RISCV"
+  scons build/RISCV/gem5.opt -j"$JOBS"
 
-echo "[1/5] Build three RV64 working-set binaries"
-mkdir -p benchmarks/bin
-for spec in "128:$BIN128" "1024:$BIN1024" "2048:$BIN2048"; do
-  ws="${spec%%:*}"
-  out="${spec#*:}"
-  "$CC" \
-    -O2 -static -fno-tree-vectorize \
-    -march=rv64imafd -mabi=lp64d \
-    -DWS_LINES="$ws" \
-    -Wall -Wextra \
-    -o "$out" "$SRC"
-  file "$out"
-done
+  echo "[1/5] Build three RV64 working-set binaries"
+  mkdir -p benchmarks/bin
+  for spec in "128:$BIN128" "1024:$BIN1024" "2048:$BIN2048"; do
+    ws="${spec%%:*}"
+    out="${spec#*:}"
+    "$CC" \
+      -O2 -static -fno-tree-vectorize \
+      -march=rv64imafd -mabi=lp64d \
+      -DWS_LINES="$ws" \
+      -Wall -Wextra \
+      -o "$out" "$SRC"
+    file "$out"
+  done
+fi
 
 if [[ "$REUSE_RESULTS" != "1" ]]; then
   rm -rf "$OUT_ROOT"
