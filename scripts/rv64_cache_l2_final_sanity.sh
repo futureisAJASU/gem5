@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 JOBS="${JOBS:-$(nproc)}"
+REUSE_RESULTS="${REUSE_RESULTS:-0}"
 OUT_ROOT="${OUT_ROOT:-rv64_cache_l2_final_sanity}"
 GEM5="$ROOT/build/RISCV/gem5.opt"
 CFG="$ROOT/configs/02_little_v052_rv64_proxy.py"
@@ -32,7 +33,9 @@ for spec in "128:$BIN128" "1024:$BIN1024" "2048:$BIN2048"; do
   file "$out"
 done
 
-rm -rf "$OUT_ROOT"
+if [[ "$REUSE_RESULTS" != "1" ]]; then
+  rm -rf "$OUT_ROOT"
+fi
 mkdir -p "$OUT_ROOT"
 
 COMMON=(
@@ -139,16 +142,33 @@ run_one() {
   fi
 }
 
-echo "[2/5] Run compact 8-point topology/capacity matrix"
-for pattern in pair_asym high_full; do
-  for profile in private4_2p0 pair2_2p0 shared4_2p0 pair2_1p75; do
-    echo "  $pattern / $profile"
-    run_one "$pattern" "$profile"
+if [[ "$REUSE_RESULTS" == "1" ]]; then
+  echo "[2/5] Reuse existing 8-point topology/capacity matrix"
+  echo "[3/5] Reuse existing deterministic safe-baseline repeat"
+  for pattern in pair_asym high_full; do
+    for profile in private4_2p0 pair2_2p0 shared4_2p0 pair2_1p75; do
+      test -f "$OUT_ROOT/$pattern/$profile/main/stats.txt" || {
+        echo "ERROR: missing reusable result $OUT_ROOT/$pattern/$profile/main/stats.txt" >&2
+        exit 5
+      }
+    done
   done
-done
+  test -f "$OUT_ROOT/high_full/pair2_2p0/repeat/stats.txt" || {
+    echo "ERROR: missing reusable repeat $OUT_ROOT/high_full/pair2_2p0/repeat/stats.txt" >&2
+    exit 5
+  }
+else
+  echo "[2/5] Run compact 8-point topology/capacity matrix"
+  for pattern in pair_asym high_full; do
+    for profile in private4_2p0 pair2_2p0 shared4_2p0 pair2_1p75; do
+      echo "  $pattern / $profile"
+      run_one "$pattern" "$profile"
+    done
+  done
 
-echo "[3/5] Deterministic repeat of safe baseline under high pressure"
-run_one high_full pair2_2p0 repeat
+  echo "[3/5] Deterministic repeat of safe baseline under high pressure"
+  run_one high_full pair2_2p0 repeat
+fi
 
 echo "[4/5] Validate work parity, geometry, and summarize"
 python3 - "$OUT_ROOT" <<'PY'
@@ -173,9 +193,12 @@ def read_stats(path):
             continue
         k, raw = p[0], p[1]
         try:
-            x = int(float(raw))
+            fv = float(raw)
         except ValueError:
             continue
+        if not math.isfinite(fv):
+            continue
+        x = int(fv)
 
         kl = k.lower()
         if k == "simTicks":
