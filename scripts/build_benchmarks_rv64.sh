@@ -55,3 +55,28 @@ done
 
 file benchmarks/bin/rv64_gap_0
 file benchmarks/bin/rv64_gap_8
+
+
+"${CC}" \
+  -O2 \
+  -static \
+  -nostdlib \
+  -nostartfiles \
+  -march=rv64imafd \
+  -mabi=lp64d \
+  -Wl,-e,_start \
+  -o benchmarks/bin/rv64_fma16_stress \
+  benchmarks/src/rv64_fma16_stress.S
+
+file benchmarks/bin/rv64_fma16_stress
+
+fma_static_count="$(riscv64-linux-gnu-objdump -d benchmarks/bin/rv64_fma16_stress | grep -Ec '\\bfmadd\\.d\\b')"
+if [[ "$fma_static_count" -ne 16 ]]; then
+  echo "ERROR: expected 16 static fmadd.d instructions, saw $fma_static_count" >&2
+  exit 4
+fi
+
+if file benchmarks/bin/rv64_fma16_stress | grep -q 'RVC'; then
+  echo "ERROR: rv64_fma16_stress unexpectedly advertises RVC" >&2
+  exit 4
+fi
