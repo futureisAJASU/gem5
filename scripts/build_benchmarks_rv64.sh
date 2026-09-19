@@ -70,7 +70,12 @@ file benchmarks/bin/rv64_gap_8
 
 file benchmarks/bin/rv64_fma16_stress
 
-fma_static_count="$(riscv64-linux-gnu-objdump -d benchmarks/bin/rv64_fma16_stress | grep -Ec '\\bfmadd\\.d\\b')"
+OBJDUMP="${RISCV64_OBJDUMP:-riscv64-linux-gnu-objdump}"
+fma_static_count="$("$OBJDUMP" -d benchmarks/bin/rv64_fma16_stress | awk '
+  /[[:space:]]fmadd[.]d[[:space:]]/ { count++ }
+  END { print count + 0 }
+')"
+echo "rv64_fma16_stress static fmadd.d count: $fma_static_count"
 if [[ "$fma_static_count" -ne 16 ]]; then
   echo "ERROR: expected 16 static fmadd.d instructions, saw $fma_static_count" >&2
   exit 4
