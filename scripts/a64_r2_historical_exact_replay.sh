@@ -17,6 +17,7 @@ CUR_GEM5="${CUR_GEM5:-$ROOT/build/ARM/gem5.opt}"
 CUR_CFG="${CUR_CFG:-$ROOT/configs/01_little_v052_proxy.py}"
 SKIP_CURRENT_BUILD="${SKIP_CURRENT_BUILD:-0}"
 REUSE_HISTORICAL="${REUSE_HISTORICAL:-0}"
+REUSE_CURRENT="${REUSE_CURRENT:-0}"
 
 HIST_COMMIT="547a4323adefdff81e490caa5a5e00dc4cd7126d"
 EXPECTED_HIST_GEM5_SHA="0b5f20709d8f94cf568f2899d5794e89bd8f729d7bfef421d5f6b70c4f9ba0d0"
@@ -313,19 +314,39 @@ run_current() {
   extract_first_roi "$out/stats.txt" "$out/roi.stats" || exit 13
 }
 
-echo "[4/5] Run current central/P21313 using the exact historical binaries"
-for w in "${WORKLOADS[@]}"; do
-  for m in stock N4; do
-    echo "  current $w / central_s2 / $m"
-    run_current "$w" central_s2 "$m"
-  done
-  for p in p21313_ff_s2 p21313_i1f_s2; do
-    for m in stock N4 N5; do
-      echo "  current $w / $p / $m"
-      run_current "$w" "$p" "$m"
+if [[ "$REUSE_CURRENT" == "1" ]]; then
+  echo "[4/5] Reuse current central/P21313 matrix already on disk"
+  for w in "${WORKLOADS[@]}"; do
+    for m in stock N4; do
+      test -f "$OUT_ROOT/current/$w/central_s2/$m/roi.stats" || {
+        echo "ERROR: missing reusable current result $OUT_ROOT/current/$w/central_s2/$m/roi.stats" >&2
+        exit 13
+      }
+    done
+    for p in p21313_ff_s2 p21313_i1f_s2; do
+      for m in stock N4 N5; do
+        test -f "$OUT_ROOT/current/$w/$p/$m/roi.stats" || {
+          echo "ERROR: missing reusable current result $OUT_ROOT/current/$w/$p/$m/roi.stats" >&2
+          exit 13
+        }
+      done
     done
   done
-done
+else
+  echo "[4/5] Run current central/P21313 using the exact historical binaries"
+  for w in "${WORKLOADS[@]}"; do
+    for m in stock N4; do
+      echo "  current $w / central_s2 / $m"
+      run_current "$w" central_s2 "$m"
+    done
+    for p in p21313_ff_s2 p21313_i1f_s2; do
+      for m in stock N4 N5; do
+        echo "  current $w / $p / $m"
+        run_current "$w" "$p" "$m"
+      done
+    done
+  done
+fi
 
 echo "[5/5] Validate and summarize exact-binary R2"
 python3 - "$OUT_ROOT" <<'PY'
@@ -359,7 +380,12 @@ def read(path):
         except ValueError: continue
         if k=="simInsts": d["insts"]=int(x)
         elif k=="simTicks": d["ticks"]=int(x)
-        elif k.endswith(".numCycles") and "cores0.core" in k:
+        elif k.endswith(".numCycles") and (
+            "processor.cores.core" in k
+            or "processor.cores0.core" in k
+            or "cores0.core" in k
+            or "cpu.numCycles" in k
+        ):
             d.setdefault("cycles",int(x))
         elif k.endswith(".nSkipLocalHiddenReadySamples"):
             d["hidden"]+=int(x)
@@ -369,7 +395,7 @@ def read(path):
             o=k.rsplit("::",1)[-1]
             if o.isdigit() and x>0: d["maxOff"]=max(d["maxOff"],int(o))
     if "cycles" not in d:
-        d["cycles"]=round(d["ticks"]*1.4e9/1e12)
+        raise RuntimeError(f"missing CPU numCycles in {path}")
     return d
 
 hist={}
