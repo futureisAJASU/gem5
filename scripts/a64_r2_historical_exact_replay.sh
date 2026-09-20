@@ -16,6 +16,7 @@ HIST_CFG="${HIST_CFG:-$HIST_ROOT/configs/01_little_v052_proxy.py}"
 CUR_GEM5="${CUR_GEM5:-$ROOT/build/ARM/gem5.opt}"
 CUR_CFG="${CUR_CFG:-$ROOT/configs/01_little_v052_proxy.py}"
 SKIP_CURRENT_BUILD="${SKIP_CURRENT_BUILD:-0}"
+REUSE_HISTORICAL="${REUSE_HISTORICAL:-0}"
 
 HIST_COMMIT="547a4323adefdff81e490caa5a5e00dc4cd7126d"
 EXPECTED_HIST_GEM5_SHA="0b5f20709d8f94cf568f2899d5794e89bd8f729d7bfef421d5f6b70c4f9ba0d0"
@@ -81,10 +82,27 @@ extract_first_roi() {
 
 read_cycle() {
   local stats="$1"
-  awk '
-    $1 ~ /cores0.core.numCycles$/ { print int($2); found=1; exit }
+  local value=""
+
+  # gem5 stat prefixes changed across the historical/current wrappers.
+  # Prefer an exact core0 numCycles-like counter, but do not let set -e
+  # silently terminate the runner when the prefix differs.
+  value="$(awk '
+    $1 ~ /cores?0[.]core[.]numCycles$/ { print int($2); found=1; exit }
+    $1 ~ /cores?0[.]numCycles$/      { print int($2); found=1; exit }
+    $1 ~ /cpu[.]numCycles$/          { print int($2); found=1; exit }
     END { if (!found) exit 1 }
-  ' "$stats"
+  ' "$stats" 2>/dev/null || true)"
+
+  if [[ -n "$value" ]]; then
+    printf '%s\n' "$value"
+    return 0
+  fi
+
+  echo "ERROR: could not locate historical core numCycles in $stats" >&2
+  echo "Available cycle/tick-like stats:" >&2
+  grep -E '(numCycles|simTicks|clock|cycle)' "$stats" | head -n 40 >&2 || true
+  return 1
 }
 
 echo "=== A64 R2 HISTORICAL-EXACT REPLAY ==="
@@ -154,7 +172,9 @@ else
   scons build/ARM/gem5.opt -j"$JOBS" CC="$HOST_CC" CXX="$HOST_CXX"
 fi
 
-rm -rf "$OUT_ROOT"
+if [[ "$REUSE_HISTORICAL" != "1" ]]; then
+  rm -rf "$OUT_ROOT"
+fi
 mkdir -p "$OUT_ROOT"
 
 run_hist() {
@@ -192,13 +212,25 @@ run_hist() {
   }
 }
 
-echo "[2/5] Replay archived 12-point historical baseline with exact old stack"
-for w in "${WORKLOADS[@]}"; do
-  echo "  historical $w / stock"
-  run_hist "$w" stock
-  echo "  historical $w / N4"
-  run_hist "$w" N4
-done
+if [[ "$REUSE_HISTORICAL" == "1" ]]; then
+  echo "[2/5] Reuse archived 12-point historical replay already on disk"
+  for w in "${WORKLOADS[@]}"; do
+    for m in stock N4; do
+      test -f "$OUT_ROOT/historical/$w/$m/roi.stats" || {
+        echo "ERROR: missing reusable historical result $OUT_ROOT/historical/$w/$m/roi.stats" >&2
+        exit 11
+      }
+    done
+  done
+else
+  echo "[2/5] Replay archived 12-point historical baseline with exact old stack"
+  for w in "${WORKLOADS[@]}"; do
+    echo "  historical $w / stock"
+    run_hist "$w" stock
+    echo "  historical $w / N4"
+    run_hist "$w" N4
+  done
+fi
 
 echo "[3/5] Require cycle-exact historical reproduction"
 for w in "${WORKLOADS[@]}"; do
