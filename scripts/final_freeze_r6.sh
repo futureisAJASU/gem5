@@ -62,7 +62,7 @@ scons build/ARM/gem5.opt -j"$JOBS"
 
 echo "[3/7] Selected final-head smoke"
 if [[ "$RUN_SMOKE" == "1" ]]; then
-  bash scripts/rv64_revalidation_smoke.sh \
+  SKIP_BUILD=1 bash scripts/rv64_revalidation_smoke.sh \
     2>&1 | tee "$OUT_ROOT.smoke.log"
 else
   echo "smoke=SKIPPED"
