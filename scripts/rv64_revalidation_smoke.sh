@@ -6,14 +6,23 @@ cd "$ROOT"
 
 JOBS="${JOBS:-$(nproc)}"
 OUT_ROOT="${OUT_ROOT:-rv64_revalidation_smoke}"
+SKIP_BUILD="${SKIP_BUILD:-0}"
 
 command -v riscv64-linux-gnu-gcc >/dev/null || {
   echo "ERROR: riscv64-linux-gnu-gcc not found" >&2
   exit 2
 }
 
-echo "[1/4] Build gem5/RISCV"
-scons build/RISCV/gem5.opt -j"$JOBS"
+if [[ "$SKIP_BUILD" == "1" ]]; then
+  echo "[1/4] Reuse existing gem5/RISCV"
+  [[ -x build/RISCV/gem5.opt ]] || {
+    echo "ERROR: SKIP_BUILD=1 but build/RISCV/gem5.opt is missing" >&2
+    exit 2
+  }
+else
+  echo "[1/4] Build gem5/RISCV"
+  scons build/RISCV/gem5.opt -j"$JOBS"
+fi
 
 echo "[2/4] Build directed RV64 binaries"
 bash scripts/build_benchmarks_rv64.sh
