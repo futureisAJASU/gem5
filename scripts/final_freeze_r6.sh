@@ -7,6 +7,7 @@ cd "$ROOT"
 JOBS="${JOBS:-2}"
 OUT_ROOT="${OUT_ROOT:-final_freeze_r6}"
 CLEAN_BUILD="${CLEAN_BUILD:-1}"
+REUSE_BUILDS="${REUSE_BUILDS:-0}"
 RUN_SMOKE="${RUN_SMOKE:-1}"
 
 RISCV_GEM5="$ROOT/build/RISCV/gem5.opt"
@@ -50,15 +51,23 @@ echo "tracked_tree_clean=YES"
 echo "head=$(git rev-parse HEAD)"
 echo "branch=$(git rev-parse --abbrev-ref HEAD)"
 
-echo "[2/7] Clean rebuild current RISCV + ARM gem5"
-if [[ "$CLEAN_BUILD" == "1" ]]; then
-  rm -rf build/RISCV build/ARM
-fi
-scons build/RISCV/gem5.opt -j"$JOBS"
-scons build/ARM/gem5.opt -j"$JOBS"
+if [[ "$REUSE_BUILDS" == "1" ]]; then
+  echo "[2/7] Reuse already completed RISCV + ARM builds"
+  [[ -x "$RISCV_GEM5" ]] || { echo "ERROR: REUSE_BUILDS=1 but RISCV gem5.opt is missing" >&2; exit 12; }
+  [[ -x "$ARM_GEM5" ]] || { echo "ERROR: REUSE_BUILDS=1 but ARM gem5.opt is missing" >&2; exit 12; }
+  echo "riscv_build=REUSED"
+  echo "arm_build=REUSED"
+else
+  echo "[2/7] Build current RISCV + ARM gem5"
+  if [[ "$CLEAN_BUILD" == "1" ]]; then
+    rm -rf build/RISCV build/ARM
+  fi
+  scons build/RISCV/gem5.opt -j"$JOBS"
+  scons build/ARM/gem5.opt -j"$JOBS"
 
-[[ -x "$RISCV_GEM5" ]] || { echo "ERROR: missing RISCV gem5.opt" >&2; exit 12; }
-[[ -x "$ARM_GEM5" ]] || { echo "ERROR: missing ARM gem5.opt" >&2; exit 12; }
+  [[ -x "$RISCV_GEM5" ]] || { echo "ERROR: missing RISCV gem5.opt" >&2; exit 12; }
+  [[ -x "$ARM_GEM5" ]] || { echo "ERROR: missing ARM gem5.opt" >&2; exit 12; }
+fi
 
 echo "[3/7] Selected final-head smoke"
 if [[ "$RUN_SMOKE" == "1" ]]; then
