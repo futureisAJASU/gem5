@@ -88,9 +88,10 @@ read_cycle() {
   # Prefer an exact core0 numCycles-like counter, but do not let set -e
   # silently terminate the runner when the prefix differs.
   value="$(awk '
-    $1 ~ /cores?0[.]core[.]numCycles$/ { print int($2); found=1; exit }
-    $1 ~ /cores?0[.]numCycles$/      { print int($2); found=1; exit }
-    $1 ~ /cpu[.]numCycles$/          { print int($2); found=1; exit }
+    $1 ~ /processor[.]cores[.]core[.]numCycles$/ { print int($2); found=1; exit }
+    $1 ~ /cores?0[.]core[.]numCycles$/            { print int($2); found=1; exit }
+    $1 ~ /cores?0[.]numCycles$/                   { print int($2); found=1; exit }
+    $1 ~ /cpu[.]numCycles$/                       { print int($2); found=1; exit }
     END { if (!found) exit 1 }
   ' "$stats" 2>/dev/null || true)"
 
