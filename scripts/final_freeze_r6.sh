@@ -231,5 +231,5 @@ echo "arm_gem5_evidence=$ARM_EVIDENCE"
 echo "package=$OUT_ROOT.tar.gz"
 echo "package_sha256=$(sha256sum "$OUT_ROOT.tar.gz" | awk '{print $1}')"
 echo
-echo "R6 PASS: required evidence present, tracked tree clean, current RISCV/ARM clean builds succeeded,"
+echo "R6 PASS: required evidence present, tracked tree clean, required ISA build evidence validated,"
 echo "selected final-head smoke completed (unless explicitly skipped), and freeze package was assembled."
