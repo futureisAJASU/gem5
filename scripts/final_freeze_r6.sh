@@ -8,6 +8,7 @@ JOBS="${JOBS:-2}"
 OUT_ROOT="${OUT_ROOT:-final_freeze_r6}"
 CLEAN_BUILD="${CLEAN_BUILD:-1}"
 REUSE_BUILDS="${REUSE_BUILDS:-0}"
+ALLOW_R2_ARM_ATTESTATION="${ALLOW_R2_ARM_ATTESTATION:-0}"
 RUN_SMOKE="${RUN_SMOKE:-1}"
 
 RISCV_GEM5="$ROOT/build/RISCV/gem5.opt"
@@ -52,11 +53,50 @@ echo "head=$(git rev-parse HEAD)"
 echo "branch=$(git rev-parse --abbrev-ref HEAD)"
 
 if [[ "$REUSE_BUILDS" == "1" ]]; then
-  echo "[2/7] Reuse already completed RISCV + ARM builds"
+  echo "[2/7] Reuse already completed ISA build evidence"
   [[ -x "$RISCV_GEM5" ]] || { echo "ERROR: REUSE_BUILDS=1 but RISCV gem5.opt is missing" >&2; exit 12; }
-  [[ -x "$ARM_GEM5" ]] || { echo "ERROR: REUSE_BUILDS=1 but ARM gem5.opt is missing" >&2; exit 12; }
   echo "riscv_build=REUSED"
-  echo "arm_build=REUSED"
+
+  if [[ -x "$ARM_GEM5" ]]; then
+    echo "arm_build=REUSED"
+    ARM_SHA="$(sha256sum "$ARM_GEM5" | awk '{print $1}')"
+    ARM_EVIDENCE="live_binary"
+  elif [[ "$ALLOW_R2_ARM_ATTESTATION" == "1" ]]; then
+    R2_MANIFEST="a64_r2_historical_exact/manifest.txt"
+    [[ -s "$R2_MANIFEST" ]] || { echo "ERROR: missing R2 manifest for ARM attestation" >&2; exit 12; }
+
+    R2_HEAD="$(awk -F= '$1=="current_head"{print $2}' "$R2_MANIFEST")"
+    R2_ARM_SHA="$(awk -F= '$1=="current_gem5_sha"{print $2}' "$R2_MANIFEST")"
+    R2_CFG_SHA="$(awk -F= '$1=="current_config_sha"{print $2}' "$R2_MANIFEST")"
+    CUR_CFG_SHA="$(sha256sum configs/01_little_v052_proxy.py | awk '{print $1}')"
+
+    [[ -n "$R2_HEAD" && -n "$R2_ARM_SHA" && -n "$R2_CFG_SHA" ]] || {
+      echo "ERROR: incomplete R2 ARM attestation fields" >&2
+      exit 12
+    }
+    [[ "$R2_CFG_SHA" == "$CUR_CFG_SHA" ]] || {
+      echo "ERROR: current A64 config differs from R2-attested config" >&2
+      exit 12
+    }
+
+    NON_SCRIPT_CHANGES="$(git diff --name-only "$R2_HEAD"..HEAD --       ':(exclude)scripts/**' || true)"
+    if [[ -n "$NON_SCRIPT_CHANGES" ]]; then
+      echo "ERROR: non-script files changed since R2 ARM validation:" >&2
+      printf '%s\n' "$NON_SCRIPT_CHANGES" >&2
+      exit 12
+    fi
+
+    ARM_SHA="$R2_ARM_SHA"
+    ARM_EVIDENCE="R2_attested_binary_source_equivalent"
+    echo "arm_build=R2_ATTESTED"
+    echo "arm_r2_head=$R2_HEAD"
+    echo "arm_attested_sha256=$ARM_SHA"
+    echo "arm_non_script_changes_since_r2=NONE"
+    echo "arm_current_config_sha_matches_r2=YES"
+  else
+    echo "ERROR: ARM gem5.opt missing; set ALLOW_R2_ARM_ATTESTATION=1 to use R2 evidence" >&2
+    exit 12
+  fi
 else
   echo "[2/7] Build current RISCV + ARM gem5"
   if [[ "$CLEAN_BUILD" == "1" ]]; then
@@ -67,6 +107,8 @@ else
 
   [[ -x "$RISCV_GEM5" ]] || { echo "ERROR: missing RISCV gem5.opt" >&2; exit 12; }
   [[ -x "$ARM_GEM5" ]] || { echo "ERROR: missing ARM gem5.opt" >&2; exit 12; }
+  ARM_SHA="$(sha256sum "$ARM_GEM5" | awk '{print $1}')"
+  ARM_EVIDENCE="fresh_or_existing_live_binary"
 fi
 
 echo "[3/7] Selected final-head smoke"
@@ -135,7 +177,8 @@ echo "[5/7] Write final freeze decisions / provenance"
   echo "python=$(python3 --version 2>&1)"
   echo "scons=$(scons --version | head -n 1)"
   echo "riscv_gem5_sha256=$(sha256sum "$RISCV_GEM5" | awk '{print $1}')"
-  echo "arm_gem5_sha256=$(sha256sum "$ARM_GEM5" | awk '{print $1}')"
+  echo "arm_gem5_sha256=$ARM_SHA"
+  echo "arm_gem5_evidence=$ARM_EVIDENCE"
   echo
   echo "R1=PASS_pair_shared_FP_persistence"
   echo "R2=PASS_A64_historical_cycle_exact_and_int1_first_confirmation"
@@ -183,7 +226,8 @@ tar -czf "$OUT_ROOT.tar.gz" "$OUT_ROOT"
 echo "[7/7] Final report"
 echo "freeze_head=$(git rev-parse HEAD)"
 echo "riscv_gem5_sha256=$(sha256sum "$RISCV_GEM5" | awk '{print $1}')"
-echo "arm_gem5_sha256=$(sha256sum "$ARM_GEM5" | awk '{print $1}')"
+echo "arm_gem5_sha256=$ARM_SHA"
+echo "arm_gem5_evidence=$ARM_EVIDENCE"
 echo "package=$OUT_ROOT.tar.gz"
 echo "package_sha256=$(sha256sum "$OUT_ROOT.tar.gz" | awk '{print $1}')"
 echo
