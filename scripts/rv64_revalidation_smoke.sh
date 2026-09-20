@@ -40,6 +40,7 @@ build/RISCV/gem5.opt \
   --cores 2 \
   --distributed-iq \
   --local-iq-picker \
+  --int-steering int1-first \
   --n-skip 4 \
   --pair-shared-div \
   --div-reactive-power \
