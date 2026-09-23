@@ -1,0 +1,330 @@
+name: N4 Cycle Exposure Closure
+
+on:
+  push:
+    branches:
+      - n4-cycle-exposure-closure-2026-09-23
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  closure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      SLIDING_REF: a37d6cbb749bfe937134e472acf426ec0010d07d
+      FIXED24_REF: dc035f2d1472a2bcfa650c4ee2d279dbe90cc290
+      EMBENCH_COMMIT: 0466a18e4f6b47e19598d7c6ba72916d54b68f65
+    steps:
+      - name: Checkout experiment branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build and RV64 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y             build-essential scons python3-dev pkg-config             zlib1g-dev libprotobuf-dev protobuf-compiler libprotoc-dev             libboost-all-dev gcc-riscv64-linux-gnu g++-riscv64-linux-gnu             libhdf5-dev libpng-dev libgoogle-perftools-dev
+          riscv64-linux-gnu-gcc --version | head -n1
+          scons --version
+          python3 --version
+
+      - name: Prepare evidence directories
+        run: |
+          rm -rf N4_CYCLE_EXPOSURE_CLOSURE
+          mkdir -p             N4_CYCLE_EXPOSURE_CLOSURE/sliding/directed             N4_CYCLE_EXPOSURE_CLOSURE/sliding/workload             N4_CYCLE_EXPOSURE_CLOSURE/fixed24/directed             N4_CYCLE_EXPOSURE_CLOSURE/fixed24/workload
+          {
+            echo "workflow_head=$(git rev-parse HEAD)"
+            echo "sliding_ref=$SLIDING_REF"
+            echo "fixed24_ref=$FIXED24_REF"
+            echo "base_final_commit=b5abd424cb49e59f13e011033b7bd4417c14af33"
+            echo "runner_os=$(uname -a)"
+            echo "compiler=$(riscv64-linux-gnu-gcc --version | head -n1)"
+            echo "python=$(python3 --version)"
+            echo "scons=$(scons --version | head -n1)"
+          } > N4_CYCLE_EXPOSURE_CLOSURE/environment.txt
+
+      - name: Build and run SLIDING instrumentation reference
+        run: |
+          git checkout --detach "$SLIDING_REF"
+          git status --short > N4_CYCLE_EXPOSURE_CLOSURE/sliding/git_status_before.txt
+          scons build/RISCV/gem5.opt -j2
+
+          mkdir -p benchmarks/bin
+          riscv64-linux-gnu-gcc             -O2 -static -nostdlib -nostartfiles             -march=rv64imafd -mabi=lp64d -Wl,-e,_start             -o benchmarks/bin/rv64_n4_cycle_exposure             benchmarks/src/rv64_n4_cycle_exposure.S
+
+          # Build the exact six-workload RV64 Embench corpus used by the final study.
+          bash scripts/rv64_embench_prepare.sh
+
+          COMMON=(
+            --distributed-iq
+            --local-iq-picker
+            --int-steering int1-first
+            --dist-int0 10
+            --dist-int1 6
+            --dist-mem 12
+            --dist-div 4
+            --dist-fpsimd 6
+            --dist-int0-write-cap 2
+            --dist-int1-write-cap 1
+            --dist-mem-write-cap 3
+            --dist-div-write-cap 1
+            --dist-fpsimd-write-cap 3
+            --bp-inst-shift 1
+            --n-skip 4
+          )
+
+          out=N4_CYCLE_EXPOSURE_CLOSURE/sliding/directed/run
+          mkdir -p "$out"
+          build/RISCV/gem5.opt             --outdir="$out"             --debug-flags=IQ             --debug-file=iq.trace             configs/02_little_v052_rv64_proxy.py             --binary benchmarks/bin/rv64_n4_cycle_exposure             "${COMMON[@]}"             > N4_CYCLE_EXPOSURE_CLOSURE/sliding/directed/stdout.txt             2> N4_CYCLE_EXPOSURE_CLOSURE/sliding/directed/stderr.txt
+          grep -q 'SIMULATION_EXIT_CODE=0' N4_CYCLE_EXPOSURE_CLOSURE/sliding/directed/stdout.txt
+          cp "$out/stats.txt" N4_CYCLE_EXPOSURE_CLOSURE/sliding/directed/stats.txt
+          if [[ -f "$out/iq.trace" ]]; then
+            cp "$out/iq.trace" N4_CYCLE_EXPOSURE_CLOSURE/sliding/directed/iq.trace
+          fi
+
+          EMBENCH_BUILD=benchmarks/external/embench-iot/bd-rv64-gem5
+          for w in matmult-int nettle-sha256 nettle-aes sglib-combined wikisort picojpeg; do
+            out=N4_CYCLE_EXPOSURE_CLOSURE/sliding/workload/$w
+            mkdir -p "$out"
+            build/RISCV/gem5.opt               --outdir="$out/run"               configs/02_little_v052_rv64_proxy.py               --binary "$EMBENCH_BUILD/src/$w/$w"               "${COMMON[@]}"               > "$out/stdout.txt" 2> "$out/stderr.txt"
+            grep -q 'SIMULATION_EXIT_CODE=0' "$out/stdout.txt"
+            awk '
+              /^---------- Begin Simulation Statistics ----------/ {
+                section++; if (section == 1) keep=1
+              }
+              keep { print }
+              /^---------- End Simulation Statistics/ && keep { exit }
+            ' "$out/run/stats.txt" > "$out/roi.stats"
+          done
+          git status --short > N4_CYCLE_EXPOSURE_CLOSURE/sliding/git_status_after.txt
+
+      - name: Build and run FIXED24 semantic variant
+        run: |
+          git checkout --detach "$FIXED24_REF"
+          git status --short > N4_CYCLE_EXPOSURE_CLOSURE/fixed24/git_status_before.txt
+          scons build/RISCV/gem5.opt -j2
+
+          mkdir -p benchmarks/bin
+          riscv64-linux-gnu-gcc             -O2 -static -nostdlib -nostartfiles             -march=rv64imafd -mabi=lp64d -Wl,-e,_start             -o benchmarks/bin/rv64_n4_cycle_exposure             benchmarks/src/rv64_n4_cycle_exposure.S
+
+          COMMON=(
+            --distributed-iq
+            --local-iq-picker
+            --int-steering int1-first
+            --dist-int0 10
+            --dist-int1 6
+            --dist-mem 12
+            --dist-div 4
+            --dist-fpsimd 6
+            --dist-int0-write-cap 2
+            --dist-int1-write-cap 1
+            --dist-mem-write-cap 3
+            --dist-div-write-cap 1
+            --dist-fpsimd-write-cap 3
+            --bp-inst-shift 1
+            --n-skip 4
+          )
+
+          out=N4_CYCLE_EXPOSURE_CLOSURE/fixed24/directed/run
+          mkdir -p "$out"
+          build/RISCV/gem5.opt             --outdir="$out"             --debug-flags=IQ             --debug-file=iq.trace             configs/02_little_v052_rv64_proxy.py             --binary benchmarks/bin/rv64_n4_cycle_exposure             "${COMMON[@]}"             > N4_CYCLE_EXPOSURE_CLOSURE/fixed24/directed/stdout.txt             2> N4_CYCLE_EXPOSURE_CLOSURE/fixed24/directed/stderr.txt
+          grep -q 'SIMULATION_EXIT_CODE=0' N4_CYCLE_EXPOSURE_CLOSURE/fixed24/directed/stdout.txt
+          cp "$out/stats.txt" N4_CYCLE_EXPOSURE_CLOSURE/fixed24/directed/stats.txt
+          if [[ -f "$out/iq.trace" ]]; then
+            cp "$out/iq.trace" N4_CYCLE_EXPOSURE_CLOSURE/fixed24/directed/iq.trace
+          fi
+
+          EMBENCH_BUILD=benchmarks/external/embench-iot/bd-rv64-gem5
+          for w in matmult-int nettle-sha256 nettle-aes sglib-combined wikisort picojpeg; do
+            out=N4_CYCLE_EXPOSURE_CLOSURE/fixed24/workload/$w
+            mkdir -p "$out"
+            build/RISCV/gem5.opt               --outdir="$out/run"               configs/02_little_v052_rv64_proxy.py               --binary "$EMBENCH_BUILD/src/$w/$w"               "${COMMON[@]}"               > "$out/stdout.txt" 2> "$out/stderr.txt"
+            grep -q 'SIMULATION_EXIT_CODE=0' "$out/stdout.txt"
+            awk '
+              /^---------- Begin Simulation Statistics ----------/ {
+                section++; if (section == 1) keep=1
+              }
+              keep { print }
+              /^---------- End Simulation Statistics/ && keep { exit }
+            ' "$out/run/stats.txt" > "$out/roi.stats"
+          done
+          git status --short > N4_CYCLE_EXPOSURE_CLOSURE/fixed24/git_status_after.txt
+
+      - name: Summarize source behavior and performance
+        run: |
+          python3 - <<'PY'
+          import csv, math, pathlib, re
+
+          root = pathlib.Path("N4_CYCLE_EXPOSURE_CLOSURE")
+          workloads = [
+              "matmult-int", "nettle-sha256", "nettle-aes",
+              "sglib-combined", "wikisort", "picojpeg",
+          ]
+
+          def parse_stats(path):
+              data = {
+                  "new_cycles": 0,
+                  "new_positions": 0,
+                  "max_round_visible": 0,
+                  "max_cycle_unique": 0,
+                  "max_offset": 0,
+              }
+              text = pathlib.Path(path).read_text()
+              for line in text.splitlines():
+                  p = line.split()
+                  if len(p) < 2:
+                      continue
+                  key, raw = p[0], p[1]
+                  try:
+                      val = float(raw)
+                  except ValueError:
+                      continue
+                  if key == "simInsts":
+                      data["simInsts"] = int(val)
+                  elif key == "simTicks":
+                      data["simTicks"] = int(val)
+                  elif key.endswith(".numCycles") and (
+                      "cores0.core" in key or
+                      "processor.cores0.core" in key or
+                      "processor.cores.core" in key or
+                      "cpu.numCycles" in key
+                  ):
+                      data.setdefault("cycles", int(val))
+                  elif key.endswith(".nSkipSameCycleNewExposureCycles"):
+                      data["new_cycles"] += int(val)
+                  elif key.endswith(".nSkipSameCycleNewExposurePositions"):
+                      data["new_positions"] += int(val)
+                  elif ".nSkipRoundVisiblePositions::" in key and val > 0:
+                      s = key.rsplit("::", 1)[-1]
+                      nums = [int(x) for x in re.findall(r"\d+", s)]
+                      if nums:
+                          data["max_round_visible"] = max(
+                              data["max_round_visible"], max(nums)
+                          )
+                  elif ".nSkipCycleUniqueVisiblePositions::" in key and val > 0:
+                      s = key.rsplit("::", 1)[-1]
+                      nums = [int(x) for x in re.findall(r"\d+", s)]
+                      if nums:
+                          data["max_cycle_unique"] = max(
+                              data["max_cycle_unique"], max(nums)
+                          )
+                  elif ".nSkipIssuedOffset::" in key and val > 0:
+                      s = key.rsplit("::", 1)[-1]
+                      if s.isdigit():
+                          data["max_offset"] = max(data["max_offset"], int(s))
+              if "cycles" not in data and "simTicks" in data:
+                  data["cycles"] = round(data["simTicks"] * 1.4e9 / 1e12)
+              return data
+
+          directed = {
+              v: parse_stats(root / v / "directed" / "stats.txt")
+              for v in ("sliding", "fixed24")
+          }
+
+          rows = []
+          ratios = []
+          for w in workloads:
+              s = parse_stats(root / "sliding" / "workload" / w / "roi.stats")
+              f = parse_stats(root / "fixed24" / "workload" / w / "roi.stats")
+              if s.get("simInsts") != f.get("simInsts"):
+                  raise SystemExit(
+                      f"architectural simInsts mismatch for {w}: "
+                      f"{s.get('simInsts')} vs {f.get('simInsts')}"
+                  )
+              ratio = f["cycles"] / s["cycles"]
+              ratios.append(ratio)
+              rows.append([
+                  w, s["cycles"], f["cycles"],
+                  (ratio - 1.0) * 100.0,
+                  s.get("simInsts", 0),
+                  s["new_cycles"], s["new_positions"],
+                  s["max_round_visible"], s["max_cycle_unique"], s["max_offset"],
+                  f["new_cycles"], f["new_positions"],
+                  f["max_round_visible"], f["max_cycle_unique"], f["max_offset"],
+              ])
+
+          gm = math.exp(sum(math.log(x) for x in ratios) / len(ratios))
+
+          with (root / "summary.csv").open("w", newline="") as fh:
+              wr = csv.writer(fh)
+              wr.writerow([
+                  "workload", "sliding_cycles", "fixed24_cycles",
+                  "fixed24_vs_sliding_pct", "simInsts",
+                  "sliding_new_exposure_cycles", "sliding_new_exposure_positions",
+                  "sliding_max_round_visible", "sliding_max_cycle_unique",
+                  "sliding_max_issued_offset",
+                  "fixed24_new_exposure_cycles", "fixed24_new_exposure_positions",
+                  "fixed24_max_round_visible", "fixed24_max_cycle_unique",
+                  "fixed24_max_issued_offset",
+              ])
+              wr.writerows(rows)
+
+          with (root / "result_summary.md").open("w") as fh:
+              fh.write("# N4 cycle-exposure closure results\n\n")
+              fh.write("## Directed\n\n")
+              for v in ("sliding", "fixed24"):
+                  d = directed[v]
+                  fh.write(
+                      f"- {v}: new_exposure_cycles={d['new_cycles']}, "
+                      f"new_exposure_positions={d['new_positions']}, "
+                      f"max_round_visible={d['max_round_visible']}, "
+                      f"max_cycle_unique={d['max_cycle_unique']}, "
+                      f"max_issued_offset={d['max_offset']}\n"
+                  )
+              fh.write("\n## Six-workload RV64 Embench FIXED24 vs SLIDING\n\n")
+              fh.write("| workload | sliding cycles | fixed24 cycles | delta |\n")
+              fh.write("|---|---:|---:|---:|\n")
+              for r in rows:
+                  fh.write(
+                      f"| {r[0]} | {r[1]} | {r[2]} | {r[3]:+.6f}% |\n"
+                  )
+              fh.write(
+                  f"\nGeomean FIXED24/SLIDING cycle delta: "
+                  f"{(gm - 1.0) * 100:+.6f}%\n"
+              )
+              fh.write("\nAll workload pairs have identical simInsts.\n")
+
+          print((root / "result_summary.md").read_text())
+
+          # Closure gates: the source model should demonstrate sliding, while
+          # the FIXED24 variant must suppress it and preserve the published bound.
+          if directed["sliding"]["new_cycles"] <= 0:
+              raise SystemExit("ERROR: directed source-model sliding was not observed")
+          if directed["sliding"]["new_positions"] <= 0:
+              raise SystemExit("ERROR: directed source-model new exposure count is zero")
+          if directed["sliding"]["max_round_visible"] > 24:
+              raise SystemExit("ERROR: source model exceeded 24 concurrent positions in a round")
+          if directed["sliding"]["max_offset"] > 4:
+              raise SystemExit("ERROR: source model issued beyond N4 offset")
+          if directed["fixed24"]["new_cycles"] != 0:
+              raise SystemExit("ERROR: FIXED24 still reports same-cycle new exposure")
+          if directed["fixed24"]["new_positions"] != 0:
+              raise SystemExit("ERROR: FIXED24 still reports new positions")
+          if directed["fixed24"]["max_cycle_unique"] > 24:
+              raise SystemExit("ERROR: FIXED24 exceeded 24 unique positions/cycle")
+          if directed["fixed24"]["max_offset"] > 4:
+              raise SystemExit("ERROR: FIXED24 issued beyond N4 offset")
+          PY
+
+      - name: Record diffs and hashes
+        if: always()
+        run: |
+          git diff "$SLIDING_REF" "$FIXED24_REF" -- src/cpu/o3/inst_queue.cc             > N4_CYCLE_EXPOSURE_CLOSURE/fixed24_semantic_patch.diff || true
+          git diff b5abd424cb49e59f13e011033b7bd4417c14af33 "$SLIDING_REF"             > N4_CYCLE_EXPOSURE_CLOSURE/instrumentation_patch.diff || true
+          {
+            echo "final_tag_commit=b5abd424cb49e59f13e011033b7bd4417c14af33"
+            echo "sliding_instrumented=$SLIDING_REF"
+            echo "fixed24=$FIXED24_REF"
+          } > N4_CYCLE_EXPOSURE_CLOSURE/final_tag_commit.txt
+          find N4_CYCLE_EXPOSURE_CLOSURE -type f -print0             | sort -z             | xargs -0 sha256sum             > N4_CYCLE_EXPOSURE_CLOSURE/sha256sums.txt
+
+      - name: Upload closure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: n4-cycle-exposure-closure-evidence
+          path: N4_CYCLE_EXPOSURE_CLOSURE
+          retention-days: 30
