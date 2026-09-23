@@ -144,6 +144,13 @@ class IQUnit : public SimObject
      */
     std::vector<DynInstPtr> readyCandidates() const;
 
+    /**
+     * Return all valid, unissued instructions structurally visible inside
+     * this IQ's current Head..Head+N frontier, regardless of readiness.
+     * Used only by behavior-neutral N4 cycle-exposure instrumentation.
+     */
+    std::vector<DynInstPtr> visibleInstructions() const;
+
     unsigned
     readyCount() const
     {
@@ -765,6 +772,13 @@ class InstructionQueue
         /** Per-IQ breakdown of local hidden-ready observations. */
         statistics::Vector nSkipLocalHiddenReadySamplesByIQ;
         statistics::Vector nSkipLocalNoVisibleReadyCyclesByIQ;
+
+        /** Behavior-neutral same-cycle N-SKIP exposure instrumentation. */
+        statistics::Scalar nSkipSameCycleNewExposureCycles;
+        statistics::Scalar nSkipSameCycleNewExposurePositions;
+        statistics::Vector nSkipSameCycleNewExposureByIQ;
+        statistics::Distribution nSkipRoundVisiblePositions;
+        statistics::Distribution nSkipCycleUniqueVisiblePositions;
 
         /** Instructions issued from offset zero. */
         statistics::Scalar nSkipHeadIssued;
