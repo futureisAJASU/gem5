@@ -277,9 +277,9 @@ IQUnit::isReady(const DynInstPtr &inst) const
 }
 
 std::vector<DynInstPtr>
-IQUnit::readyCandidates() const
+IQUnit::visibleInstructions() const
 {
-    std::vector<DynInstPtr> candidates;
+    std::vector<DynInstPtr> visible;
     int offset = 0;
 
     for (const auto &entry : _orderedInsts) {
@@ -292,11 +292,22 @@ IQUnit::readyCandidates() const
             break;
         }
 
+        visible.push_back(entry);
+        ++offset;
+    }
+
+    return visible;
+}
+
+std::vector<DynInstPtr>
+IQUnit::readyCandidates() const
+{
+    std::vector<DynInstPtr> candidates;
+
+    for (const auto &entry : visibleInstructions()) {
         if (isReady(entry)) {
             candidates.push_back(entry);
         }
-
-        ++offset;
     }
 
     return candidates;
@@ -459,6 +470,16 @@ InstructionQueue::IQStats::IQStats(
                "Ready instructions hidden beyond local N-SKIP windows by physical IQ"),
       ADD_STAT(nSkipLocalNoVisibleReadyCyclesByIQ, statistics::units::Cycle::get(),
                "Cycles with hidden ready work but no visible ready candidate by physical IQ"),
+      ADD_STAT(nSkipSameCycleNewExposureCycles, statistics::units::Cycle::get(),
+               "Scheduling cycles where a later issue round exposed a new N-SKIP position"),
+      ADD_STAT(nSkipSameCycleNewExposurePositions, statistics::units::Count::get(),
+               "Distinct positions first exposed after round zero in the same scheduling cycle"),
+      ADD_STAT(nSkipSameCycleNewExposureByIQ, statistics::units::Count::get(),
+               "Same-cycle newly exposed positions by physical IQ"),
+      ADD_STAT(nSkipRoundVisiblePositions, statistics::units::Count::get(),
+               "Total N-SKIP structural positions visible in each selection round"),
+      ADD_STAT(nSkipCycleUniqueVisiblePositions, statistics::units::Count::get(),
+               "Distinct N-SKIP structural positions exposed across one scheduling cycle"),
       ADD_STAT(nSkipHeadIssued, statistics::units::Count::get(),
                "N-SKIP instructions issued from the queue head"),
       ADD_STAT(nSkipBypassIssued, statistics::units::Count::get(),
@@ -516,6 +537,16 @@ InstructionQueue::IQStats::IQStats(
     nSkipLocalNoVisibleReadyCyclesByIQ
         .init(num_iqs)
         .flags(statistics::total);
+    nSkipSameCycleNewExposureByIQ
+        .init(num_iqs)
+        .flags(statistics::total);
+
+    nSkipRoundVisiblePositions
+        .init(0, 64, 1)
+        .flags(statistics::pdf);
+    nSkipCycleUniqueVisiblePositions
+        .init(0, 64, 1)
+        .flags(statistics::pdf);
 
     for (unsigned i = 0; i < num_iqs; ++i) {
         const std::string iq_name = "IQ" + std::to_string(i);
@@ -533,6 +564,7 @@ InstructionQueue::IQStats::IQStats(
         dispatchWrite3PlusCycles.subname(i, iq_name);
         nSkipLocalHiddenReadySamplesByIQ.subname(i, iq_name);
         nSkipLocalNoVisibleReadyCyclesByIQ.subname(i, iq_name);
+        nSkipSameCycleNewExposureByIQ.subname(i, iq_name);
     }
 
     steerOccupancySamples
@@ -588,6 +620,11 @@ InstructionQueue::IQStats::IQStats(
 
     nSkipLocalNoVisibleReadyCycles
         .prereq(nSkipLocalNoVisibleReadyCycles);
+
+    nSkipSameCycleNewExposureCycles
+        .prereq(nSkipSameCycleNewExposureCycles);
+    nSkipSameCycleNewExposurePositions
+        .prereq(nSkipSameCycleNewExposurePositions);
 
     nSkipHeadIssued
         .prereq(nSkipHeadIssued);
