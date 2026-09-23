@@ -1455,8 +1455,18 @@ InstructionQueue::scheduleReadyInsts()
          */
         std::vector<InstSeqNum> fu_blocked;
 
+        /*
+         * Cycle-exposure audit state.  This is behavior-neutral: candidate
+         * eligibility remains identical to readyCandidates().  We only retain
+         * the identities structurally visited by each bounded selection round.
+         */
+        std::vector<std::vector<InstSeqNum>> cycle_seen(iqs.size());
+        unsigned selection_round = 0;
+        bool cycle_new_exposure = false;
+
         while (total_issued < totalWidth) {
             std::vector<DynInstPtr> candidates;
+            unsigned round_visible_positions = 0;
 
             /*
              * Refresh after every successful issue.  Issuing an older
@@ -1464,8 +1474,52 @@ InstructionQueue::scheduleReadyInsts()
              * expose a new candidate for another issue slot in the same
              * cycle.
              */
-            for (auto iq : iqs) {
-                const auto local = iq->readyCandidates();
+            for (unsigned iq_index = 0; iq_index < iqs.size(); ++iq_index) {
+                auto iq = iqs[iq_index];
+                const auto visible = iq->visibleInstructions();
+                std::vector<DynInstPtr> local;
+
+                if (iq->nSkipEnabled()) {
+                    round_visible_positions += visible.size();
+
+                    for (const auto &inst : visible) {
+                        auto &seen = cycle_seen[iq_index];
+                        const bool first_seen =
+                            std::find(seen.begin(), seen.end(), inst->seqNum) ==
+                            seen.end();
+
+                        if (first_seen) {
+                            seen.push_back(inst->seqNum);
+
+                            if (selection_round > 0) {
+                                cycle_new_exposure = true;
+                                iqStats.nSkipSameCycleNewExposurePositions++;
+                                iqStats.nSkipSameCycleNewExposureByIQ[iq_index]++;
+                                DPRINTF(
+                                    IQ,
+                                    "N4CycleExposure round=%u iq=%u new_sn=%llu "
+                                    "offset=%d\\n",
+                                    selection_round,
+                                    iq_index,
+                                    inst->seqNum,
+                                    iq->issueWindowOffset(inst));
+                            }
+                        }
+                    }
+                }
+
+                for (const auto &inst : visible) {
+                    if (iq->isReady(inst)) {
+                        local.push_back(inst);
+                    }
+                }
+
+                /* Prove the instrumentation refactor is behavior-neutral. */
+                const auto reference = iq->readyCandidates();
+                assert(local.size() == reference.size());
+                for (unsigned i = 0; i < local.size(); ++i) {
+                    assert(local[i] == reference[i]);
+                }
 
                 for (const auto &inst : local) {
                     if (std::find(
@@ -1475,6 +1529,11 @@ InstructionQueue::scheduleReadyInsts()
                         candidates.push_back(inst);
                     }
                 }
+            }
+
+            if (round_visible_positions) {
+                iqStats.nSkipRoundVisiblePositions.sample(
+                    round_visible_positions);
             }
 
             if (candidates.empty()) {
@@ -1656,6 +1715,20 @@ InstructionQueue::scheduleReadyInsts()
             if (!issued_this_slot) {
                 break;
             }
+
+            ++selection_round;
+        }
+
+        unsigned cycle_unique_visible = 0;
+        for (const auto &seen : cycle_seen) {
+            cycle_unique_visible += seen.size();
+        }
+        if (cycle_unique_visible) {
+            iqStats.nSkipCycleUniqueVisiblePositions.sample(
+                cycle_unique_visible);
+        }
+        if (cycle_new_exposure) {
+            iqStats.nSkipSameCycleNewExposureCycles++;
         }
 
         iqStats.numIssuedDist.sample(total_issued);
