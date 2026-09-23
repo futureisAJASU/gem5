@@ -1464,6 +1464,35 @@ InstructionQueue::scheduleReadyInsts()
         unsigned selection_round = 0;
         bool cycle_new_exposure = false;
 
+        /*
+         * FIXED24 semantic variant: snapshot the bounded structural membership
+         * once at the issue-selection observation point.  Later same-cycle
+         * grants may remove/mask snapshot members, but they may not admit a
+         * previously hidden Head+5-or-later instruction until the next cycle.
+         */
+        std::vector<std::vector<DynInstPtr>> cycle_visible_snapshot(iqs.size());
+        for (unsigned iq_index = 0; iq_index < iqs.size(); ++iq_index) {
+            if (iqs[iq_index]->nSkipEnabled()) {
+                cycle_visible_snapshot[iq_index] =
+                    iqs[iq_index]->visibleInstructions();
+            }
+        }
+
+        auto selectionVisible = [&](unsigned iq_index) {
+            auto iq = iqs[iq_index];
+            if (!iq->nSkipEnabled()) {
+                return iq->visibleInstructions();
+            }
+
+            std::vector<DynInstPtr> visible;
+            for (const auto &inst : cycle_visible_snapshot[iq_index]) {
+                if (!inst->isIssued() && !inst->isSquashed()) {
+                    visible.push_back(inst);
+                }
+            }
+            return visible;
+        };
+
         while (total_issued < totalWidth) {
             std::vector<DynInstPtr> candidates;
             unsigned round_visible_positions = 0;
@@ -1476,7 +1505,7 @@ InstructionQueue::scheduleReadyInsts()
              */
             for (unsigned iq_index = 0; iq_index < iqs.size(); ++iq_index) {
                 auto iq = iqs[iq_index];
-                const auto visible = iq->visibleInstructions();
+                const auto visible = selectionVisible(iq_index);
                 std::vector<DynInstPtr> local;
 
                 if (iq->nSkipEnabled()) {
@@ -1514,11 +1543,13 @@ InstructionQueue::scheduleReadyInsts()
                     }
                 }
 
-                /* Prove the instrumentation refactor is behavior-neutral. */
-                const auto reference = iq->readyCandidates();
-                assert(local.size() == reference.size());
-                for (unsigned i = 0; i < local.size(); ++i) {
-                    assert(local[i] == reference[i]);
+                /* Round zero must exactly match the source-model frontier. */
+                if (selection_round == 0) {
+                    const auto reference = iq->readyCandidates();
+                    assert(local.size() == reference.size());
+                    for (unsigned i = 0; i < local.size(); ++i) {
+                        assert(local[i] == reference[i]);
+                    }
                 }
 
                 for (const auto &inst : local) {
