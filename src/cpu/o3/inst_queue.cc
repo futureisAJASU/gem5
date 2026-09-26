@@ -831,6 +831,28 @@ InstructionQueue::numFreeEntries()
     return free_entries;
 }
 
+std::vector<unsigned>
+InstructionQueue::dispatchTraceFreeEntries() const
+{
+    std::vector<unsigned> out;
+    out.reserve(iqs.size());
+    for (auto iq : iqs) {
+        out.push_back(iq->numFreeEntries());
+    }
+    return out;
+}
+
+std::vector<unsigned>
+InstructionQueue::dispatchTraceCapacities() const
+{
+    std::vector<unsigned> out;
+    out.reserve(iqs.size());
+    for (auto iq : iqs) {
+        out.push_back(iq->numEntries());
+    }
+    return out;
+}
+
 unsigned
 InstructionQueue::numFreeEntries(ThreadID tid)
 {
