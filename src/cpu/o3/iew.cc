@@ -60,6 +60,7 @@
 #include "debug/Drain.hh"
 #include "debug/IEW.hh"
 #include "params/BaseO3CPU.hh"
+#include "sim/pseudo_inst.hh"
 
 namespace gem5
 {
@@ -893,7 +894,7 @@ IEW::dispatch(ThreadID tid)
         }
     }
 
-    if (trace_enabled) {
+    if (trace_enabled && pseudo_inst::p2DispatchTraceRoiActive()) {
         if (numThreads != 1 || tid != 0) {
             fatal("P2 dispatcher trace currently requires 1 core/1 thread; "
                   "numThreads=%u tid=%u\n", numThreads, tid);
