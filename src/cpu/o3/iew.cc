@@ -45,7 +45,10 @@
 
 #include "cpu/o3/iew.hh"
 
+#include <cstdlib>
+#include <fstream>
 #include <queue>
+#include <string>
 
 #include "cpu/checker/cpu.hh"
 #include "cpu/o3/dyn_inst.hh"
@@ -841,6 +844,171 @@ IEW::deactivateStage()
 void
 IEW::dispatch(ThreadID tid)
 {
+    /*
+     * P2 representative dispatcher-power trace.
+     *
+     * Enabled only when LITTLE_P2_DISPATCH_TRACE points to a file. The
+     * instrumentation is deliberately behavior-neutral: it snapshots the
+     * route-visible inputs and physical free counts before dispatch mutates
+     * any queue state in this cycle, then writes one little-endian uint64
+     * record. The final P2 runner uses exactly one core / one thread.
+     *
+     * Packed schema v1:
+     *   [ 2: 0] valid[2:0]
+     *   [11: 3] exec_class lane0..2, 3 bits/lane
+     *   [17:12] mem_kind   lane0..2, 2 bits/lane
+     *   [23:18] INT0 free
+     *   [29:24] INT1 free
+     *   [35:30] MEM free
+     *   [41:36] DIV free
+     *   [47:42] FP/SIMD free
+     *   [53:48] LQ free
+     *   [59:54] SQ free
+     *   [63:60] reserved = 0
+     *
+     * exec_class encoding matches little_v052_pkg.sv:
+     *   0 IntAlu, 1 IntMult, 2 System/NoOp, 3 MEM,
+     *   4 IntDiv, 5 FP/SIMD.
+     * mem_kind: 0 none, 1 load, 2 store.
+     */
+    static bool trace_init = false;
+    static bool trace_enabled = false;
+    static std::ofstream trace_file;
+    static std::string trace_path;
+
+    if (!trace_init) {
+        trace_init = true;
+        const char *env_path = std::getenv("LITTLE_P2_DISPATCH_TRACE");
+        if (env_path && env_path[0] != '\0') {
+            trace_path = env_path;
+            trace_file.open(
+                trace_path,
+                std::ios::out | std::ios::binary | std::ios::trunc);
+            if (!trace_file.is_open()) {
+                fatal("Unable to open LITTLE_P2_DISPATCH_TRACE=%s\n",
+                      trace_path);
+            }
+            trace_enabled = true;
+        }
+    }
+
+    if (trace_enabled) {
+        if (numThreads != 1 || tid != 0) {
+            fatal("P2 dispatcher trace currently requires 1 core/1 thread; "
+                  "numThreads=%u tid=%u\n", numThreads, tid);
+        }
+
+        const auto free_entries = instQueue.dispatchTraceFreeEntries();
+        const auto capacities = instQueue.dispatchTraceCapacities();
+        static const unsigned expected_caps[5] = {10, 6, 12, 4, 6};
+
+        if (free_entries.size() != 5 || capacities.size() != 5) {
+            fatal("P2 dispatcher trace requires exactly five distributed IQs; "
+                  "free=%zu caps=%zu\n",
+                  free_entries.size(), capacities.size());
+        }
+
+        for (unsigned q = 0; q < 5; ++q) {
+            if (capacities[q] != expected_caps[q]) {
+                fatal("P2 dispatcher trace IQ geometry mismatch q%u: "
+                      "got=%u expected=%u\n",
+                      q, capacities[q], expected_caps[q]);
+            }
+            if (free_entries[q] > capacities[q] || free_entries[q] > 63) {
+                fatal("P2 dispatcher trace invalid free count q%u=%u\n",
+                      q, free_entries[q]);
+            }
+        }
+
+        uint64_t word = 0;
+        unsigned lane = 0;
+
+        const bool route_active =
+            dispatchStatus[tid] == Running ||
+            dispatchStatus[tid] == Idle ||
+            dispatchStatus[tid] == Unblocking;
+
+        if (route_active) {
+            std::queue<DynInstPtr> trace_q =
+                dispatchStatus[tid] == Unblocking ?
+                skidBuffer[tid] : insts[tid];
+
+            unsigned examined = 0;
+            while (!trace_q.empty() &&
+                   examined < dispatchWidth &&
+                   lane < 3) {
+                DynInstPtr trace_inst = trace_q.front();
+                trace_q.pop();
+                ++examined;
+
+                if (!trace_inst || trace_inst->isSquashed()) {
+                    continue;
+                }
+
+                unsigned exec_code = 0;
+                unsigned mem_code = 0;
+
+                if (trace_inst->isMemRef()) {
+                    exec_code = 3;
+                    if (trace_inst->isAtomic()) {
+                        fatal("P2 dispatcher trace encountered atomic memory "
+                              "op [sn:%llu]; schema v1 supports load/store "
+                              "only\n", trace_inst->seqNum);
+                    } else if (trace_inst->isLoad()) {
+                        mem_code = 1;
+                    } else if (trace_inst->isStore()) {
+                        mem_code = 2;
+                    } else {
+                        fatal("P2 dispatcher trace encountered unsupported "
+                              "memory class [sn:%llu]\n",
+                              trace_inst->seqNum);
+                    }
+                } else if (trace_inst->opClass() == enums::IntAlu) {
+                    exec_code = 0;
+                } else if (trace_inst->opClass() == enums::IntMult) {
+                    exec_code = 1;
+                } else if (trace_inst->opClass() == enums::System ||
+                           trace_inst->opClass() == enums::No_OpClass) {
+                    exec_code = 2;
+                } else if (trace_inst->opClass() == enums::IntDiv) {
+                    exec_code = 4;
+                } else if (trace_inst->isFloating() ||
+                           trace_inst->isVector()) {
+                    exec_code = 5;
+                } else {
+                    fatal("P2 dispatcher trace unsupported opClass=%s "
+                          "[sn:%llu]\n",
+                          enums::OpClassStrings[trace_inst->opClass()],
+                          trace_inst->seqNum);
+                }
+
+                word |= uint64_t(1) << lane;
+                word |= uint64_t(exec_code & 0x7) << (3 + lane * 3);
+                word |= uint64_t(mem_code & 0x3) << (12 + lane * 2);
+                ++lane;
+            }
+        }
+
+        for (unsigned q = 0; q < 5; ++q) {
+            word |= uint64_t(free_entries[q] & 0x3f) << (18 + q * 6);
+        }
+
+        const unsigned lq_free = ldstQueue.numFreeLoadEntries(tid);
+        const unsigned sq_free = ldstQueue.numFreeStoreEntries(tid);
+        if (lq_free > 63 || sq_free > 63) {
+            fatal("P2 dispatcher trace LSQ free count overflow: LQ=%u SQ=%u\n",
+                  lq_free, sq_free);
+        }
+        word |= uint64_t(lq_free & 0x3f) << 48;
+        word |= uint64_t(sq_free & 0x3f) << 54;
+
+        trace_file.write(
+            reinterpret_cast<const char *>(&word), sizeof(word));
+        if (!trace_file.good()) {
+            fatal("P2 dispatcher trace write failed: %s\n", trace_path);
+        }
+    }
+
     // If status is Running or idle,
     //     call dispatchInsts()
     // If status is Unblocking,
