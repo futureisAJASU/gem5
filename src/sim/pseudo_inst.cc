@@ -46,6 +46,7 @@
 #include <unistd.h>
 
 #include <array>
+#include <cstdlib>
 #include <cerrno>
 #include <fstream>
 #include <string>
@@ -100,6 +101,22 @@ const std::string DIST_RANK = "dist-rank";
  *  Unique key for "size" param (distributed gem5 runs)
  */
 const std::string DIST_SIZE = "dist-size";
+
+/*
+ * P2 representative dispatcher trace ROI state.
+ *
+ * This is instrumentation-only state. It is armed by the exact Embench
+ * m5_reset_stats(0, 0) marker and disarmed by m5_dump_stats(0, 0), matching
+ * the first statistics section used by the historical/frozen ROI protocol.
+ */
+bool p2_dispatch_trace_roi_active = false;
+
+bool
+p2DispatchTraceRequested()
+{
+    const char *path = std::getenv("LITTLE_P2_DISPATCH_TRACE");
+    return path && path[0] != '\0';
+}
 
 } // anonymous namespace
 
@@ -317,11 +334,31 @@ resetstats(ThreadContext *tc, Tick delay, Tick period)
     if (!tc->getCpuPtr()->params().do_statistics_insts)
         return;
 
+    if (p2DispatchTraceRequested()) {
+        if (delay != 0 || period != 0) {
+            fatal("P2 dispatcher trace requires immediate one-shot "
+                  "m5_reset_stats(0,0); got delay=%llu period=%llu\n",
+                  static_cast<unsigned long long>(delay),
+                  static_cast<unsigned long long>(period));
+        }
+        if (p2_dispatch_trace_roi_active) {
+            fatal("P2 dispatcher trace saw nested/duplicate ROI reset marker\n");
+        }
+        p2_dispatch_trace_roi_active = true;
+        inform("P2_DISPATCH_TRACE_ROI_BEGIN tick=%llu\n",
+               static_cast<unsigned long long>(curTick()));
+    }
 
     Tick when = curTick() + delay * sim_clock::as_int::ns;
     Tick repeat = period * sim_clock::as_int::ns;
 
     statistics::schedStatEvent(false, true, when, repeat);
+}
+
+bool
+p2DispatchTraceRoiActive()
+{
+    return p2_dispatch_trace_roi_active;
 }
 
 void
@@ -331,6 +368,20 @@ dumpstats(ThreadContext *tc, Tick delay, Tick period)
     if (!tc->getCpuPtr()->params().do_statistics_insts)
         return;
 
+    if (p2DispatchTraceRequested()) {
+        if (delay != 0 || period != 0) {
+            fatal("P2 dispatcher trace requires immediate one-shot "
+                  "m5_dump_stats(0,0); got delay=%llu period=%llu\n",
+                  static_cast<unsigned long long>(delay),
+                  static_cast<unsigned long long>(period));
+        }
+        if (!p2_dispatch_trace_roi_active) {
+            fatal("P2 dispatcher trace saw ROI dump marker without active ROI\n");
+        }
+        p2_dispatch_trace_roi_active = false;
+        inform("P2_DISPATCH_TRACE_ROI_END tick=%llu\n",
+               static_cast<unsigned long long>(curTick()));
+    }
 
     Tick when = curTick() + delay * sim_clock::as_int::ns;
     Tick repeat = period * sim_clock::as_int::ns;
