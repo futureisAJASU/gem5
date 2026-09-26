@@ -301,7 +301,28 @@ hwprobe_one_pair(ThreadContext *tc, RiscvLinux::riscv_hwprobe *pair,
             RiscvLinux::key_ima_ext_0_t *ext = (RiscvLinux::key_ima_ext_0_t *)&pair->value;
             if (misa.rvf && misa.rvd) ext->FD = 1;
             if (misa.rvc) ext->C = 1;
-            if (misa.rvv) ext->V = 1;
+
+            /*
+             * P2_HWPROBE_RVV_CONSISTENCY
+             *
+             * Keep Linux SE hwprobe vector capability reporting consistent
+             * with the configured architectural MISA. Little v0.52's frozen
+             * RV64 proxy explicitly uses RiscvISA(enable_rvv=False). Newer
+             * glibc may use riscv_hwprobe to select vector-optimized libc
+             * routines; advertising ZVE/ZVFH while MISA.V is clear can then
+             * execute opcode 0x57 on a core where RVV is disabled.
+             *
+             * This changes no CPU execution capability. It prevents SE
+             * userspace from being told that disabled vector extensions are
+             * available.
+             */
+            if (misa.rvv) {
+                ext->V = 1;
+                ext->ZVFH = 1;
+                ext->ZVFHMIN = 1;
+                ext->ZVE64D = 1;
+            }
+
             ext->ZBA = 1;
             ext->ZBB = 1;
             ext->ZBS = 1;
@@ -318,11 +339,8 @@ hwprobe_one_pair(ThreadContext *tc, RiscvLinux::riscv_hwprobe *pair,
             ext->ZKT = 1;
             ext->ZFH = 1;
             ext->ZFHMIN = 1;
-            ext->ZVFH = 1;
-            ext->ZVFHMIN = 1;
             ext->ZFA = 1;
             ext->ZICOND = 1;
-            ext->ZVE64D = 1;
             ext->ZCB = 1;
             ext->ZCD = 1;
             ext->ZCF = 1;
