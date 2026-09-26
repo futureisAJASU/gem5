@@ -45,6 +45,7 @@
 
 #include "sim/stat_control.hh"
 
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -61,6 +62,51 @@ namespace statistics
 {
 
 GlobalEvent *dumpEvent;
+
+namespace
+{
+bool p2TraceInit = false;
+bool p2TraceEnabled = false;
+bool p2TraceActive = false;
+Tick p2TraceBegin = 0;
+Tick p2TraceEnd = 0;
+
+void
+p2TraceInitFromEnv()
+{
+    if (p2TraceInit)
+        return;
+    p2TraceInit = true;
+    const char *path = std::getenv("LITTLE_P2_DISPATCH_TRACE");
+    p2TraceEnabled = path && path[0] != '\0';
+}
+} // anonymous namespace
+
+bool
+p2DispatchTraceEnabled()
+{
+    p2TraceInitFromEnv();
+    return p2TraceEnabled;
+}
+
+bool
+p2DispatchTraceActive()
+{
+    p2TraceInitFromEnv();
+    return p2TraceEnabled && p2TraceActive;
+}
+
+Tick
+p2DispatchTraceBeginTick()
+{
+    return p2TraceBegin;
+}
+
+Tick
+p2DispatchTraceEndTick()
+{
+    return p2TraceEnd;
+}
 
 void
 initSimStats()
@@ -87,8 +133,37 @@ class StatEvent : public GlobalEvent
     virtual void
     process()
     {
+        p2TraceInitFromEnv();
+
+        /*
+         * Historical Embench ROI protocol uses reset-only at ROI begin and
+         * dump-only at ROI end. Trace only that exact shape. dump+reset and
+         * periodic events are intentionally ignored and will be rejected by
+         * the capture runner if the expected markers are absent.
+         */
+        if (p2TraceEnabled && repeat == 0 && !dump && reset) {
+            if (p2TraceActive) {
+                fatal("P2 dispatcher trace received nested ROI reset at tick %llu\n",
+                      curTick());
+            }
+            p2TraceActive = true;
+            p2TraceBegin = curTick();
+            p2TraceEnd = 0;
+            inform("P2_DISPATCH_TRACE_ROI_BEGIN tick=%llu\n", curTick());
+        }
+
         if (dump)
             statistics::dump();
+
+        if (p2TraceEnabled && repeat == 0 && dump && !reset) {
+            if (!p2TraceActive) {
+                fatal("P2 dispatcher trace received ROI dump without active ROI "
+                      "at tick %llu\n", curTick());
+            }
+            p2TraceActive = false;
+            p2TraceEnd = curTick();
+            inform("P2_DISPATCH_TRACE_ROI_END tick=%llu\n", curTick());
+        }
 
         if (reset)
             statistics::reset();
