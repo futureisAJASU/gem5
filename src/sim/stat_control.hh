@@ -81,20 +81,6 @@ void schedStatEvent(bool dump, bool reset, Tick when = curTick(),
  * @param period The period at which the dumping should occur.
  */
 void periodicStatDump(Tick period = 0);
-
-/**
- * P2 dispatcher trace ROI observation state.
- *
- * These helpers are instrumentation-only. They become active only when
- * LITTLE_P2_DISPATCH_TRACE is present in the environment. The state transition
- * is tied to the actual statistics event, not merely pseudo-instruction decode,
- * so trace lifetime follows the benchmark ROI statistics lifetime.
- */
-bool p2DispatchTraceEnabled();
-bool p2DispatchTraceActive();
-Tick p2DispatchTraceBeginTick();
-Tick p2DispatchTraceEndTick();
-
 } // namespace statistics
 } // namespace gem5
 
