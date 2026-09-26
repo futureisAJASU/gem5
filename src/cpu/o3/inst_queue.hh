@@ -329,6 +329,16 @@ class InstructionQueue
     /** Returns total number of free entries. */
     unsigned numFreeEntries();
 
+    /**
+     * Behavior-neutral P2 dispatcher-power trace accessors.
+     *
+     * The Little distributed-IQ configuration defines physical-IQ order as
+     * INT0, INT1, MEM, DIV, FP/SIMD. These helpers expose only occupancy
+     * geometry; they do not perform steering or mutate scheduler state.
+     */
+    std::vector<unsigned> dispatchTraceFreeEntries() const;
+    std::vector<unsigned> dispatchTraceCapacities() const;
+
     /** Returns number of free entries for a thread. */
     unsigned numFreeEntries(ThreadID tid);
 
