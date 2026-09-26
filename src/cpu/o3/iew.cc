@@ -976,9 +976,9 @@ IEW::dispatch(ThreadID tid)
                            trace_inst->isVector()) {
                     exec_code = 5;
                 } else {
-                    fatal("P2 dispatcher trace unsupported opClass=%s "
+                    fatal("P2 dispatcher trace unsupported opClass=%d "
                           "[sn:%llu]\n",
-                          enums::OpClassStrings[trace_inst->opClass()],
+                          static_cast<int>(trace_inst->opClass()),
                           trace_inst->seqNum);
                 }
 
