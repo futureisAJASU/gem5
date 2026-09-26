@@ -45,6 +45,7 @@
 
 #include "cpu/o3/iew.hh"
 
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <queue>
@@ -886,7 +887,7 @@ IEW::dispatch(ThreadID tid)
                 std::ios::out | std::ios::binary | std::ios::trunc);
             if (!trace_file.is_open()) {
                 fatal("Unable to open LITTLE_P2_DISPATCH_TRACE=%s\n",
-                      trace_path);
+                      trace_path.c_str());
             }
             trace_enabled = true;
         }
@@ -1005,7 +1006,7 @@ IEW::dispatch(ThreadID tid)
         trace_file.write(
             reinterpret_cast<const char *>(&word), sizeof(word));
         if (!trace_file.good()) {
-            fatal("P2 dispatcher trace write failed: %s\n", trace_path);
+            fatal("P2 dispatcher trace write failed: %s\n", trace_path.c_str());
         }
     }
 
