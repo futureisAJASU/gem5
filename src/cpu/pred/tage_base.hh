@@ -488,6 +488,7 @@ class TAGEBase : public SimObject
     const unsigned histBufferSize;
     const unsigned minHist;
     const unsigned maxHist;
+    const std::vector<unsigned> explicitHistLengths;
     const unsigned pathHistBits;
 
     std::vector<unsigned> tagTableTagWidths;
