@@ -34,6 +34,8 @@ if (( missing )); then
 fi
 
 echo "[2/5] Static RVC/branch-PC audit"
+rm -rf "$OUT_ROOT"
+mkdir -p "$OUT_ROOT"
 OBJDUMP="${RISCV64_OBJDUMP:-riscv64-linux-gnu-objdump}"
 command -v "$OBJDUMP" >/dev/null 2>&1 || {
   echo "ERROR: $OBJDUMP not found" >&2
@@ -62,9 +64,7 @@ command -v "$OBJDUMP" >/dev/null 2>&1 || {
     ')"
     echo "$w,$insn16,$ctrl_bit1"
   done
-} | tee "$OUT_ROOT.static.tmp"
-mkdir -p "$OUT_ROOT"
-mv "$OUT_ROOT.static.tmp" "$OUT_ROOT/static_rvc_audit.csv"
+} | tee "$OUT_ROOT/static_rvc_audit.csv"
 
 extract_first_roi() {
   local src="$1"
@@ -104,7 +104,6 @@ run_one() {
 }
 
 echo "[3/5] Run TournamentBP shift0/1/2 across six fixed Embench workloads (18 ROI runs)"
-rm -rf "$OUT_ROOT/runs"
 for w in "${WORKLOADS[@]}"; do
   for shift in "${SHIFTS[@]}"; do
     echo "  $w / shift$shift"
