@@ -60,21 +60,11 @@ echo "[2/5] Static branch-PC bit1 audit across full Embench corpus"
       END { print n+0 }
     ')"
     read -r ctrl_total ctrl_bit1 < <("$OBJDUMP" -d "$bin" | awk '
-      function isctrl(m) {
-        return (
-          m ~ /^b(eq|ne|lt|ge|ltu|geu)$/ ||
-          m ~ /^(beqz|bnez)$/ ||
-          m ~ /^c\.(beqz|bnez)$/ ||
-          m ~ /^(j|jal|jr|jalr)$/ ||
-          m ~ /^c\.(j|jal|jr|jalr)$/ ||
-          m == "ret" || m == "call" || m == "tail"
-        )
-      }
       /^[[:space:]]*[0-9a-f]+:/ {
         addr=$1
         sub(/:$/, "", addr)
         mnem=$3
-        if (isctrl(mnem)) {
+        if (mnem ~ /^(beq|bne|blt|bge|bltu|bgeu|beqz|bnez|c[.]beqz|c[.]bnez|j|jal|jr|jalr|c[.]j|c[.]jal|c[.]jr|c[.]jalr|ret|call|tail)$/) {
           total++
           last=tolower(substr(addr, length(addr), 1))
           if (last ~ /^[2367abef]$/) bit1++
