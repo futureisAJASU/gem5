@@ -57,6 +57,7 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
       histBufferSize(p.histBufferSize),
       minHist(p.minHist),
       maxHist(p.maxHist),
+      explicitHistLengths(p.explicitHistLengths),
       pathHistBits(p.pathHistBits),
       tagTableTagWidths(p.tagTableTagWidths),
       logTagTableSizes(p.logTagTableSizes),
@@ -173,6 +174,30 @@ TAGEBase::buildTageTables()
 void
 TAGEBase::calculateParameters()
 {
+    if (!explicitHistLengths.empty()) {
+        fatal_if(explicitHistLengths.size() != nHistoryTables,
+                 "explicitHistLengths must contain exactly %u entries, got %zu",
+                 nHistoryTables, explicitHistLengths.size());
+        fatal_if(explicitHistLengths.front() != minHist,
+                 "explicitHistLengths first entry (%u) must equal minHist (%u)",
+                 explicitHistLengths.front(), minHist);
+        fatal_if(explicitHistLengths.back() != maxHist,
+                 "explicitHistLengths last entry (%u) must equal maxHist (%u)",
+                 explicitHistLengths.back(), maxHist);
+
+        for (int i = 1; i <= nHistoryTables; ++i) {
+            const unsigned length = explicitHistLengths[i - 1];
+            fatal_if(length == 0,
+                     "explicitHistLengths entries must be non-zero");
+            if (i > 1) {
+                fatal_if(length <= explicitHistLengths[i - 2],
+                         "explicitHistLengths must be strictly increasing");
+            }
+            histLengths[i] = length;
+        }
+        return;
+    }
+
     histLengths[1] = minHist;
     histLengths[nHistoryTables] = maxHist;
 
