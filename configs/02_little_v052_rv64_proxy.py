@@ -1,7 +1,13 @@
 import argparse
 from pathlib import Path
 
-from m5.objects import RiscvO3CPU, RiscvISA, IQUnit, L2XBar
+from m5.objects import (
+    IQUnit,
+    L2XBar,
+    LittleMicroTAGE,
+    RiscvISA,
+    RiscvO3CPU,
+)
 from m5.objects.FUPool import FUPool
 from m5.params import NULL
 from m5.objects.FuncUnit import FUDesc, OpDesc
@@ -1003,6 +1009,7 @@ class LittleV052Rv64Core(BaseCPUCore):
         fetch_width: int | None = None,
         decode_width: int | None = None,
         commit_width: int = 3,
+        bp_type: str = "tournament",
         bp_inst_shift: int = 1,
         bp_local_size: int = 2048,
         bp_local_history_size: int = 2048,
@@ -1097,12 +1104,16 @@ class LittleV052Rv64Core(BaseCPUCore):
         #   - indirect predictor PC indexing
         cpu.branchPred.instShiftAmt = bp_inst_shift
 
-        tournament = cpu.branchPred.conditionalBranchPred
-
-        tournament.localPredictorSize = bp_local_size
-        tournament.localHistoryTableSize = bp_local_history_size
-        tournament.globalPredictorSize = bp_global_size
-        tournament.choicePredictorSize = bp_choice_size
+        if bp_type == "tournament":
+            tournament = cpu.branchPred.conditionalBranchPred
+            tournament.localPredictorSize = bp_local_size
+            tournament.localHistoryTableSize = bp_local_history_size
+            tournament.globalPredictorSize = bp_global_size
+            tournament.choicePredictorSize = bp_choice_size
+        elif bp_type == "micro-tage":
+            cpu.branchPred.conditionalBranchPred = LittleMicroTAGE()
+        else:
+            raise ValueError(f"unsupported bp_type: {bp_type}")
 
         cpu.branchPred.btb.numEntries = btb_entries
 
@@ -1206,6 +1217,7 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
         fetch_width: int | None,
         decode_width: int | None,
         commit_width: int,
+        bp_type: str,
         bp_inst_shift: int,
         bp_local_size: int,
         bp_local_history_size: int,
@@ -1340,6 +1352,7 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
                 fetch_width=fetch_width,
                 decode_width=decode_width,
                 commit_width=commit_width,
+                bp_type=bp_type,
                 bp_inst_shift=bp_inst_shift,
                 bp_local_size=bp_local_size,
                 bp_local_history_size=bp_local_history_size,
@@ -1669,6 +1682,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--commit-width", type=int, default=3)
 
     parser.add_argument(
+        "--bp-type",
+        choices=("tournament", "micro-tage"),
+        default="tournament",
+        help=(
+            "Conditional predictor family. tournament preserves the "
+            "historical proxy; micro-tage selects the Little v0.52 "
+            "3-table research seed."
+        ),
+    )
+
+    parser.add_argument(
         "--bp-inst-shift",
         type=int,
         choices=(0, 1, 2),
@@ -1979,6 +2003,7 @@ def main() -> None:
         fetch_width=args.fetch_width,
         decode_width=args.decode_width,
         commit_width=args.commit_width,
+        bp_type=args.bp_type,
         bp_inst_shift=args.bp_inst_shift,
         bp_local_size=args.bp_local_size,
         bp_local_history_size=args.bp_local_history_size,
@@ -2108,6 +2133,7 @@ def main() -> None:
             "decode-width="
             f"{args.decode_width if args.decode_width is not None else args.width}"
         ),
+        f"bp-type={args.bp_type}",
         f"bp-inst-shift={args.bp_inst_shift}",
         f"bp-local-size={args.bp_local_size}",
         f"bp-local-history-size={args.bp_local_history_size}",
