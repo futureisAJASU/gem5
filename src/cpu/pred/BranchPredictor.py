@@ -302,6 +302,12 @@ class TAGEBase(SimObject):
     nHistoryTables = Param.Unsigned(7, "Number of history tables")
     minHist = Param.Unsigned(5, "Minimum history size of TAGE")
     maxHist = Param.Unsigned(130, "Maximum history size of TAGE")
+    explicitHistLengths = VectorParam.Unsigned(
+        [],
+        "Optional exact tagged-table history lengths. When non-empty, "
+        "must contain nHistoryTables entries and match minHist/maxHist "
+        "at the endpoints.",
+    )
 
     tagTableTagWidths = VectorParam.Unsigned(
         [0, 9, 9, 10, 10, 11, 11, 12], "Tag size in TAGE tag tables"
@@ -359,6 +365,23 @@ class TAGE(ConditionalPredictor):
     cxx_header = "cpu/pred/tage.hh"
 
     tage = Param.TAGEBase(TAGEBase(), "Tage object")
+
+
+class LittleMicroTAGEBase(TAGEBase):
+    """Little v0.52 compact TAGE seed used by the BPU research track."""
+
+    nHistoryTables = 3
+    minHist = 8
+    maxHist = 64
+    explicitHistLengths = [8, 24, 64]
+    tagTableTagWidths = [0, 8, 9, 10]
+    logTagTableSizes = [11, 9, 9, 9]
+
+
+class LittleMicroTAGE(TAGE):
+    """micro-TAGE-only BPU seed; perceptron correction is added separately."""
+
+    tage = LittleMicroTAGEBase()
 
 
 class LTAGE_TAGE(TAGEBase):
