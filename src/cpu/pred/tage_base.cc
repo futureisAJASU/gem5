@@ -758,6 +758,8 @@ TAGEBase::recordHistState(ThreadID tid, BranchInfo* bi)
 {
     ThreadHistory &tHist = threadHistory[tid];
     bi->pathHist = tHist.pathHist;
+    bi->savedPtGhist = tHist.ptGhist;
+    stats.historyStateRecords++;
 
     for (int i = 1; i <= nHistoryTables; i++) {
         bi->ci[i]  = tHist.computeIndices[i].comp;
@@ -800,6 +802,24 @@ TAGEBase::restoreHistState(ThreadID tid, BranchInfo* bi)
         // during a rollover. Consider increasing the `rollbackBuffer`
         assert((tHist.ptGhist + maxHist) < tHist.globalHist.size());
     }
+
+    stats.historyStateRestores++;
+    fatal_if(tHist.ptGhist != bi->savedPtGhist,
+             "TAGE history rollback pointer mismatch: got %d expected %d",
+             tHist.ptGhist, bi->savedPtGhist);
+    fatal_if(tHist.pathHist != bi->pathHist,
+             "TAGE path-history rollback mismatch: got %#x expected %#x",
+             tHist.pathHist, bi->pathHist);
+    for (int i = 1; i <= nHistoryTables; ++i) {
+        fatal_if(tHist.computeIndices[i].comp != (unsigned)bi->ci[i],
+                 "TAGE folded-index rollback mismatch in bank %d", i);
+        fatal_if(tHist.computeTags[0][i].comp != (unsigned)bi->ct0[i],
+                 "TAGE folded-tag0 rollback mismatch in bank %d", i);
+        fatal_if(tHist.computeTags[1][i].comp != (unsigned)bi->ct1[i],
+                 "TAGE folded-tag1 rollback mismatch in bank %d", i);
+    }
+    stats.historyRestoreChecks++;
+
     bi->nGhist = 0;
     bi->modified = false;
 }
@@ -835,6 +855,29 @@ TAGEBase::extraAltCalc(BranchInfo* bi)
 void
 TAGEBase::updateStats(bool taken, BranchInfo* bi)
 {
+    fatal_if(bi->provider > LAST_TAGE_PROVIDER_TYPE,
+             "Invalid TAGE provider type %u", bi->provider);
+    fatal_if(bi->providerConfidence >= NUM_PROVIDER_CONFIDENCE_CLASSES,
+             "Invalid TAGE confidence class %u", bi->providerConfidence);
+    fatal_if(bi->providerStrength == 0 || !(bi->providerStrength & 1),
+             "Invalid TAGE provider strength %u", bi->providerStrength);
+    fatal_if(bi->selectedProviderBank > nHistoryTables,
+             "Invalid selected TAGE provider bank %u", bi->selectedProviderBank);
+
+    if (bi->provider == TAGE_LONGEST_MATCH) {
+        fatal_if(bi->hitBank <= 0 ||
+                 bi->selectedProviderBank != (unsigned)bi->hitBank,
+                 "Longest-match provider metadata mismatch");
+    } else if (bi->provider == TAGE_ALT_MATCH) {
+        fatal_if(bi->altBank <= 0 ||
+                 bi->selectedProviderBank != (unsigned)bi->altBank,
+                 "Alternate-match provider metadata mismatch");
+    } else {
+        fatal_if(bi->selectedProviderBank != 0,
+                 "Bimodal provider must select bank 0");
+    }
+
+    stats.predictionMetadataChecks++;
     stats.committedConditionalPredictions++;
     stats.selectedProviderBank[bi->selectedProviderBank]++;
     stats.providerConfidence[bi->providerConfidence]++;
@@ -956,6 +999,14 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
                "Correct committed predictions by confidence class"),
       ADD_STAT(providerConfidenceWrong, statistics::units::Count::get(),
                "Wrong committed predictions by confidence class"),
+      ADD_STAT(historyStateRecords, statistics::units::Count::get(),
+               "Prediction-time TAGE history snapshots recorded"),
+      ADD_STAT(historyStateRestores, statistics::units::Count::get(),
+               "Speculative TAGE history rollbacks performed"),
+      ADD_STAT(historyRestoreChecks, statistics::units::Count::get(),
+               "TAGE rollback state checks completed successfully"),
+      ADD_STAT(predictionMetadataChecks, statistics::units::Count::get(),
+               "Committed TAGE prediction metadata checks completed"),
       ADD_STAT(storageBits, statistics::units::Count::get(),
                "Persistent TAGE predictor state in bits"),
       ADD_STAT(bimodalStorageBits, statistics::units::Count::get(),
