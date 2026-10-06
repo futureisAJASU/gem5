@@ -38,6 +38,8 @@
 
 #include "cpu/pred/tage_base.hh"
 
+#include <cstdlib>
+
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "debug/Fetch.hh"
