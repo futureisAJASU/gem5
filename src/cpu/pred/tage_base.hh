@@ -493,6 +493,10 @@ class TAGEBase : public SimObject
                                 bool taken, int brtype, Addr target) const;
     bool isSpeculativeUpdateEnabled() const;
     size_t getSizeInBits() const;
+    size_t getBimodalStorageBits() const;
+    size_t getTaggedStorageBits() const;
+    size_t getHistoryStorageBits() const;
+    size_t getOtherStorageBits() const;
 
   protected:
     const unsigned logRatioBiModalHystEntries;
@@ -568,7 +572,7 @@ class TAGEBase : public SimObject
 
     struct TAGEBaseStats : public statistics::Group
     {
-        TAGEBaseStats(statistics::Group *parent, unsigned nHistoryTables);
+        TAGEBaseStats(TAGEBase *parent, unsigned nHistoryTables);
         // stats
         statistics::Scalar longestMatchProviderCorrect;
         statistics::Scalar altMatchProviderCorrect;
@@ -596,11 +600,11 @@ class TAGEBase : public SimObject
 
         // Persistent predictor-state accounting in bits, following the same
         // convention as getSizeInBits().
-        statistics::Scalar storageBits;
-        statistics::Scalar bimodalStorageBits;
-        statistics::Scalar taggedStorageBits;
-        statistics::Scalar historyStorageBits;
-        statistics::Scalar otherStorageBits;
+        statistics::Value storageBits;
+        statistics::Value bimodalStorageBits;
+        statistics::Value taggedStorageBits;
+        statistics::Value historyStorageBits;
+        statistics::Value otherStorageBits;
     } stats;
 };
 
