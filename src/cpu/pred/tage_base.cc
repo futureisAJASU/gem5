@@ -505,9 +505,17 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
         bi->providerStrength = std::abs(2 * providerState - 3);
     }
 
+    const bool bimodalProvider =
+        bi->provider == BIMODAL_ONLY || bi->provider == BIMODAL_ALT_MATCH;
     if (bi->providerStrength <= 1) {
         bi->providerConfidence = CONFIDENCE_WEAK;
+    } else if (bimodalProvider) {
+        // A 2-bit bimodal predictor has only weak (01/10) and strong
+        // (00/11) semantic states.
+        bi->providerConfidence = CONFIDENCE_STRONG;
     } else if (bi->providerStrength <= 3) {
+        // For a signed 3-bit TAGE counter, the next magnitude above weak
+        // is kept as a separate medium class for later selective gating.
         bi->providerConfidence = CONFIDENCE_MEDIUM;
     } else {
         bi->providerConfidence = CONFIDENCE_STRONG;
