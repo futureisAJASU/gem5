@@ -65,7 +65,7 @@ Therefore:
 ```text
 256 entries/table   13,414 bits = 1.6375 KiB
 512 entries/table   24,166 bits = 2.9500 KiB
-1024 entries/table  45,670 bits = 5.5740 KiB
+1024 entries/table  45,670 bits = 5.5750 KiB
 ```
 
 The runner must verify these values from runtime stats and the emitted configuration.
