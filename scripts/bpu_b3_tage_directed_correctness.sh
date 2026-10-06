@@ -63,12 +63,26 @@ run_one() {
   local out="$OUT_ROOT/$tag"
   mkdir -p "$out"
 
+  set +e
   "$GEM5" --outdir="$out"     "$CFG"     --binary "$BIN"     --bp-type micro-tage     --bp-inst-shift 1     --bp-cond-shift 1     --bp-btb-shift 2     --bp-indirect-shift 1     --btb-entries 4096     >"$out.stdout" 2>"$out.stderr"
+  local rc=$?
+  set -e
+
+  if (( rc != 0 )); then
+    echo "ERROR: $tag gem5 exited with rc=$rc" >&2
+    echo "----- $tag stdout -----" >&2
+    tail -n 200 "$out.stdout" >&2 || true
+    echo "----- $tag stderr -----" >&2
+    tail -n 200 "$out.stderr" >&2 || true
+    exit "$rc"
+  fi
 
   grep -q 'SIMULATION_EXIT_CODE=0' "$out.stdout" || {
-    echo "ERROR: $tag benchmark verification failed" >&2
-    cat "$out.stdout" >&2
-    cat "$out.stderr" >&2
+    echo "ERROR: $tag benchmark verification failed despite gem5 rc=0" >&2
+    echo "----- $tag stdout -----" >&2
+    tail -n 200 "$out.stdout" >&2 || true
+    echo "----- $tag stderr -----" >&2
+    tail -n 200 "$out.stderr" >&2 || true
     exit 5
   }
 
