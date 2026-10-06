@@ -1011,6 +1011,9 @@ class LittleV052Rv64Core(BaseCPUCore):
         commit_width: int = 3,
         bp_type: str = "tournament",
         bp_inst_shift: int = 1,
+        bp_cond_shift: int | None = None,
+        bp_btb_shift: int | None = None,
+        bp_indirect_shift: int | None = None,
         bp_local_size: int = 2048,
         bp_local_history_size: int = 2048,
         bp_global_size: int = 8192,
@@ -1064,6 +1067,23 @@ class LittleV052Rv64Core(BaseCPUCore):
                 "bp_inst_shift must be 0, 1, or 2"
             )
 
+        effective_cond_shift = (
+            bp_inst_shift if bp_cond_shift is None else bp_cond_shift
+        )
+        effective_btb_shift = (
+            bp_inst_shift if bp_btb_shift is None else bp_btb_shift
+        )
+        effective_indirect_shift = (
+            bp_inst_shift if bp_indirect_shift is None else bp_indirect_shift
+        )
+        for name, value in (
+            ("bp_cond_shift", effective_cond_shift),
+            ("bp_btb_shift", effective_btb_shift),
+            ("bp_indirect_shift", effective_indirect_shift),
+        ):
+            if value not in (0, 1, 2):
+                raise ValueError(f"{name} must be 0, 1, or 2")
+
         predictor_sizes = {
             "bp_local_size": bp_local_size,
             "bp_local_history_size": bp_local_history_size,
@@ -1106,16 +1126,24 @@ class LittleV052Rv64Core(BaseCPUCore):
 
         if bp_type == "tournament":
             tournament = cpu.branchPred.conditionalBranchPred
+            tournament.instShiftAmt = effective_cond_shift
             tournament.localPredictorSize = bp_local_size
             tournament.localHistoryTableSize = bp_local_history_size
             tournament.globalPredictorSize = bp_global_size
             tournament.choicePredictorSize = bp_choice_size
         elif bp_type == "micro-tage":
-            cpu.branchPred.conditionalBranchPred = LittleMicroTAGE()
+            micro_tage = LittleMicroTAGE()
+            micro_tage.instShiftAmt = effective_cond_shift
+            micro_tage.tage.instShiftAmt = effective_cond_shift
+            cpu.branchPred.conditionalBranchPred = micro_tage
         else:
             raise ValueError(f"unsupported bp_type: {bp_type}")
 
         cpu.branchPred.btb.numEntries = btb_entries
+        cpu.branchPred.btb.instShiftAmt = effective_btb_shift
+        cpu.branchPred.btb.btbIndexingPolicy.set_shift = effective_btb_shift
+        if cpu.branchPred.indirectBranchPred is not NULL:
+            cpu.branchPred.indirectBranchPred.instShiftAmt = effective_indirect_shift
 
         cpu.fetchWidth = effective_fetch_width
         cpu.decodeWidth = effective_decode_width
@@ -1219,6 +1247,9 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
         commit_width: int,
         bp_type: str,
         bp_inst_shift: int,
+        bp_cond_shift: int | None,
+        bp_btb_shift: int | None,
+        bp_indirect_shift: int | None,
         bp_local_size: int,
         bp_local_history_size: int,
         bp_global_size: int,
@@ -1354,6 +1385,9 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
                 commit_width=commit_width,
                 bp_type=bp_type,
                 bp_inst_shift=bp_inst_shift,
+                bp_cond_shift=bp_cond_shift,
+                bp_btb_shift=bp_btb_shift,
+                bp_indirect_shift=bp_indirect_shift,
                 bp_local_size=bp_local_size,
                 bp_local_history_size=bp_local_history_size,
                 bp_global_size=bp_global_size,
@@ -1705,6 +1739,28 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--bp-cond-shift",
+        type=int,
+        choices=(0, 1, 2),
+        default=None,
+        help="Conditional-predictor PC shift; default inherits --bp-inst-shift",
+    )
+    parser.add_argument(
+        "--bp-btb-shift",
+        type=int,
+        choices=(0, 1, 2),
+        default=None,
+        help="BTB PC-index shift; default inherits --bp-inst-shift",
+    )
+    parser.add_argument(
+        "--bp-indirect-shift",
+        type=int,
+        choices=(0, 1, 2),
+        default=None,
+        help="Indirect-predictor PC shift; default inherits --bp-inst-shift",
+    )
+
+    parser.add_argument(
         "--bp-local-size",
         type=int,
         default=2048,
@@ -2005,6 +2061,9 @@ def main() -> None:
         commit_width=args.commit_width,
         bp_type=args.bp_type,
         bp_inst_shift=args.bp_inst_shift,
+        bp_cond_shift=args.bp_cond_shift,
+        bp_btb_shift=args.bp_btb_shift,
+        bp_indirect_shift=args.bp_indirect_shift,
         bp_local_size=args.bp_local_size,
         bp_local_history_size=args.bp_local_history_size,
         bp_global_size=args.bp_global_size,
@@ -2135,6 +2194,9 @@ def main() -> None:
         ),
         f"bp-type={args.bp_type}",
         f"bp-inst-shift={args.bp_inst_shift}",
+        f"bp-cond-shift={args.bp_cond_shift if args.bp_cond_shift is not None else args.bp_inst_shift}",
+        f"bp-btb-shift={args.bp_btb_shift if args.bp_btb_shift is not None else args.bp_inst_shift}",
+        f"bp-indirect-shift={args.bp_indirect_shift if args.bp_indirect_shift is not None else args.bp_inst_shift}",
         f"bp-local-size={args.bp_local_size}",
         f"bp-local-history-size={args.bp_local_history_size}",
         f"bp-global-size={args.bp_global_size}",
