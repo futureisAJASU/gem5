@@ -71,6 +71,7 @@ run_one() {
   local bin="$EMBENCH_BUILD/src/$workload/$workload"
   local out="$OUT_ROOT/$workload/$mode"
 
+  mkdir -p "$out"
   echo "  $workload / $mode (c$cond b$btb i$ind)"
 
   "$GEM5" --outdir="$out"     "$CFG"     --binary "$bin"     --bp-type tournament     --bp-inst-shift 1     --bp-cond-shift "$cond"     --bp-btb-shift "$btb"     --bp-indirect-shift "$ind"     --btb-entries 4096     >"$out.stdout" 2>"$out.stderr"
