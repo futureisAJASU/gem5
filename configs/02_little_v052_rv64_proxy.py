@@ -1018,6 +1018,7 @@ class LittleV052Rv64Core(BaseCPUCore):
         bp_local_history_size: int = 2048,
         bp_global_size: int = 8192,
         bp_choice_size: int = 8192,
+        micro_tage_tagged_entries: int = 512,
         btb_entries: int = 4096,
         int_regs: int = 112,
         fp_regs: int = 96,
@@ -1103,6 +1104,15 @@ class LittleV052Rv64Core(BaseCPUCore):
                     f"{name} must be a power of two"
                 )
 
+        if micro_tage_tagged_entries <= 0:
+            raise ValueError(
+                "micro_tage_tagged_entries must be positive"
+            )
+        if micro_tage_tagged_entries & (micro_tage_tagged_entries - 1):
+            raise ValueError(
+                "micro_tage_tagged_entries must be a power of two"
+            )
+
         cpu = RiscvO3CPU()
 
         # Initial cross-ISA gate targets scalar RV64IMAFD-class execution.
@@ -1135,6 +1145,13 @@ class LittleV052Rv64Core(BaseCPUCore):
             micro_tage = LittleMicroTAGE()
             micro_tage.instShiftAmt = effective_cond_shift
             micro_tage.tage.instShiftAmt = effective_cond_shift
+            tagged_log_size = micro_tage_tagged_entries.bit_length() - 1
+            micro_tage.tage.logTagTableSizes = [
+                11,
+                tagged_log_size,
+                tagged_log_size,
+                tagged_log_size,
+            ]
             cpu.branchPred.conditionalBranchPred = micro_tage
         else:
             raise ValueError(f"unsupported bp_type: {bp_type}")
@@ -1254,6 +1271,7 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
         bp_local_history_size: int,
         bp_global_size: int,
         bp_choice_size: int,
+        micro_tage_tagged_entries: int,
         btb_entries: int,
         n_skip: int,
         checker: bool,
@@ -1392,6 +1410,7 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
                 bp_local_history_size=bp_local_history_size,
                 bp_global_size=bp_global_size,
                 bp_choice_size=bp_choice_size,
+                micro_tage_tagged_entries=micro_tage_tagged_entries,
                 btb_entries=btb_entries,
                 n_skip=n_skip,
                 checker=checker,
@@ -1789,6 +1808,17 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--micro-tage-tagged-entries",
+        type=int,
+        choices=(256, 512, 1024),
+        default=512,
+        help=(
+            "Entries in each of the three LittleMicroTAGE tagged tables; "
+            "BPU-4 A1 sweep control. Default preserves the S0 seed."
+        ),
+    )
+
+    parser.add_argument(
         "--btb-entries",
         type=int,
         default=4096,
@@ -2068,6 +2098,7 @@ def main() -> None:
         bp_local_history_size=args.bp_local_history_size,
         bp_global_size=args.bp_global_size,
         bp_choice_size=args.bp_choice_size,
+        micro_tage_tagged_entries=args.micro_tage_tagged_entries,
         btb_entries=args.btb_entries,
         n_skip=args.n_skip,
         checker=args.checker,
@@ -2201,6 +2232,7 @@ def main() -> None:
         f"bp-local-history-size={args.bp_local_history_size}",
         f"bp-global-size={args.bp_global_size}",
         f"bp-choice-size={args.bp_choice_size}",
+        f"micro-tage-tagged-entries={args.micro_tage_tagged_entries}",
         f"btb-entries={args.btb_entries}",
         f"pair-shared-div={args.pair_shared_div}",
         f"div-decode-wake={args.div_decode_wake}",
