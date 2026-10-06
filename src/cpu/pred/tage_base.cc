@@ -145,6 +145,25 @@ TAGEBase::init()
 
     tableIndices = new int [nHistoryTables+1];
     tableTags = new int [nHistoryTables+1];
+
+    uint64_t taggedBits = 0;
+    for (int i = 1; i <= nHistoryTables; ++i) {
+        taggedBits += (1ULL << logTagTableSizes[i]) *
+            (tagTableCounterBits + tagTableUBits + tagTableTagWidths[i]);
+    }
+    const uint64_t bimodalBits =
+        bimodalTableSize +
+        (bimodalTableSize >> logRatioBiModalHystEntries);
+    const uint64_t historyBits = maxHist + pathHistBits;
+    const uint64_t otherBits =
+        (numUseAltOnNa * useAltOnNaBits) + logUResetPeriod;
+
+    stats.taggedStorageBits = taggedBits;
+    stats.bimodalStorageBits = bimodalBits;
+    stats.historyStorageBits = historyBits;
+    stats.otherStorageBits = otherBits;
+    stats.storageBits = taggedBits + bimodalBits + historyBits + otherBits;
+
     initialized = true;
 }
 
@@ -461,8 +480,42 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
         bi->provider = BIMODAL_ONLY;
     }
 
-    DPRINTF(Tage, "Predict for %lx: tagePred:%d, altPred:%d\n",
-            branch_pc, bi->tagePred, bi->altTaken);
+    // Capture the actual selected provider and its confidence at
+    // prediction time. This must not be reconstructed at commit because an
+    // older branch may have trained the same entry in the meantime.
+    int providerState = 0;
+    if (bi->provider == TAGE_LONGEST_MATCH) {
+        bi->selectedProviderBank = bi->hitBank;
+        const int ctr = gtable[bi->hitBank][bi->hitBankIndex].ctr;
+        bi->providerStrength = std::abs(2 * ctr + 1);
+    } else if (bi->provider == TAGE_ALT_MATCH) {
+        bi->selectedProviderBank = bi->altBank;
+        const int ctr = gtable[bi->altBank][bi->altBankIndex].ctr;
+        bi->providerStrength = std::abs(2 * ctr + 1);
+    } else {
+        bi->selectedProviderBank = 0;
+        providerState =
+            (btablePrediction[bi->bimodalIndex] << 1) +
+            btableHysteresis[
+                bi->bimodalIndex >> logRatioBiModalHystEntries];
+        // Map the 2-bit bimodal state onto the same odd strength scale:
+        // states 1/2 -> 1 (weak), states 0/3 -> 3 (medium).
+        bi->providerStrength = std::abs(2 * providerState - 3);
+    }
+
+    if (bi->providerStrength <= 1) {
+        bi->providerConfidence = CONFIDENCE_WEAK;
+    } else if (bi->providerStrength <= 3) {
+        bi->providerConfidence = CONFIDENCE_MEDIUM;
+    } else {
+        bi->providerConfidence = CONFIDENCE_STRONG;
+    }
+
+    DPRINTF(Tage, "Predict for %lx: tagePred:%d, altPred:%d, "
+            "providerBank:%u, strength:%u, confidence:%u\n",
+            branch_pc, bi->tagePred, bi->altTaken,
+            bi->selectedProviderBank, bi->providerStrength,
+            bi->providerConfidence);
 
     return bi->tagePred;
 }
@@ -790,7 +843,13 @@ TAGEBase::extraAltCalc(BranchInfo* bi)
 void
 TAGEBase::updateStats(bool taken, BranchInfo* bi)
 {
+    stats.committedConditionalPredictions++;
+    stats.selectedProviderBank[bi->selectedProviderBank]++;
+    stats.providerConfidence[bi->providerConfidence]++;
+
     if (taken == bi->tagePred) {
+        stats.committedConditionalCorrect++;
+        stats.providerConfidenceCorrect[bi->providerConfidence]++;
         // correct prediction
         switch (bi->provider) {
           case BIMODAL_ONLY: stats.bimodalProviderCorrect++; break;
@@ -801,6 +860,8 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
           case TAGE_ALT_MATCH: stats.altMatchProviderCorrect++; break;
         }
     } else {
+        stats.committedConditionalWrong++;
+        stats.providerConfidenceWrong[bi->providerConfidence]++;
         // wrong prediction
         switch (bi->provider) {
           case BIMODAL_ONLY: stats.bimodalProviderWrong++; break;
@@ -885,10 +946,41 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
       ADD_STAT(longestMatchProvider, statistics::units::Count::get(),
                "TAGE provider for longest match"),
       ADD_STAT(altMatchProvider, statistics::units::Count::get(),
-               "TAGE provider for alt match")
+               "TAGE provider for alt match"),
+      ADD_STAT(committedConditionalPredictions,
+               statistics::units::Count::get(),
+               "Committed conditional predictions observed by TAGE"),
+      ADD_STAT(committedConditionalCorrect,
+               statistics::units::Count::get(),
+               "Committed conditional predictions correct in TAGE"),
+      ADD_STAT(committedConditionalWrong,
+               statistics::units::Count::get(),
+               "Committed conditional predictions wrong in TAGE"),
+      ADD_STAT(selectedProviderBank, statistics::units::Count::get(),
+               "Actual selected provider bank; bank 0 is bimodal"),
+      ADD_STAT(providerConfidence, statistics::units::Count::get(),
+               "Prediction-time selected-provider confidence class"),
+      ADD_STAT(providerConfidenceCorrect, statistics::units::Count::get(),
+               "Correct committed predictions by confidence class"),
+      ADD_STAT(providerConfidenceWrong, statistics::units::Count::get(),
+               "Wrong committed predictions by confidence class"),
+      ADD_STAT(storageBits, statistics::units::Count::get(),
+               "Persistent TAGE predictor state in bits"),
+      ADD_STAT(bimodalStorageBits, statistics::units::Count::get(),
+               "Persistent bimodal prediction+hysteresis bits"),
+      ADD_STAT(taggedStorageBits, statistics::units::Count::get(),
+               "Persistent tagged-table bits"),
+      ADD_STAT(historyStorageBits, statistics::units::Count::get(),
+               "Persistent global+path history bits"),
+      ADD_STAT(otherStorageBits, statistics::units::Count::get(),
+               "Persistent use-alt and reset-counter bits")
 {
     longestMatchProvider.init(nHistoryTables + 1);
     altMatchProvider.init(nHistoryTables + 1);
+    selectedProviderBank.init(nHistoryTables + 1);
+    providerConfidence.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
+    providerConfidenceCorrect.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
+    providerConfidenceWrong.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
 }
 
 int8_t
