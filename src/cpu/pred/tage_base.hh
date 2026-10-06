@@ -132,6 +132,14 @@ class TAGEBase : public SimObject
         LAST_TAGE_PROVIDER_TYPE = TAGE_ALT_MATCH
     };
 
+    enum ProviderConfidence
+    {
+        CONFIDENCE_WEAK = 0,
+        CONFIDENCE_MEDIUM,
+        CONFIDENCE_STRONG,
+        NUM_PROVIDER_CONFIDENCE_CLASSES
+    };
+
     // Primary branch history entry
     struct BranchInfo
     {
@@ -165,6 +173,9 @@ class TAGEBase : public SimObject
 
         // for stats purposes
         unsigned provider;
+        unsigned selectedProviderBank;
+        unsigned providerConfidence;
+        unsigned providerStrength;
 
         // The bit vector and the number of bits of global
         // history used for this branch.
@@ -186,6 +197,9 @@ class TAGEBase : public SimObject
               longestMatchPred(false),
               pseudoNewAlloc(false),
               provider(-1),
+              selectedProviderBank(0),
+              providerConfidence(CONFIDENCE_WEAK),
+              providerStrength(0),
               ghist(0), nGhist(0),
               modified(false),
               valid(false)
@@ -569,6 +583,24 @@ class TAGEBase : public SimObject
 
         statistics::Vector longestMatchProvider;
         statistics::Vector altMatchProvider;
+
+        // Little BPU research instrumentation. These are commit-time stats
+        // based on metadata captured at prediction time.
+        statistics::Scalar committedConditionalPredictions;
+        statistics::Scalar committedConditionalCorrect;
+        statistics::Scalar committedConditionalWrong;
+        statistics::Vector selectedProviderBank;
+        statistics::Vector providerConfidence;
+        statistics::Vector providerConfidenceCorrect;
+        statistics::Vector providerConfidenceWrong;
+
+        // Persistent predictor-state accounting in bits, following the same
+        // convention as getSizeInBits().
+        statistics::Scalar storageBits;
+        statistics::Scalar bimodalStorageBits;
+        statistics::Scalar taggedStorageBits;
+        statistics::Scalar historyStorageBits;
+        statistics::Scalar otherStorageBits;
     } stats;
 };
 
