@@ -211,6 +211,19 @@ for w in workloads:
         wrong=int(scalar(s,"committedConditionalWrong"))
         committed=int(scalar(s,"committedConditionalPredictions"))
         correct=int(scalar(s,"committedConditionalCorrect"))
+        restores=int(scalar(s,"historyStateRestores"))
+        restore_checks=int(scalar(s,"historyRestoreChecks"))
+        metadata_checks=int(scalar(s,"predictionMetadataChecks"))
+        if restore_checks != restores:
+            raise SystemExit(
+                f"ERROR {w}/e{e}: restore checks {restore_checks} != "
+                f"restores {restores}"
+            )
+        if metadata_checks != committed:
+            raise SystemExit(
+                f"ERROR {w}/e{e}: metadata checks {metadata_checks} != "
+                f"committed {committed}"
+            )
         banks=vector(v,"selectedProviderBank")
         conf=vector(v,"providerConfidence")
 
@@ -381,10 +394,10 @@ echo "[4/6] Emit provenance manifest"
 } >"$OUT_ROOT/manifest.txt"
 
 echo "[5/6] Show no-rerun native provider/confidence delta"
-if [[ -x scripts/bpu_b4_a1_provider_confidence_delta.sh ]]; then
+if [[ -f scripts/bpu_b4_a1_provider_confidence_delta.sh ]]; then
   bash scripts/bpu_b4_a1_provider_confidence_delta.sh
 else
-  echo "NOTE: provider/confidence postprocessor is not executable; skip"
+  echo "NOTE: provider/confidence postprocessor missing; skip"
 fi
 
 echo "[6/6] Done"
