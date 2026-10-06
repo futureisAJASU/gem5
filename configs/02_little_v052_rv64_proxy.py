@@ -1826,7 +1826,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--micro-tage-tagged-entries",
         type=int,
-        choices=(256, 512, 1024, 2048, 4096),
+        choices=(256, 512, 1024, 2048, 4096, 8192),
         default=512,
         help=(
             "Entries in each of the three LittleMicroTAGE tagged tables; "
@@ -1837,12 +1837,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--micro-tage-fixed-index-hash-log",
         type=int,
-        choices=(0, 11),
+        choices=(0, 11, 12),
         default=0,
         help=(
             "Diagnostic-only fixed tagged-index hash/folding width. "
             "0 preserves native TAGE geometry behavior; 11 freezes a "
-            "canonical 2048-entry hash before the physical-capacity mask."
+            "canonical 2048-entry hash and 12 freezes a canonical "
+            "4096-entry hash before the physical-capacity mask."
         ),
     )
 
