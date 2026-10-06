@@ -1019,6 +1019,7 @@ class LittleV052Rv64Core(BaseCPUCore):
         bp_global_size: int = 8192,
         bp_choice_size: int = 8192,
         micro_tage_tagged_entries: int = 512,
+        micro_tage_fixed_index_hash_log: int = 0,
         btb_entries: int = 4096,
         int_regs: int = 112,
         fp_regs: int = 96,
@@ -1146,12 +1147,23 @@ class LittleV052Rv64Core(BaseCPUCore):
             micro_tage.instShiftAmt = effective_cond_shift
             micro_tage.tage.instShiftAmt = effective_cond_shift
             tagged_log_size = micro_tage_tagged_entries.bit_length() - 1
+            if (
+                micro_tage_fixed_index_hash_log != 0
+                and micro_tage_fixed_index_hash_log < tagged_log_size
+            ):
+                raise ValueError(
+                    "micro_tage_fixed_index_hash_log must be zero or >= "
+                    "the physical tagged-table log2 size"
+                )
             micro_tage.tage.logTagTableSizes = [
                 11,
                 tagged_log_size,
                 tagged_log_size,
                 tagged_log_size,
             ]
+            micro_tage.tage.fixedIndexHashLogSize = (
+                micro_tage_fixed_index_hash_log
+            )
             cpu.branchPred.conditionalBranchPred = micro_tage
         else:
             raise ValueError(f"unsupported bp_type: {bp_type}")
@@ -1272,6 +1284,7 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
         bp_global_size: int,
         bp_choice_size: int,
         micro_tage_tagged_entries: int,
+        micro_tage_fixed_index_hash_log: int,
         btb_entries: int,
         n_skip: int,
         checker: bool,
@@ -1411,6 +1424,9 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
                 bp_global_size=bp_global_size,
                 bp_choice_size=bp_choice_size,
                 micro_tage_tagged_entries=micro_tage_tagged_entries,
+                micro_tage_fixed_index_hash_log=(
+                    micro_tage_fixed_index_hash_log
+                ),
                 btb_entries=btb_entries,
                 n_skip=n_skip,
                 checker=checker,
@@ -1819,6 +1835,18 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--micro-tage-fixed-index-hash-log",
+        type=int,
+        choices=(0, 11),
+        default=0,
+        help=(
+            "Diagnostic-only fixed tagged-index hash/folding width. "
+            "0 preserves native TAGE geometry behavior; 11 freezes a "
+            "canonical 2048-entry hash before the physical-capacity mask."
+        ),
+    )
+
+    parser.add_argument(
         "--btb-entries",
         type=int,
         default=4096,
@@ -2099,6 +2127,9 @@ def main() -> None:
         bp_global_size=args.bp_global_size,
         bp_choice_size=args.bp_choice_size,
         micro_tage_tagged_entries=args.micro_tage_tagged_entries,
+        micro_tage_fixed_index_hash_log=(
+            args.micro_tage_fixed_index_hash_log
+        ),
         btb_entries=args.btb_entries,
         n_skip=args.n_skip,
         checker=args.checker,
@@ -2233,6 +2264,10 @@ def main() -> None:
         f"bp-global-size={args.bp_global_size}",
         f"bp-choice-size={args.bp_choice_size}",
         f"micro-tage-tagged-entries={args.micro_tage_tagged_entries}",
+        (
+            "micro-tage-fixed-index-hash-log="
+            f"{args.micro_tage_fixed_index_hash_log}"
+        ),
         f"btb-entries={args.btb_entries}",
         f"pair-shared-div={args.pair_shared_div}",
         f"div-decode-wake={args.div_decode_wake}",
