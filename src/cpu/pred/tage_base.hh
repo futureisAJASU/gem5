@@ -147,6 +147,7 @@ class TAGEBase : public SimObject
         const bool condBranch;
 
         int pathHist;
+        int savedPtGhist;
         int hitBank;
         int hitBankIndex;
         int altBank;
@@ -190,6 +191,7 @@ class TAGEBase : public SimObject
 
         BranchInfo(const TAGEBase &tage, Addr pc, bool conditional)
             : branchPC(pc), condBranch(conditional),
+              savedPtGhist(0),
               hitBank(0), hitBankIndex(0),
               altBank(0), altBankIndex(0),
               bimodalIndex(0),
@@ -597,6 +599,12 @@ class TAGEBase : public SimObject
         statistics::Vector providerConfidence;
         statistics::Vector providerConfidenceCorrect;
         statistics::Vector providerConfidenceWrong;
+
+        // Directed-correctness audit counters.
+        statistics::Scalar historyStateRecords;
+        statistics::Scalar historyStateRestores;
+        statistics::Scalar historyRestoreChecks;
+        statistics::Scalar predictionMetadataChecks;
 
         // Persistent predictor-state accounting in bits, following the same
         // convention as getSizeInBits().
