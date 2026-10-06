@@ -315,6 +315,12 @@ class TAGEBase(SimObject):
     logTagTableSizes = VectorParam.Int(
         [13, 9, 9, 9, 9, 9, 9, 9], "Log2 of TAGE table sizes"
     )
+    fixedIndexHashLogSize = Param.Unsigned(
+        0,
+        "Diagnostic-only tagged-index hash width; 0 uses each physical "
+        "table's log2 size. A nonzero value keeps PC/global/path-history "
+        "index mixing at a fixed width before the final physical-table mask.",
+    )
     logRatioBiModalHystEntries = Param.Unsigned(
         2,
         "Log num of prediction entries for a shared hysteresis bit "
