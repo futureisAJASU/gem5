@@ -516,6 +516,11 @@ class TAGEBase : public SimObject
     std::vector<unsigned> tagTableTagWidths;
     std::vector<int> logTagTableSizes;
 
+    // Diagnostic-only index-hash width. Zero preserves native TAGE behavior.
+    // When nonzero, index folding/mixing uses this fixed width while the
+    // final table index is still masked to each physical table's capacity.
+    const unsigned fixedIndexHashLogSize;
+
     std::vector<bool> btablePrediction;
     std::vector<bool> btableHysteresis;
     TageEntry **gtable;
