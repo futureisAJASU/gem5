@@ -63,6 +63,7 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
       pathHistBits(p.pathHistBits),
       tagTableTagWidths(p.tagTableTagWidths),
       logTagTableSizes(p.logTagTableSizes),
+      fixedIndexHashLogSize(p.fixedIndexHashLogSize),
       threadHistory(p.numThreads),
       logUResetPeriod(p.logUResetPeriod),
       initialTCounterValue(p.initialTCounterValue),
@@ -125,6 +126,20 @@ TAGEBase::init()
     assert(tagTableTagWidths.size() == (nHistoryTables+1));
     assert(logTagTableSizes.size() == (nHistoryTables+1));
 
+    if (fixedIndexHashLogSize != 0) {
+        for (int i = 1; i <= nHistoryTables; ++i) {
+            fatal_if(
+                fixedIndexHashLogSize < (unsigned)logTagTableSizes[i],
+                "fixedIndexHashLogSize (%u) must be >= physical tagged "
+                "table log size (%d) for bank %d",
+                fixedIndexHashLogSize, logTagTableSizes[i], i);
+            fatal_if(
+                fixedIndexHashLogSize <= (unsigned)i,
+                "fixedIndexHashLogSize (%u) must exceed bank number %d",
+                fixedIndexHashLogSize, i);
+        }
+    }
+
     // First entry is for the Bimodal table and it is untagged in this
     // implementation
     assert(tagTableTagWidths[0] == 0);
@@ -155,14 +170,19 @@ void
 TAGEBase::initFoldedHistories(ThreadHistory & history)
 {
     for (int i = 1; i <= nHistoryTables; i++) {
+        const int hashLogSize = fixedIndexHashLogSize ?
+            fixedIndexHashLogSize : logTagTableSizes[i];
         history.computeIndices[i].init(
-            histLengths[i], (logTagTableSizes[i]));
+            histLengths[i], hashLogSize);
         history.computeTags[0][i].init(
             history.computeIndices[i].origLength, tagTableTagWidths[i]);
         history.computeTags[1][i].init(
             history.computeIndices[i].origLength, tagTableTagWidths[i]-1);
-        DPRINTF(Tage, "HistLength:%d, TTSize:%d, TTTWidth:%d\n",
-                histLengths[i], logTagTableSizes[i], tagTableTagWidths[i]);
+        DPRINTF(Tage,
+                "HistLength:%d, PhysicalTTSize:%d, IndexHashSize:%d, "
+                "TTTWidth:%d\n",
+                histLengths[i], logTagTableSizes[i], hashLogSize,
+                tagTableTagWidths[i]);
     }
 }
 
@@ -222,29 +242,35 @@ int
 TAGEBase::F(int A, int size, int bank) const
 {
     int A1, A2;
+    const int hashLogSize = fixedIndexHashLogSize ?
+        fixedIndexHashLogSize : logTagTableSizes[bank];
 
     A = A & ((1ULL << size) - 1);
-    A1 = (A & ((1ULL << logTagTableSizes[bank]) - 1));
-    A2 = (A >> logTagTableSizes[bank]);
-    A2 = ((A2 << bank) & ((1ULL << logTagTableSizes[bank]) - 1))
-       + (A2 >> (logTagTableSizes[bank] - bank));
+    A1 = (A & ((1ULL << hashLogSize) - 1));
+    A2 = (A >> hashLogSize);
+    A2 = ((A2 << bank) & ((1ULL << hashLogSize) - 1))
+       + (A2 >> (hashLogSize - bank));
     A = A1 ^ A2;
-    A = ((A << bank) & ((1ULL << logTagTableSizes[bank]) - 1))
-      + (A >> (logTagTableSizes[bank] - bank));
+    A = ((A << bank) & ((1ULL << hashLogSize) - 1))
+      + (A >> (hashLogSize - bank));
     return (A);
 }
 
-// gindex computes a full hash of pc, ghist and pathHist
+// gindex computes a full hash of pc, ghist and pathHist. In diagnostic
+// fixed-hash mode, the mixing/folding width is invariant across physical
+// capacities; only this final physical-table mask changes.
 int
 TAGEBase::gindex(ThreadID tid, Addr pc, int bank) const
 {
     int index;
     int hlen = (histLengths[bank] > pathHistBits) ? pathHistBits :
                                                     histLengths[bank];
+    const int hashLogSize = fixedIndexHashLogSize ?
+        fixedIndexHashLogSize : logTagTableSizes[bank];
     const unsigned int shiftedPc = pc >> instShiftAmt;
     index =
         shiftedPc ^
-        (shiftedPc >> ((int) abs(logTagTableSizes[bank] - bank) + 1)) ^
+        (shiftedPc >> ((int) abs(hashLogSize - bank) + 1)) ^
         threadHistory[tid].computeIndices[bank].comp ^
         F(threadHistory[tid].pathHist, hlen, bank);
 
