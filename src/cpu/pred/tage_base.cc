@@ -346,13 +346,14 @@ TAGEBase::updateGHist(ThreadID tid, uint64_t bv, uint8_t n)
         // To avoid this we copy an addition rollback window of 1k additional
         // bit. This should allow more than 500 predictions (TAGE-SC-L) in
         // flight.
-        const int rollbackBuffer = 1000;
-        for (int i = 0; i < (maxHist + rollbackBuffer); i++) {
-            tHist.globalHist[histBufferSize - maxHist - rollbackBuffer + i] =
+        for (int i = 0; i < (maxHist + historyRollbackBuffer); i++) {
+            tHist.globalHist[
+                histBufferSize - maxHist - historyRollbackBuffer + i] =
                 tHist.globalHist[tHist.ptGhist + i];
         }
 
-        tHist.ptGhist = histBufferSize - maxHist - rollbackBuffer;
+        tHist.ptGhist =
+            histBufferSize - maxHist - historyRollbackBuffer;
     }
 
     // Update the global history
@@ -759,6 +760,10 @@ TAGEBase::recordHistState(ThreadID tid, BranchInfo* bi)
     ThreadHistory &tHist = threadHistory[tid];
     bi->pathHist = tHist.pathHist;
     bi->savedPtGhist = tHist.ptGhist;
+    for (unsigned i = 0; i < maxHist; ++i) {
+        bi->savedGlobalHistWindow[i] =
+            tHist.globalHist.at(tHist.ptGhist + i);
+    }
     stats.historyStateRecords++;
 
     for (int i = 1; i <= nHistoryTables; i++) {
@@ -804,12 +809,33 @@ TAGEBase::restoreHistState(ThreadID tid, BranchInfo* bi)
     }
 
     stats.historyStateRestores++;
-    fatal_if(tHist.ptGhist != bi->savedPtGhist,
-             "TAGE history rollback pointer mismatch: got %d expected %d",
-             tHist.ptGhist, bi->savedPtGhist);
+
+    // The first update can roll the circular history buffer from pointer 0
+    // into the copied rollback window. Restoring that update returns the
+    // same logical history at the relocated pointer, not necessarily the
+    // original numeric pointer. Validate the only legal relocation and then
+    // compare the entire max-history window exactly.
+    int expectedPtGhist = bi->savedPtGhist;
+    if (bi->savedPtGhist < bi->nGhist) {
+        expectedPtGhist =
+            histBufferSize - maxHist - historyRollbackBuffer;
+    }
+    fatal_if(tHist.ptGhist != expectedPtGhist,
+             "TAGE history rollback pointer mismatch: got %d expected %d "
+             "(saved %d, nGhist %u)",
+             tHist.ptGhist, expectedPtGhist,
+             bi->savedPtGhist, bi->nGhist);
+
     fatal_if(tHist.pathHist != bi->pathHist,
              "TAGE path-history rollback mismatch: got %#x expected %#x",
              tHist.pathHist, bi->pathHist);
+
+    for (unsigned i = 0; i < maxHist; ++i) {
+        fatal_if(tHist.globalHist.at(tHist.ptGhist + i) !=
+                     bi->savedGlobalHistWindow[i],
+                 "TAGE raw global-history rollback mismatch at offset %u", i);
+    }
+
     for (int i = 1; i <= nHistoryTables; ++i) {
         fatal_if(tHist.computeIndices[i].comp != (unsigned)bi->ci[i],
                  "TAGE folded-index rollback mismatch in bank %d", i);
