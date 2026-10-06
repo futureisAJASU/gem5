@@ -148,24 +148,6 @@ TAGEBase::init()
     tableIndices = new int [nHistoryTables+1];
     tableTags = new int [nHistoryTables+1];
 
-    uint64_t taggedBits = 0;
-    for (int i = 1; i <= nHistoryTables; ++i) {
-        taggedBits += (1ULL << logTagTableSizes[i]) *
-            (tagTableCounterBits + tagTableUBits + tagTableTagWidths[i]);
-    }
-    const uint64_t bimodalBits =
-        bimodalTableSize +
-        (bimodalTableSize >> logRatioBiModalHystEntries);
-    const uint64_t historyBits = maxHist + pathHistBits;
-    const uint64_t otherBits =
-        (numUseAltOnNa * useAltOnNaBits) + logUResetPeriod;
-
-    stats.taggedStorageBits = taggedBits;
-    stats.bimodalStorageBits = bimodalBits;
-    stats.historyStorageBits = historyBits;
-    stats.otherStorageBits = otherBits;
-    stats.storageBits = taggedBits + bimodalBits + historyBits + otherBits;
-
     initialized = true;
 }
 
@@ -921,7 +903,7 @@ TAGEBase::getGHR(ThreadID tid) const
 
 
 TAGEBase::TAGEBaseStats::TAGEBaseStats(
-    statistics::Group *parent, unsigned nHistoryTables)
+    TAGEBase *parent, unsigned nHistoryTables)
     : statistics::Group(parent),
       ADD_STAT(longestMatchProviderCorrect, statistics::units::Count::get(),
                "Number of times TAGE Longest Match is the provider and the "
@@ -991,6 +973,15 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
     providerConfidence.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
     providerConfidenceCorrect.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
     providerConfidenceWrong.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
+
+    // Persistent-structure accounting must survive m5_reset_stats() at ROI
+    // boundaries. Value stats proxy the current geometry and have a no-op
+    // reset, unlike Scalar stats.
+    storageBits.method(parent, &TAGEBase::getSizeInBits);
+    bimodalStorageBits.method(parent, &TAGEBase::getBimodalStorageBits);
+    taggedStorageBits.method(parent, &TAGEBase::getTaggedStorageBits);
+    historyStorageBits.method(parent, &TAGEBase::getHistoryStorageBits);
+    otherStorageBits.method(parent, &TAGEBase::getOtherStorageBits);
 }
 
 int8_t
@@ -1019,20 +1010,42 @@ TAGEBase::isSpeculativeUpdateEnabled() const
 }
 
 size_t
-TAGEBase::getSizeInBits() const {
+TAGEBase::getTaggedStorageBits() const
+{
     size_t bits = 0;
-    for (int i = 1; i <= nHistoryTables; i++) {
-        bits += (1 << logTagTableSizes[i]) *
+    for (int i = 1; i <= nHistoryTables; ++i) {
+        bits += (1ULL << logTagTableSizes[i]) *
             (tagTableCounterBits + tagTableUBits + tagTableTagWidths[i]);
     }
-    uint64_t bimodalTableSize = 1ULL << logTagTableSizes[0];
-    bits += numUseAltOnNa * useAltOnNaBits;
-    bits += bimodalTableSize;
-    bits += (bimodalTableSize >> logRatioBiModalHystEntries);
-    bits += histLengths[nHistoryTables];
-    bits += pathHistBits;
-    bits += logUResetPeriod;
     return bits;
+}
+
+size_t
+TAGEBase::getBimodalStorageBits() const
+{
+    const size_t entries = 1ULL << logTagTableSizes[0];
+    return entries + (entries >> logRatioBiModalHystEntries);
+}
+
+size_t
+TAGEBase::getHistoryStorageBits() const
+{
+    return histLengths[nHistoryTables] + pathHistBits;
+}
+
+size_t
+TAGEBase::getOtherStorageBits() const
+{
+    return (numUseAltOnNa * useAltOnNaBits) + logUResetPeriod;
+}
+
+size_t
+TAGEBase::getSizeInBits() const
+{
+    return getTaggedStorageBits() +
+           getBimodalStorageBits() +
+           getHistoryStorageBits() +
+           getOtherStorageBits();
 }
 
 } // namespace branch_prediction
