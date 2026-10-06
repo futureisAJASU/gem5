@@ -148,6 +148,7 @@ class TAGEBase : public SimObject
 
         int pathHist;
         int savedPtGhist;
+        std::vector<uint8_t> savedGlobalHistWindow;
         int hitBank;
         int hitBankIndex;
         int altBank;
@@ -192,6 +193,7 @@ class TAGEBase : public SimObject
         BranchInfo(const TAGEBase &tage, Addr pc, bool conditional)
             : branchPC(pc), condBranch(conditional),
               savedPtGhist(0),
+              savedGlobalHistWindow(tage.maxHist, 0),
               hitBank(0), hitBankIndex(0),
               altBank(0), altBankIndex(0),
               bimodalIndex(0),
@@ -567,6 +569,11 @@ class TAGEBase : public SimObject
     std::vector<bool> noSkip;
 
     const bool speculativeHistUpdate;
+
+    // Keep this identical to the history rollover safety window used by
+    // updateGHist(). A rollback may restore semantically identical history
+    // at this relocated buffer position instead of the original pointer.
+    static constexpr int historyRollbackBuffer = 1000;
 
     const unsigned instShiftAmt;
 
