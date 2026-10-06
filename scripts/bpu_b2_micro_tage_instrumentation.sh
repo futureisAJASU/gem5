@@ -200,7 +200,12 @@ for w in workloads:
         expected,expected_bimodal,expected_tagged,expected_history,expected_other
     ):
         raise SystemExit(
-            f"ERROR {w}: emitted-config storage accounting mismatch"
+            f"ERROR {w}: emitted-config storage accounting mismatch\n"
+            f"  runtime: total={storage} bimodal={bimodal} tagged={tagged} "
+            f"history={history} other={other}\n"
+            f"  config:  total={expected} bimodal={expected_bimodal} "
+            f"tagged={expected_tagged} history={expected_history} "
+            f"other={expected_other}"
         )
 
     weak=int(conf.get(0,0))
