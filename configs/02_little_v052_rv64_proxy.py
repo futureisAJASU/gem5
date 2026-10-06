@@ -1810,7 +1810,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--micro-tage-tagged-entries",
         type=int,
-        choices=(256, 512, 1024),
+        choices=(256, 512, 1024, 2048),
         default=512,
         help=(
             "Entries in each of the three LittleMicroTAGE tagged tables; "
