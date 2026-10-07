@@ -5,6 +5,8 @@ from m5.objects import (
     IQUnit,
     L2XBar,
     LittleMicroTAGE,
+    LittleTAGE5Iso45K,
+    LittleTAGE7Iso65K,
     TAGE,
     RiscvISA,
     RiscvO3CPU,
@@ -1148,6 +1150,16 @@ class LittleV052Rv64Core(BaseCPUCore):
             stock_tage.instShiftAmt = effective_cond_shift
             stock_tage.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = stock_tage
+        elif bp_type == "tage5-iso45k":
+            tage5 = LittleTAGE5Iso45K()
+            tage5.instShiftAmt = effective_cond_shift
+            tage5.tage.instShiftAmt = effective_cond_shift
+            cpu.branchPred.conditionalBranchPred = tage5
+        elif bp_type == "tage7-iso65k":
+            tage7 = LittleTAGE7Iso65K()
+            tage7.instShiftAmt = effective_cond_shift
+            tage7.tage.instShiftAmt = effective_cond_shift
+            cpu.branchPred.conditionalBranchPred = tage7
         elif bp_type == "micro-tage":
             micro_tage = LittleMicroTAGE()
             micro_tage.instShiftAmt = effective_cond_shift
@@ -1758,13 +1770,20 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--bp-type",
-        choices=("tournament", "tage", "micro-tage"),
+        choices=(
+            "tournament",
+            "tage",
+            "tage5-iso45k",
+            "tage7-iso65k",
+            "micro-tage",
+        ),
         default="tournament",
         help=(
             "Conditional predictor family. tournament preserves the "
             "historical proxy; tage selects gem5 stock 8-component "
-            "63.5-Kbit TAGE; micro-tage selects the Little v0.52 "
-            "3-tagged-table research family."
+            "63.5-Kbit TAGE; tage5-iso45k and tage7-iso65k are "
+            "budget-normalized BPU-4B geometry-audit profiles; "
+            "micro-tage selects the Little v0.52 3-tagged-table family."
         ),
     )
 
