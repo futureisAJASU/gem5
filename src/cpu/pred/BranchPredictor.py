@@ -390,6 +390,45 @@ class LittleMicroTAGE(TAGE):
     tage = LittleMicroTAGEBase()
 
 
+class LittleTAGE5Iso45KBase(TAGEBase):
+    """Near-iso-budget 5-tagged-table geometry for BPU-4B."""
+
+    nHistoryTables = 5
+    minHist = 5
+    maxHist = 130
+    explicitHistLengths = [5, 11, 25, 58, 130]
+    tagTableTagWidths = [0, 8, 8, 9, 10, 10]
+    # Base=2K. Tagged sizes = 512/512/1024/512/512.
+    # Exact getSizeInBits() state = 45,736 bits.
+    logTagTableSizes = [11, 9, 9, 10, 9, 9]
+
+
+class LittleTAGE5Iso45K(TAGE):
+    """5-tagged-table near-iso-budget comparator for micro e1024."""
+
+    tage = LittleTAGE5Iso45KBase()
+
+
+class LittleTAGE7Iso65KBase(TAGEBase):
+    """Exact-iso-budget 7-tagged-table geometry for stock TAGE."""
+
+    nHistoryTables = 7
+    minHist = 5
+    maxHist = 130
+    explicitHistLengths = [5, 9, 15, 25, 44, 76, 130]
+    tagTableTagWidths = [0, 9, 9, 10, 10, 11, 11, 12]
+    # Base=2K. Tagged sizes = 512/512/512/1024/512/512/512.
+    # Moving 7,680 bits from the stock 8K-entry base into the
+    # central history-25 bank makes total state exactly 65,192 bits.
+    logTagTableSizes = [11, 9, 9, 9, 10, 9, 9, 9]
+
+
+class LittleTAGE7Iso65K(TAGE):
+    """7-tagged-table exact-iso-budget comparator for stock TAGE."""
+
+    tage = LittleTAGE7Iso65KBase()
+
+
 class LTAGE_TAGE(TAGEBase):
     nHistoryTables = 12
     minHist = 4
