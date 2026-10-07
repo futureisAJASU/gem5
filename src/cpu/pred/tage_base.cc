@@ -45,6 +45,7 @@
 #include "debug/Fetch.hh"
 #include "debug/Tage.hh"
 #include "debug/TageResearch.hh"
+#include "debug/TageResearchAll.hh"
 
 namespace gem5
 {
@@ -934,6 +935,19 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
     stats.committedConditionalPredictions++;
     stats.selectedProviderBank[bi->selectedProviderBank]++;
     stats.providerConfidence[bi->providerConfidence]++;
+
+    // Research-only trace of every committed conditional branch. Disabled
+    // unless TageResearchAll is explicitly enabled. This captures the
+    // prediction-time metadata already checked above and never changes
+    // predictor state or decisions.
+    DPRINTF(TageResearchAll,
+            "TAGE_RESEARCH_COMMIT pc=%#lx conf=%u provider=%u "
+            "bank=%u strength=%u hitBank=%d altBank=%d "
+            "pred=%u taken=%u correct=%u altTaken=%u longestPred=%u\n",
+            bi->branchPC, bi->providerConfidence, bi->provider,
+            bi->selectedProviderBank, bi->providerStrength,
+            bi->hitBank, bi->altBank, bi->tagePred, taken,
+            bi->tagePred == taken, bi->altTaken, bi->longestMatchPred);
 
     if (taken == bi->tagePred) {
         stats.committedConditionalCorrect++;
