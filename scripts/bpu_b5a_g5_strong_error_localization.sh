@@ -107,6 +107,7 @@ workloads=[
   "nbody","nettle-aes","nettle-sha256","nsichneu","picojpeg","qrduino",
   "sglib-combined","slre","st","statemate","ud","wikisort"
 ]
+tick_rx=re.compile(r"^\\s*(\\d+):")
 rx=re.compile(
     r"TAGE_RESEARCH_WRONG pc=(0x[0-9a-fA-F]+) conf=(\d+) provider=(\d+) "
     r"bank=(\d+) strength=(\d+) hitBank=(-?\d+) altBank=(-?\d+) "
@@ -176,6 +177,14 @@ for w in workloads:
     s,v=parse_stats(root/w/"roi.stats")
     stat_wrong=int(one(s,"committedConditionalWrong"))
     stat_conf={i:int(x) for i,x in vector(v,"providerConfidenceWrong").items()}
+    sim_ticks=int(one(s,"simTicks"))
+    final_tick=int(one(s,"finalTick"))
+    roi_start_tick=final_tick-sim_ticks
+    if roi_start_tick < 0:
+        raise SystemExit(
+            f"ERROR {w}: invalid ROI tick window start={roi_start_tick} "
+            f"final={final_tick} simTicks={sim_ticks}"
+        )
 
     wrong=collections.Counter()
     strong=collections.Counter()
@@ -184,10 +193,25 @@ for w in workloads:
     bank=collections.Counter()
 
     matched=0
+    pre_roi_wrong=0
+    post_roi_wrong=0
     for line in (root/w/"tage_research.log").read_text(errors="replace").splitlines():
         m=rx.search(line)
         if not m:
             continue
+        tm=tick_rx.match(line)
+        if not tm:
+            raise SystemExit(
+                f"ERROR {w}: research event missing leading gem5 tick: {line}"
+            )
+        tick=int(tm.group(1))
+        if tick < roi_start_tick:
+            pre_roi_wrong += 1
+            continue
+        if tick > final_tick:
+            post_roi_wrong += 1
+            continue
+
         pc=int(m.group(1),16)
         conf=int(m.group(2))
         prov=int(m.group(3))
@@ -207,7 +231,10 @@ for w in workloads:
 
     if matched != stat_wrong:
         raise SystemExit(
-            f"ERROR {w}: logged wrong {matched} != stats committed wrong {stat_wrong}"
+            f"ERROR {w}: ROI-window logged wrong {matched} != "
+            f"stats committed wrong {stat_wrong}; "
+            f"window=[{roi_start_tick},{final_tick}] "
+            f"preROI={pre_roi_wrong} postROI={post_roi_wrong}"
         )
     for i in range(3):
         if conf_counts[i] != stat_conf.get(i,0):
@@ -225,6 +252,10 @@ for w in workloads:
 
     rows.append({
       "workload":w,
+      "roiStartTick":roi_start_tick,
+      "roiEndTick":final_tick,
+      "preRoiWrongEventsIgnored":pre_roi_wrong,
+      "postRoiWrongEventsIgnored":post_roi_wrong,
       "wrong":matched,
       "strongWrong":total,
       "uniqueStrongWrongPCs":uniq,
