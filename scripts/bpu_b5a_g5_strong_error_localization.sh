@@ -6,6 +6,7 @@ cd "$ROOT"
 
 JOBS="${JOBS:-$(nproc)}"
 OUT_ROOT="${OUT_ROOT:-bpu_b5a_g5_strong_error_localization}"
+ANALYZE_ONLY="${ANALYZE_ONLY:-0}"
 EMBENCH_DIR="${EMBENCH_DIR:-$ROOT/benchmarks/external/embench-iot}"
 EMBENCH_BUILD="${EMBENCH_BUILD:-$EMBENCH_DIR/bd-rv64-gem5}"
 GEM5="$ROOT/build/RISCV/gem5.opt"
@@ -33,10 +34,11 @@ WORKLOADS=(
   wikisort
 )
 
-echo "[0/5] Build current gem5/RISCV"
-scons build/RISCV/gem5.opt -j"$JOBS"
+if [[ "$ANALYZE_ONLY" != "1" ]]; then
+  echo "[0/5] Build current gem5/RISCV"
+  scons build/RISCV/gem5.opt -j"$JOBS"
 
-echo "[1/5] Verify full Embench corpus binaries"
+  echo "[1/5] Verify full Embench corpus binaries"
 for w in "${WORKLOADS[@]}"; do
   [[ -x "$EMBENCH_BUILD/src/$w/$w" ]] || {
     echo "ERROR: missing Embench binary for $w" >&2
@@ -93,6 +95,20 @@ for w in "${WORKLOADS[@]}"; do
   }
 done
 
+else
+  echo "[0-2/5] ANALYZE_ONLY=1: reuse existing ROI stats and TageResearch logs"
+  for w in "${WORKLOADS[@]}"; do
+    [[ -f "$OUT_ROOT/$w/roi.stats" ]] || {
+      echo "ERROR: missing existing ROI stats for $w" >&2
+      exit 2
+    }
+    [[ -f "$OUT_ROOT/$w/tage_research.log" ]] || {
+      echo "ERROR: missing existing research log for $w" >&2
+      exit 2
+    }
+  done
+fi
+
 echo "[3/5] Reconcile logs with stats and measure exact static-PC concentration"
 python3 - "$OUT_ROOT" <<'PY'
 import collections
@@ -107,7 +123,7 @@ workloads=[
   "nbody","nettle-aes","nettle-sha256","nsichneu","picojpeg","qrduino",
   "sglib-combined","slre","st","statemate","ud","wikisort"
 ]
-tick_rx=re.compile(r"^\\s*(\\d+):")
+tick_rx=re.compile(r"^\s*(\d+):")
 rx=re.compile(
     r"TAGE_RESEARCH_WRONG pc=(0x[0-9a-fA-F]+) conf=(\d+) provider=(\d+) "
     r"bank=(\d+) strength=(\d+) hitBank=(-?\d+) altBank=(-?\d+) "
