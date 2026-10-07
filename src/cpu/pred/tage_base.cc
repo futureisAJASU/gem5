@@ -44,6 +44,7 @@
 #include "base/logging.hh"
 #include "debug/Fetch.hh"
 #include "debug/Tage.hh"
+#include "debug/TageResearch.hh"
 
 namespace gem5
 {
@@ -949,6 +950,19 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
     } else {
         stats.committedConditionalWrong++;
         stats.providerConfidenceWrong[bi->providerConfidence]++;
+
+        // Research-only exact wrong-event trace. Disabled unless the
+        // TageResearch debug flag is explicitly requested; it does not
+        // modify predictor state or decisions.
+        DPRINTF(TageResearch,
+                "TAGE_RESEARCH_WRONG pc=%#lx conf=%u provider=%u "
+                "bank=%u strength=%u hitBank=%d altBank=%d "
+                "pred=%u taken=%u altTaken=%u longestPred=%u\n",
+                bi->branchPC, bi->providerConfidence, bi->provider,
+                bi->selectedProviderBank, bi->providerStrength,
+                bi->hitBank, bi->altBank, bi->tagePred, taken,
+                bi->altTaken, bi->longestMatchPred);
+
         // wrong prediction
         switch (bi->provider) {
           case BIMODAL_ONLY: stats.bimodalProviderWrong++; break;
