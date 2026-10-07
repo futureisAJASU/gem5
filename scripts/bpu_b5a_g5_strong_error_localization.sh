@@ -70,7 +70,7 @@ for w in "${WORKLOADS[@]}"; do
   echo "  $w / G5 strong-error localization"
 
   set +e
-  "$GEM5" --outdir="$out"     --debug-flags=TageResearch     --debug-file="$out/tage_research.log"     "$CFG"     --binary "$EMBENCH_BUILD/src/$w/$w"     --bp-type tage5-iso45k     --bp-inst-shift 1     --bp-cond-shift 1     --bp-btb-shift 2     --bp-indirect-shift 1     --btb-entries 4096     >"$out.stdout" 2>"$out.stderr"
+  "$GEM5" --outdir="$out"     --debug-flags=TageResearch     --debug-file=tage_research.log     "$CFG"     --binary "$EMBENCH_BUILD/src/$w/$w"     --bp-type tage5-iso45k     --bp-inst-shift 1     --bp-cond-shift 1     --bp-btb-shift 2     --bp-indirect-shift 1     --btb-entries 4096     >"$out.stdout" 2>"$out.stderr"
   rc=$?
   set -e
 
