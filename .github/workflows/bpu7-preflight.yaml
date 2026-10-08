@@ -1,0 +1,42 @@
+name: BPU-7 Matrix and Evidence Preflight
+
+on:
+  push:
+    branches: [little-v052-bpu]
+    paths:
+      - .github/workflows/bpu7-preflight.yaml
+      - docs/bpu7_sweep_matrix_v02.json
+      - scripts/bpu_b7_sweep_preflight.py
+      - scripts/bpu_b7_round1_result_gate.py
+      - tests/bpu7/**
+  workflow_dispatch:
+
+jobs:
+  validate-preparation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate registered 21-profile matrix
+        run: python3 scripts/bpu_b7_sweep_preflight.py --emit /tmp/bpu7_plan
+      - name: Run synthetic-only result-gate unit tests
+        run: python3 -m unittest discover -s tests/bpu7 -p 'test_*.py' -v
+      - name: Ensure matrix never authorizes simulator runs
+        shell: bash
+        run: |
+          if python3 scripts/bpu_b7_sweep_preflight.py --require-run-ready; then
+            echo "ERROR: BPU-7 is not authorized for simulator execution" >&2
+            exit 1
+          fi
+          echo "EXPECTED: PRE_FREEZE prevents runs"
+      - name: Ensure absent real ROI results fail closed
+        shell: bash
+        run: |
+          if python3 scripts/bpu_b7_round1_result_gate.py --results /tmp/does_not_exist.csv; then
+            echo "ERROR: missing real BPU-7 ROI results should fail" >&2
+            exit 1
+          fi
+          echo "EXPECTED: missing evidence prevents result ranking"
