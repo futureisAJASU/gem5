@@ -6,6 +6,7 @@ from m5.objects import (
     L2XBar,
     LittleMicroTAGE,
     LittleTAGE5Iso45K,
+    LittleTAGE5C3PcBiasShadow,
     LittleTAGE5Perceptron,
     LittleTAGE5PerceptronAlways,
     LittleTAGE5PerceptronPrior22,
@@ -1160,6 +1161,16 @@ class LittleV052Rv64Core(BaseCPUCore):
             tage5.instShiftAmt = effective_cond_shift
             tage5.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = tage5
+        elif bp_type.startswith("tage5-c3-pcbias-shadow-e"):
+            # C3 is SHADOW ONLY: it learns and records hypothetical
+            # corrections but MUST NOT change the G5 frontend direction.
+            candidate = LittleTAGE5C3PcBiasShadow()
+            candidate.instShiftAmt = effective_cond_shift
+            candidate.tage.instShiftAmt = effective_cond_shift
+            candidate.tage.c3PcBiasEntries = int(
+                bp_type.rsplit("-e", 1)[1]
+            )
+            cpu.branchPred.conditionalBranchPred = candidate
         elif bp_type == "tage5-perc-v1":
             tage5p = LittleTAGE5Perceptron()
             tage5p.instShiftAmt = effective_cond_shift
@@ -1804,6 +1815,9 @@ def parse_args() -> argparse.Namespace:
             "tournament",
             "tage",
             "tage5-iso45k",
+            "tage5-c3-pcbias-shadow-e64",
+            "tage5-c3-pcbias-shadow-e128",
+            "tage5-c3-pcbias-shadow-e256",
             "tage5-perc-v1",
             "tage5-perc-wm",
             "tage5-perc-always",
@@ -1819,7 +1833,9 @@ def parse_args() -> argparse.Namespace:
             "63.5-Kbit TAGE; tage5-iso45k and tage7-iso65k are "
             "budget-normalized BPU-4B geometry-audit profiles; "
             "tage5-perc-v1/wm/always are BPU-6 G5+perceptron variants; "
-            "micro-tage selects the Little v0.52 3-tagged-table family."
+            "micro-tage selects the Little v0.52 3-tagged-table family; "
+            "tage5-c3-pcbias-shadow-e* enables ONLY nonredirecting "
+            "BPU-7 C3 commit-trained residual diagnostics."
         ),
     )
 
