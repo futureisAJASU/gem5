@@ -1355,12 +1355,24 @@ TAGEBase::getOtherStorageBits() const
 }
 
 size_t
+TAGEBase::getPerceptronStorageBits() const
+{
+    if (!perceptronEnabled) {
+        return 0;
+    }
+    return static_cast<size_t>(perceptronEntries) *
+           (perceptronHistoryLength + 1) *
+           perceptronWeightBits;
+}
+
+size_t
 TAGEBase::getSizeInBits() const
 {
     return getTaggedStorageBits() +
            getBimodalStorageBits() +
            getHistoryStorageBits() +
-           getOtherStorageBits();
+           getOtherStorageBits() +
+           getPerceptronStorageBits();
 }
 
 } // namespace branch_prediction
