@@ -381,6 +381,11 @@ class TAGEBase(SimObject):
     perceptronOverrideThreshold = Param.Int(
         0, "Override TAGE on disagreement only when abs(sum) > threshold"
     )
+    perceptronTagePrior = Param.Int(
+        0,
+        "Signed prior magnitude contributed by the base TAGE direction "
+        "to the perceptron correction score; 0 preserves standalone seed",
+    )
 
 
 # TAGE branch predictor as described in https://www.jilp.org/vol8/v8paper1.pdf
@@ -465,6 +470,26 @@ class LittleTAGE5PerceptronAlwaysBase(LittleTAGE5PerceptronBase):
 
 class LittleTAGE5PerceptronAlways(TAGE):
     tage = LittleTAGE5PerceptronAlwaysBase()
+
+
+class LittleTAGE5PerceptronPrior22Base(LittleTAGE5PerceptronBase):
+    """BPU-6A V1 with an MPP-TAGE-inspired +/-22 base-prediction prior."""
+
+    perceptronTagePrior = 22
+
+
+class LittleTAGE5PerceptronPrior22(TAGE):
+    tage = LittleTAGE5PerceptronPrior22Base()
+
+
+class LittleTAGE5PerceptronWMPrior22Base(LittleTAGE5PerceptronWMBase):
+    """BPU-6A W+M gate with the same +/-22 TAGE prior."""
+
+    perceptronTagePrior = 22
+
+
+class LittleTAGE5PerceptronWMPrior22(TAGE):
+    tage = LittleTAGE5PerceptronWMPrior22Base()
 
 
 class LittleTAGE7Iso65KBase(TAGEBase):
