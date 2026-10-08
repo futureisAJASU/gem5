@@ -396,6 +396,15 @@ class TAGEBase(SimObject):
         128, "C3 PC bias entries, Round-I only: 64/128/256"
     )
 
+    # P1 alternative: independent PC direction + comparison-trained chooser.
+    # This is a research shadow, not a replacement for the C3 v0.2 matrix.
+    c3PcChooserEnabled = Param.Bool(
+        False, "Enable independent C3 PC-bias with disagreement chooser SHADOW"
+    )
+    c3PcChooserEntries = Param.Unsigned(
+        128, "C3 chooser shadow rows: 64/128/256"
+    )
+
 
 # TAGE branch predictor as described in https://www.jilp.org/vol8/v8paper1.pdf
 # The default sizes below are for the 8C-TAGE configuration (63.5 Kbits)
@@ -441,6 +450,19 @@ class LittleTAGE5Iso45K(TAGE):
     """5-tagged-table near-iso-budget comparator for micro e1024."""
 
     tage = LittleTAGE5Iso45KBase()
+
+
+class LittleTAGE5C3PcChooserShadowBase(LittleTAGE5Iso45KBase):
+    """Distinct opt-in P1: C3 independent direction plus learned chooser."""
+
+    c3PcChooserEnabled = True
+    c3PcChooserEntries = 128
+
+
+class LittleTAGE5C3PcChooserShadow(TAGE):
+    """P1 diagnostic only: G5 direction and timing always retained."""
+
+    tage = LittleTAGE5C3PcChooserShadowBase()
 
 
 class LittleTAGE5C3PcBiasShadowBase(LittleTAGE5Iso45KBase):
