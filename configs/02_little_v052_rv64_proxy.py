@@ -8,7 +8,9 @@ from m5.objects import (
     LittleTAGE5Iso45K,
     LittleTAGE5Perceptron,
     LittleTAGE5PerceptronAlways,
+    LittleTAGE5PerceptronPrior22,
     LittleTAGE5PerceptronWM,
+    LittleTAGE5PerceptronWMPrior22,
     LittleTAGE7Iso65K,
     TAGE,
     RiscvISA,
@@ -1173,6 +1175,16 @@ class LittleV052Rv64Core(BaseCPUCore):
             tage5p.instShiftAmt = effective_cond_shift
             tage5p.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = tage5p
+        elif bp_type == "tage5-perc-v1-prior22":
+            tage5p = LittleTAGE5PerceptronPrior22()
+            tage5p.instShiftAmt = effective_cond_shift
+            tage5p.tage.instShiftAmt = effective_cond_shift
+            cpu.branchPred.conditionalBranchPred = tage5p
+        elif bp_type == "tage5-perc-wm-prior22":
+            tage5p = LittleTAGE5PerceptronWMPrior22()
+            tage5p.instShiftAmt = effective_cond_shift
+            tage5p.tage.instShiftAmt = effective_cond_shift
+            cpu.branchPred.conditionalBranchPred = tage5p
         elif bp_type == "tage7-iso65k":
             tage7 = LittleTAGE7Iso65K()
             tage7.instShiftAmt = effective_cond_shift
@@ -1795,6 +1807,8 @@ def parse_args() -> argparse.Namespace:
             "tage5-perc-v1",
             "tage5-perc-wm",
             "tage5-perc-always",
+            "tage5-perc-v1-prior22",
+            "tage5-perc-wm-prior22",
             "tage7-iso65k",
             "micro-tage",
         ),
