@@ -362,6 +362,26 @@ class TAGEBase(SimObject):
         "in modern server CPUs: https://ieeexplore.ieee.org/document/9246215",
     )
 
+    # Little-v0.52 selective perceptron research controls. Disabled by
+    # default so all stock/reference TAGE configurations are unchanged.
+    perceptronEnabled = Param.Bool(False, "Enable Little selective perceptron")
+    perceptronEntries = Param.Unsigned(64, "PC-indexed perceptron rows")
+    perceptronHistoryLength = Param.Unsigned(
+        24, "Speculative TAGE global-history bits consumed by perceptron"
+    )
+    perceptronWeightBits = Param.Unsigned(6, "Signed perceptron weight width")
+    perceptronGateMode = Param.Unsigned(
+        0,
+        "0=off, 1=always, 2=weak+medium, "
+        "3=weak+medium+TAGE low-strong(strength=5)",
+    )
+    perceptronTrainThreshold = Param.Int(
+        60, "Train on wrong prediction or abs(sum) <= this threshold"
+    )
+    perceptronOverrideThreshold = Param.Int(
+        0, "Override TAGE on disagreement only when abs(sum) > threshold"
+    )
+
 
 # TAGE branch predictor as described in https://www.jilp.org/vol8/v8paper1.pdf
 # The default sizes below are for the 8C-TAGE configuration (63.5 Kbits)
@@ -407,6 +427,24 @@ class LittleTAGE5Iso45K(TAGE):
     """5-tagged-table near-iso-budget comparator for micro e1024."""
 
     tage = LittleTAGE5Iso45KBase()
+
+
+class LittleTAGE5PerceptronBase(LittleTAGE5Iso45KBase):
+    """G5 compact TAGE plus optional Little selective perceptron."""
+
+    perceptronEnabled = True
+    perceptronEntries = 64
+    perceptronHistoryLength = 24
+    perceptronWeightBits = 6
+    perceptronGateMode = 3
+    perceptronTrainThreshold = 60
+    perceptronOverrideThreshold = 0
+
+
+class LittleTAGE5Perceptron(TAGE):
+    """BPU-6 G5 + 64x24x6 selective perceptron research predictor."""
+
+    tage = LittleTAGE5PerceptronBase()
 
 
 class LittleTAGE7Iso65KBase(TAGEBase):
