@@ -288,7 +288,7 @@ def main():
         "status": "SHADOW_DIAGNOSTIC_NOT_M1",
         "no_measured_real_correction": True,
         "repo_head": head,
-        "repo_dirty": bool(git("status", "--porcelain")),
+        "repo_dirty_tracked": bool(git("status", "--porcelain", "--untracked-files=no")),
         "gem5_sha256": sha(gem5),
         "config_sha256": sha(CFG),
         "matrix_sha256": sha(matrix_file),
