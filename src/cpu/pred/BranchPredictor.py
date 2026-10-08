@@ -442,9 +442,29 @@ class LittleTAGE5PerceptronBase(LittleTAGE5Iso45KBase):
 
 
 class LittleTAGE5Perceptron(TAGE):
-    """BPU-6 G5 + 64x24x6 selective perceptron research predictor."""
+    """BPU-6 G5 + 64x24x6 SELECTIVE_GATE_V1 perceptron."""
 
     tage = LittleTAGE5PerceptronBase()
+
+
+class LittleTAGE5PerceptronWMBase(LittleTAGE5PerceptronBase):
+    """BPU-6 weak+medium-only gating ablation."""
+
+    perceptronGateMode = 2
+
+
+class LittleTAGE5PerceptronWM(TAGE):
+    tage = LittleTAGE5PerceptronWMBase()
+
+
+class LittleTAGE5PerceptronAlwaysBase(LittleTAGE5PerceptronBase):
+    """BPU-6 always-on perceptron ablation."""
+
+    perceptronGateMode = 1
+
+
+class LittleTAGE5PerceptronAlways(TAGE):
+    tage = LittleTAGE5PerceptronAlwaysBase()
 
 
 class LittleTAGE7Iso65KBase(TAGEBase):
