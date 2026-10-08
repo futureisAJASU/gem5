@@ -7,7 +7,7 @@ yet-to-be-written C1..C7 implementations. Do not use synthetic rows as results.
 Expected CSV columns:
   profile,workload,cycles,insts,committed,base_wrong,final_wrong,
   fixes,breaks,overrides,total_bits,bp_reads,bp_writes,m1_verified,
-  test_gate_pass,run_sha,artifact_sha256
+  test_gate_pass,run_sha,artifact_sha256,artifact_path
 
 Must include R0 and R1 for every workload, plus all 21 registered candidates.
 C0 is historical and not a required Round-I row.
@@ -27,7 +27,7 @@ MATRIX = ROOT / "docs" / "bpu7_sweep_matrix_v02.json"
 NUMERIC = ("cycles", "insts", "committed", "base_wrong", "final_wrong",
            "fixes", "breaks", "overrides", "total_bits", "bp_reads", "bp_writes")
 REQUIRED = {"profile", "workload", *NUMERIC, "m1_verified", "test_gate_pass",
-            "run_sha", "artifact_sha256"}
+            "run_sha", "artifact_sha256", "artifact_path"}
 
 
 def fail(message):
@@ -54,6 +54,7 @@ def read_matrix(path):
 
 def read_results(path, names, workloads, bits):
     seen = {}
+    run_shas = set()
     with path.open(newline="", encoding="utf-8") as stream:
         rd = csv.DictReader(stream)
         if not rd.fieldnames or not REQUIRED.issubset(set(rd.fieldnames)):
@@ -74,6 +75,17 @@ def read_results(path, names, workloads, bits):
                 fail(f"missing git commit SHA {key}")
             if not re.fullmatch("[0-9a-f]{64}", row["artifact_sha256"]):
                 fail(f"missing actual artifact digest {key}")
+            # Evidence hash is checked against the actual file, not only parsed.
+            rel_path = Path(row["artifact_path"])
+            if rel_path.is_absolute() or ".." in rel_path.parts or not row["artifact_path"]:
+                fail(f"unsafe or missing artifact path {key}")
+            artifact = (path.parent / rel_path).resolve()
+            if not artifact.is_file():
+                fail(f"ROI artifact missing for {key}: {artifact}")
+            actual = hashlib.sha256(artifact.read_bytes()).hexdigest()
+            if actual != row["artifact_sha256"]:
+                fail(f"ROI artifact SHA-256 mismatch {key}")
+            run_shas.add(row["run_sha"])
             for field in NUMERIC:
                 try:
                     row[field] = int(row[field])
@@ -97,6 +109,8 @@ def read_results(path, names, workloads, bits):
                 fail(f"bare TAGE baseline has incorrect auxiliary overrides {key}")
             seen[key] = row
 
+    if len(run_shas) != 1:
+        fail(f"cross-profile simulator commit mismatch: {sorted(run_shas)}")
     need = {(p, w) for p in names + ["R0", "R1"] for w in workloads}
     missing = sorted(need - set(seen))
     if missing:
