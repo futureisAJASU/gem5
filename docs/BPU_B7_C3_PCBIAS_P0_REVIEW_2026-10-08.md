@@ -12,6 +12,8 @@ Current G5 = 5 tagged-history TAGE tables, 45,736 logical persistent bits. A bra
 
 **Important prior-art boundary:** This is a small tagged exception/corrector-style implementation informed by earlier tagged branch-predictor work and the existing G5 TAGE/perceptron metadata paths, *not* a demonstrated novel predictive concept.
 
+**Primary mechanism precedent:** A. N. Eden and T. Mudge, *The YAGS Branch Prediction Scheme*, MICRO-31 (1998), pp. 69–77 ([original PDF](https://american.cs.ucdavis.edu/academic/readings/papers/yags.pdf); [University of Michigan publication registry](https://tnm.engin.umich.edu/papers/)). YAGS uses **tagged exception direction caches** to mitigate destructive aliasing. Our C3 PC_BIAS is **not a literal YAGS implementation**: it places ONE tagged residual-inversion score behind the already-frozen G5 prediction and uses a separate source-independent initial training/protection policy. The paper supports the tagged-exception *design precedent*, not C3's +2 threshold, 2-bit protection scheme or any speed/power improvement. Those remain original engineering assumptions to verify experimentally.
+
 ## 2. Concrete first-seed geometry and state accounting
 
 - Direct-mapped rows: E64/E128/E256 (CLI `--bp-type tage5-c3-pcbias-shadow-e64`, `e128`, or `e256`).
