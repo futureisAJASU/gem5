@@ -76,6 +76,8 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
       perceptronTagePrior(p.perceptronTagePrior),
       c3PcBiasEnabled(p.c3PcBiasEnabled),
       c3PcBiasEntries(p.c3PcBiasEntries),
+      c3PcChooserEnabled(p.c3PcChooserEnabled),
+      c3PcChooserEntries(p.c3PcChooserEntries),
       threadHistory(p.numThreads),
       logUResetPeriod(p.logUResetPeriod),
       initialTCounterValue(p.initialTCounterValue),
@@ -154,6 +156,18 @@ TAGEBase::init()
         cfg.entries = c3PcBiasEntries;
         cfg.pcShift = instShiftAmt;
         c3PcBias = std::make_unique<LittleC3PcBias>(cfg);
+    }
+
+    if (c3PcChooserEnabled) {
+        fatal_if(perceptronEnabled || c3PcBiasEnabled,
+                 "C3 chooser shadow must be exclusive with other auxiliaries");
+        fatal_if(c3PcChooserEntries != 64 && c3PcChooserEntries != 128 &&
+                 c3PcChooserEntries != 256,
+                 "C3 chooser P1 supports E64/E128/E256");
+        LittleC3PcChooser::Config cfg;
+        cfg.entries = c3PcChooserEntries;
+        cfg.pcShift = instShiftAmt;
+        c3PcChooser = std::make_unique<LittleC3PcChooser>(cfg);
     }
 
     useAltPredForNewlyAllocated.resize(numUseAltOnNa, 0);
@@ -713,6 +727,14 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
         }
     }
 
+    if (c3PcChooserEnabled) {
+        bi->c3PcChooserLookup = c3PcChooser->lookup(
+            branch_pc, bi->tagePred, c3PcBiasGate(bi));
+        if (bi->c3PcChooserLookup.eligible) {
+            stats.c3PcChooserReads++;
+        }
+    }
+
     return bi->finalPred;
 }
 
@@ -1233,6 +1255,31 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
             if (update.collisionBlocked) stats.c3PcBiasCollisionBlocked++;
         }
     }
+
+    if (c3PcChooserEnabled) {
+        const auto& snap = bi->c3PcChooserLookup;
+        if (snap.eligible) {
+            stats.c3PcChooserEligibleCommitted++;
+            if (snap.tagHit) stats.c3PcChooserTagHits++;
+            if (snap.disagrees) stats.c3PcChooserDisagreements++;
+            if (snap.wouldOverride) {
+                stats.c3PcChooserWouldOverride++;
+                if (snap.c3Taken == taken) {
+                    stats.c3PcChooserWouldFix++;
+                } else {
+                    stats.c3PcChooserWouldBreak++;
+                }
+            }
+            const auto u = c3PcChooser->train(snap, taken);
+            if (u.rowWrite) stats.c3PcChooserRowWrites++;
+            if (u.directionUpdated) stats.c3PcChooserDirectionUpdates++;
+            if (u.chooserUpdated) stats.c3PcChooserChooserUpdates++;
+            if (u.allocated) stats.c3PcChooserAllocations++;
+            if (u.evicted) stats.c3PcChooserEvictions++;
+            if (u.collisionBlocked) stats.c3PcChooserCollisionBlocked++;
+            if (u.stalePrediction) stats.c3PcChooserStalePredictions++;
+        }
+    }
 }
 
 unsigned
@@ -1346,6 +1393,34 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
                "C3 replaced valid tags"),
       ADD_STAT(c3PcBiasCollisionBlocked, statistics::units::Count::get(),
                "C3 tag collisions deferred by protection"),
+      ADD_STAT(c3PcChooserReads, statistics::units::Count::get(),
+               "C3 PC chooser table reads, including wrong-path"),
+      ADD_STAT(c3PcChooserEligibleCommitted, statistics::units::Count::get(),
+               "C3 chooser committed eligible conditional branches"),
+      ADD_STAT(c3PcChooserTagHits, statistics::units::Count::get(),
+               "C3 chooser valid matching PC tags"),
+      ADD_STAT(c3PcChooserDisagreements, statistics::units::Count::get(),
+               "C3 independent direction disagrees with G5"),
+      ADD_STAT(c3PcChooserWouldOverride, statistics::units::Count::get(),
+               "C3 chooser hypothetical requests, never actual redirect"),
+      ADD_STAT(c3PcChooserWouldFix, statistics::units::Count::get(),
+               "C3 chooser hypothetical corrections fixing G5"),
+      ADD_STAT(c3PcChooserWouldBreak, statistics::units::Count::get(),
+               "C3 chooser hypothetical corrections breaking G5"),
+      ADD_STAT(c3PcChooserRowWrites, statistics::units::Count::get(),
+               "C3 chooser writes including collision-protection decay"),
+      ADD_STAT(c3PcChooserDirectionUpdates, statistics::units::Count::get(),
+               "C3 independent direction updates"),
+      ADD_STAT(c3PcChooserChooserUpdates, statistics::units::Count::get(),
+               "C3 comparative disagreement chooser updates"),
+      ADD_STAT(c3PcChooserAllocations, statistics::units::Count::get(),
+               "C3 PC chooser row allocations"),
+      ADD_STAT(c3PcChooserEvictions, statistics::units::Count::get(),
+               "C3 PC chooser valid row evictions"),
+      ADD_STAT(c3PcChooserCollisionBlocked, statistics::units::Count::get(),
+               "C3 PC chooser tag conflicts deferred"),
+      ADD_STAT(c3PcChooserStalePredictions, statistics::units::Count::get(),
+               "C3 chooser previously matching but currently missing tags"),
       ADD_STAT(historyStateRecords, statistics::units::Count::get(),
                "Prediction-time TAGE history snapshots recorded"),
       ADD_STAT(historyStateRestores, statistics::units::Count::get(),
@@ -1367,7 +1442,9 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
       ADD_STAT(perceptronStorageBits, statistics::units::Count::get(),
                "Persistent Little perceptron weight bits"),
       ADD_STAT(c3PcBiasStorageBits, statistics::units::Count::get(),
-               "C3 PC-bias logical persistent state bits")
+               "C3 PC-bias logical persistent state bits"),
+      ADD_STAT(c3PcChooserStorageBits, statistics::units::Count::get(),
+               "C3 independent predictor+chooser persistent bits")
 {
     longestMatchProvider.init(nHistoryTables + 1);
     altMatchProvider.init(nHistoryTables + 1);
@@ -1388,6 +1465,8 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
         parent, &TAGEBase::getPerceptronStorageBits);
     c3PcBiasStorageBits.method(
         parent, &TAGEBase::getC3PcBiasStorageBits);
+    c3PcChooserStorageBits.method(
+        parent, &TAGEBase::getC3PcChooserStorageBits);
 }
 
 int8_t
@@ -1466,6 +1545,13 @@ TAGEBase::getC3PcBiasStorageBits() const
 }
 
 size_t
+TAGEBase::getC3PcChooserStorageBits() const
+{
+    return c3PcChooserEnabled ?
+        static_cast<size_t>(c3PcChooserEntries) * 17 : 0;
+}
+
+size_t
 TAGEBase::getSizeInBits() const
 {
     return getTaggedStorageBits() +
@@ -1473,7 +1559,8 @@ TAGEBase::getSizeInBits() const
            getHistoryStorageBits() +
            getOtherStorageBits() +
            getPerceptronStorageBits() +
-           getC3PcBiasStorageBits();
+           getC3PcBiasStorageBits() +
+           getC3PcChooserStorageBits();
 }
 
 } // namespace branch_prediction
