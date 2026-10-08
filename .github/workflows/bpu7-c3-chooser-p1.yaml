@@ -11,6 +11,7 @@ on:
       - src/cpu/pred/BranchPredictor.py
       - configs/02_little_v052_rv64_proxy.py
       - tests/bpu7/c3_pc_chooser_directed.cc
+      - scripts/bpu_b7_c3_chooser_shadow_smoke.py
   workflow_dispatch:
 
 jobs:
@@ -47,6 +48,7 @@ jobs:
         run: |
           python3 -m py_compile src/cpu/pred/BranchPredictor.py
           python3 -m py_compile configs/02_little_v052_rv64_proxy.py
+          python3 -m py_compile scripts/bpu_b7_c3_chooser_shadow_smoke.py
       - name: Verify new candidate remains a separate shadow
         run: |
           python3 - <<'PY'
