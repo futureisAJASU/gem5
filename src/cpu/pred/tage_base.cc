@@ -1235,6 +1235,30 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
                "Correct committed predictions by confidence class"),
       ADD_STAT(providerConfidenceWrong, statistics::units::Count::get(),
                "Wrong committed predictions by confidence class"),
+      ADD_STAT(finalConditionalCorrect, statistics::units::Count::get(),
+               "Committed conditional predictions correct after optional "
+               "Little perceptron correction"),
+      ADD_STAT(finalConditionalWrong, statistics::units::Count::get(),
+               "Committed conditional predictions wrong after optional "
+               "Little perceptron correction"),
+      ADD_STAT(perceptronEligiblePredictions,
+               statistics::units::Count::get(),
+               "Conditional predictions that activated Little perceptron"),
+      ADD_STAT(perceptronDisagreements,
+               statistics::units::Count::get(),
+               "Eligible perceptron predictions disagreeing with TAGE"),
+      ADD_STAT(perceptronOverrides,
+               statistics::units::Count::get(),
+               "Perceptron disagreements that overrode TAGE"),
+      ADD_STAT(perceptronWouldFix,
+               statistics::units::Count::get(),
+               "Overrides changing wrong TAGE predictions to correct"),
+      ADD_STAT(perceptronWouldBreak,
+               statistics::units::Count::get(),
+               "Overrides changing correct TAGE predictions to wrong"),
+      ADD_STAT(perceptronTrainings,
+               statistics::units::Count::get(),
+               "Perceptron weight-update events"),
       ADD_STAT(historyStateRecords, statistics::units::Count::get(),
                "Prediction-time TAGE history snapshots recorded"),
       ADD_STAT(historyStateRestores, statistics::units::Count::get(),
@@ -1252,7 +1276,9 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
       ADD_STAT(historyStorageBits, statistics::units::Count::get(),
                "Persistent global+path history bits"),
       ADD_STAT(otherStorageBits, statistics::units::Count::get(),
-               "Persistent use-alt and reset-counter bits")
+               "Persistent use-alt and reset-counter bits"),
+      ADD_STAT(perceptronStorageBits, statistics::units::Count::get(),
+               "Persistent Little perceptron weight bits")
 {
     longestMatchProvider.init(nHistoryTables + 1);
     altMatchProvider.init(nHistoryTables + 1);
@@ -1269,6 +1295,8 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
     taggedStorageBits.method(parent, &TAGEBase::getTaggedStorageBits);
     historyStorageBits.method(parent, &TAGEBase::getHistoryStorageBits);
     otherStorageBits.method(parent, &TAGEBase::getOtherStorageBits);
+    perceptronStorageBits.method(
+        parent, &TAGEBase::getPerceptronStorageBits);
 }
 
 int8_t
