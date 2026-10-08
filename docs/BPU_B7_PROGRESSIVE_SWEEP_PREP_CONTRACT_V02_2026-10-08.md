@@ -15,7 +15,7 @@ Frozen costs: G5 = 45,736 bits, G7 = 65,192 bits, cap for G5 additional persiste
 
 ## 2. R1 primary capacity sweep: all families, no exceptions
 
-Machine-readable matrix is authoritative for identifiers, geometries and exact listed storage arithmetic. **21 geometry profiles × 19 frozen workloads = 399 primary M1 ROI** (not yet run). All 21 profiles use one effective G0_AND_NATIVE_G1 candidate selector, not two independent gates. G0: weak OR medium OR signed3 tagged-provider strength5 (BPU-5D). G1: candidate valid/trust/score confidence, specified and frozen at P0. Track native feature updates and training separately even if prediction read gate is closed.
+Machine-readable matrix is authoritative for identifiers, geometries and exact listed storage arithmetic. **21 geometry profiles × 19 frozen workloads = 399 primary M1 ROI** (not yet run). All 21 profiles use one effective G0_AND_NATIVE_G1 correction selector, not two independent runs. **G0 is the pre-read request/wake gate** (weak OR medium OR signed3 tagged-provider strength5 from BPU-5D). **G1 is a post-read native acceptance test** (tag valid / trained counter / candidate confidence); G1 cannot suppress the read needed to obtain its own value. Tracker and training updates must be counted separately even if G0 closes the predictor read. Before a whole mechanism is eliminated, R2 must consider a bounded candidate-specific, genuinely pre-read admission alternative (e.g. known backward-branch type for loop/IMLI), so the shared G0 does not predetermine failure of a mechanism with strong-confidence residuals.
 
 | Family | First-round geometry points | Extra persistent bits as currently listed |
 | --- | --- | --- |
