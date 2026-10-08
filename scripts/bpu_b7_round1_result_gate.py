@@ -55,6 +55,7 @@ def read_matrix(path):
 def read_results(path, names, workloads, bits):
     seen = {}
     run_shas = set()
+    artifact_paths = set()
     with path.open(newline="", encoding="utf-8") as stream:
         rd = csv.DictReader(stream)
         if not rd.fieldnames or not REQUIRED.issubset(set(rd.fieldnames)):
@@ -82,6 +83,9 @@ def read_results(path, names, workloads, bits):
             artifact = (path.parent / rel_path).resolve()
             if not artifact.is_file():
                 fail(f"ROI artifact missing for {key}: {artifact}")
+            if artifact in artifact_paths:
+                fail(f"same ROI artifact reused by multiple profile/workload rows: {artifact}")
+            artifact_paths.add(artifact)
             actual = hashlib.sha256(artifact.read_bytes()).hexdigest()
             if actual != row["artifact_sha256"]:
                 fail(f"ROI artifact SHA-256 mismatch {key}")
