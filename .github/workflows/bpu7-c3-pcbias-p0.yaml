@@ -13,6 +13,7 @@ on:
       - tests/bpu7/c3_pc_bias_directed.cc
       - scripts/bpu_b7_c3_shadow_smoke.py
       - scripts/bpu_b7_c3_shadow_full19.py
+      - tests/bpu7/test_c3_shadow_runner.py
       - docs/BPU_B7_C3_PCBIAS_P0_REVIEW_2026-10-08.md
   workflow_dispatch:
 
@@ -48,6 +49,10 @@ jobs:
           python3 -m py_compile configs/02_little_v052_rv64_proxy.py
           python3 -m py_compile scripts/bpu_b7_c3_shadow_smoke.py
           python3 -m py_compile scripts/bpu_b7_c3_shadow_full19.py
+      - name: Reproduce real gem5 stats terminator and resume prior ROI
+        run: |
+          python3 -m unittest discover -s tests/bpu7 \
+              -p 'test_c3_shadow_runner.py' -v
       - name: Check complete C3 shadow matrix (95 jobs, not 152 M1)
         run: |
           python3 scripts/bpu_b7_c3_shadow_full19.py --list > /tmp/bpu7_c3_list.txt
