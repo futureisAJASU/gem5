@@ -387,6 +387,15 @@ class TAGEBase(SimObject):
         "to the perceptron correction score; 0 preserves standalone seed",
     )
 
+    # BPU-7 C3 PC_BIAS: G5-aligned SHADOW ONLY. No M0 or M1 redirect.
+    # Direct-mapped valid/tag/score/collision-protection: 16 bits per row.
+    c3PcBiasEnabled = Param.Bool(
+        False, "BPU-7 C3 tagged PC-bias shadow diagnostics"
+    )
+    c3PcBiasEntries = Param.Unsigned(
+        128, "C3 PC bias entries, Round-I only: 64/128/256"
+    )
+
 
 # TAGE branch predictor as described in https://www.jilp.org/vol8/v8paper1.pdf
 # The default sizes below are for the 8C-TAGE configuration (63.5 Kbits)
@@ -432,6 +441,19 @@ class LittleTAGE5Iso45K(TAGE):
     """5-tagged-table near-iso-budget comparator for micro e1024."""
 
     tage = LittleTAGE5Iso45KBase()
+
+
+class LittleTAGE5C3PcBiasShadowBase(LittleTAGE5Iso45KBase):
+    """G5 with C3 PC-tagged residual lookup/commit training, NO correction."""
+
+    c3PcBiasEnabled = True
+    c3PcBiasEntries = 128
+
+
+class LittleTAGE5C3PcBiasShadow(TAGE):
+    """BPU-7 C3 experiment preparation only; never report M1 cycles."""
+
+    tage = LittleTAGE5C3PcBiasShadowBase()
 
 
 class LittleTAGE5PerceptronBase(LittleTAGE5Iso45KBase):
