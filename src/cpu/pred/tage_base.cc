@@ -669,7 +669,9 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
             bi->selectedProviderBank, bi->providerStrength,
             bi->providerConfidence);
 
-    return bi->tagePred;
+    perceptronPredict(tid, branch_pc, bi);
+
+    return bi->finalPred;
 }
 
 void
