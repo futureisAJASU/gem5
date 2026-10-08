@@ -453,6 +453,109 @@ TAGEBase::getUseAltIdx(BranchInfo* bi, Addr branch_pc)
 }
 
 bool
+TAGEBase::perceptronGate(const BranchInfo* bi) const
+{
+    if (!perceptronEnabled) {
+        return false;
+    }
+
+    switch (perceptronGateMode) {
+      case 1:
+        return true;
+      case 2:
+        return bi->providerConfidence != CONFIDENCE_STRONG;
+      case 3:
+        return bi->providerConfidence != CONFIDENCE_STRONG ||
+               bi->providerStrength == 5;
+      default:
+        return false;
+    }
+}
+
+int8_t
+TAGEBase::saturatePerceptronWeight(int value) const
+{
+    const int minValue = -(1 << (perceptronWeightBits - 1));
+    const int maxValue = (1 << (perceptronWeightBits - 1)) - 1;
+    if (value < minValue) {
+        value = minValue;
+    } else if (value > maxValue) {
+        value = maxValue;
+    }
+    return static_cast<int8_t>(value);
+}
+
+void
+TAGEBase::perceptronPredict(ThreadID tid, Addr branch_pc, BranchInfo* bi)
+{
+    bi->finalPred = bi->tagePred;
+    if (!perceptronEnabled || !perceptronGate(bi)) {
+        return;
+    }
+
+    bi->perceptronEligible = true;
+    bi->perceptronIndex =
+        (branch_pc >> instShiftAmt) & (perceptronEntries - 1);
+
+    const size_t row =
+        bi->perceptronIndex * (perceptronHistoryLength + 1);
+    int sum = perceptronWeights[row];
+    uint64_t historyBits = 0;
+
+    const ThreadHistory& tHist = threadHistory[tid];
+    for (unsigned i = 0; i < perceptronHistoryLength; ++i) {
+        const bool histTaken =
+            tHist.globalHist.at(tHist.ptGhist + i) & 0x1;
+        if (histTaken) {
+            historyBits |= (1ULL << i);
+            sum += perceptronWeights[row + i + 1];
+        } else {
+            sum -= perceptronWeights[row + i + 1];
+        }
+    }
+
+    bi->perceptronHistoryBits = historyBits;
+    bi->perceptronSum = sum;
+    bi->perceptronPred = sum >= 0;
+    bi->perceptronOverride =
+        bi->perceptronPred != bi->tagePred &&
+        std::abs(sum) > perceptronOverrideThreshold;
+
+    if (bi->perceptronOverride) {
+        bi->finalPred = bi->perceptronPred;
+    }
+}
+
+void
+TAGEBase::perceptronTrain(bool taken, BranchInfo* bi)
+{
+    if (!perceptronEnabled || !bi->perceptronEligible) {
+        return;
+    }
+
+    if (bi->perceptronPred == taken &&
+        std::abs(bi->perceptronSum) > perceptronTrainThreshold) {
+        return;
+    }
+
+    const int delta = taken ? 1 : -1;
+    const size_t row =
+        bi->perceptronIndex * (perceptronHistoryLength + 1);
+
+    perceptronWeights[row] =
+        saturatePerceptronWeight(perceptronWeights[row] + delta);
+
+    for (unsigned i = 0; i < perceptronHistoryLength; ++i) {
+        const bool histTaken = (bi->perceptronHistoryBits >> i) & 0x1;
+        const int featureDelta = histTaken ? delta : -delta;
+        perceptronWeights[row + i + 1] = saturatePerceptronWeight(
+            perceptronWeights[row + i + 1] + featureDelta);
+    }
+
+    stats.perceptronTrainings++;
+}
+
+bool
 TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
               bool cond_branch, BranchInfo* bi)
 {
