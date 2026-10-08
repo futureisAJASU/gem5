@@ -156,9 +156,18 @@ class TAGEBase : public SimObject
         int bimodalIndex;
 
         bool tagePred;
+        bool finalPred;
         bool altTaken;
         bool longestMatchPred;
         bool pseudoNewAlloc;
+
+        // Optional Little selective-perceptron prediction-time metadata.
+        bool perceptronEligible;
+        bool perceptronPred;
+        bool perceptronOverride;
+        unsigned perceptronIndex;
+        int perceptronSum;
+        uint64_t perceptronHistoryBits;
 
         // Pointer to dynamically allocated storage
         // to save table indices and folded histories.
@@ -197,9 +206,15 @@ class TAGEBase : public SimObject
               hitBank(0), hitBankIndex(0),
               altBank(0), altBankIndex(0),
               bimodalIndex(0),
-              tagePred(false), altTaken(false),
+              tagePred(false), finalPred(false), altTaken(false),
               longestMatchPred(false),
               pseudoNewAlloc(false),
+              perceptronEligible(false),
+              perceptronPred(false),
+              perceptronOverride(false),
+              perceptronIndex(0),
+              perceptronSum(0),
+              perceptronHistoryBits(0),
               provider(-1),
               selectedProviderBank(0),
               providerConfidence(CONFIDENCE_WEAK),
@@ -501,6 +516,7 @@ class TAGEBase : public SimObject
     size_t getTaggedStorageBits() const;
     size_t getHistoryStorageBits() const;
     size_t getOtherStorageBits() const;
+    size_t getPerceptronStorageBits() const;
 
   protected:
     const unsigned logRatioBiModalHystEntries;
@@ -520,6 +536,16 @@ class TAGEBase : public SimObject
     // When nonzero, index folding/mixing uses this fixed width while the
     // final table index is still masked to each physical table's capacity.
     const unsigned fixedIndexHashLogSize;
+
+    // Little selective perceptron research structure. Disabled by default.
+    const bool perceptronEnabled;
+    const unsigned perceptronEntries;
+    const unsigned perceptronHistoryLength;
+    const unsigned perceptronWeightBits;
+    const unsigned perceptronGateMode;
+    const int perceptronTrainThreshold;
+    const int perceptronOverrideThreshold;
+    std::vector<int8_t> perceptronWeights;
 
     std::vector<bool> btablePrediction;
     std::vector<bool> btableHysteresis;
@@ -584,6 +610,11 @@ class TAGEBase : public SimObject
 
     bool initialized;
 
+    bool perceptronGate(const BranchInfo* bi) const;
+    void perceptronPredict(ThreadID tid, Addr branch_pc, BranchInfo* bi);
+    void perceptronTrain(bool taken, BranchInfo* bi);
+    int8_t saturatePerceptronWeight(int value) const;
+
     struct TAGEBaseStats : public statistics::Group
     {
         TAGEBaseStats(TAGEBase *parent, unsigned nHistoryTables);
@@ -612,6 +643,16 @@ class TAGEBase : public SimObject
         statistics::Vector providerConfidenceCorrect;
         statistics::Vector providerConfidenceWrong;
 
+        // Little selective-perceptron commit-time instrumentation.
+        statistics::Scalar finalConditionalCorrect;
+        statistics::Scalar finalConditionalWrong;
+        statistics::Scalar perceptronEligiblePredictions;
+        statistics::Scalar perceptronDisagreements;
+        statistics::Scalar perceptronOverrides;
+        statistics::Scalar perceptronWouldFix;
+        statistics::Scalar perceptronWouldBreak;
+        statistics::Scalar perceptronTrainings;
+
         // Directed-correctness audit counters.
         statistics::Scalar historyStateRecords;
         statistics::Scalar historyStateRestores;
@@ -625,6 +666,7 @@ class TAGEBase : public SimObject
         statistics::Value taggedStorageBits;
         statistics::Value historyStorageBits;
         statistics::Value otherStorageBits;
+        statistics::Value perceptronStorageBits;
     } stats;
 };
 
