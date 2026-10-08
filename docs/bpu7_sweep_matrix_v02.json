@@ -1,0 +1,514 @@
+{
+  "schema": "little-v052-bpu7-sweep-v0.2",
+  "status": "PRE_FREEZE",
+  "execution_permitted": false,
+  "created_kst": "2026-10-08",
+  "repo": "futureisAJASU/gem5",
+  "base_branch": "little-v052-bpu",
+  "source_sha_at_planning": "986c8c6a09175f0a382d6bbeffa67163a0780315",
+  "frozen_baselines": {
+    "G5_bits": 45736,
+    "G7_bits": 65192,
+    "gap_bits": 19456,
+    "C0_bits": 9600
+  },
+  "condition": {
+    "cond_index_shift": 1,
+    "btb_index_shift": 2,
+    "indirect_index_shift": 1,
+    "btb_proxy_entries": 4096,
+    "ras": 16
+  },
+  "analysis_policy": {
+    "primary_timing": "M1",
+    "aux_correction_latency_cycles": 1,
+    "m0": "algorithmic_only",
+    "m2": "latency_sensitivity",
+    "candidate_family_elimination": "realistic_full19_only",
+    "oracle_only_elimination": false,
+    "training_selector_rule": "FREEZE_AT_P0",
+    "no_posthoc_tuning": true
+  },
+  "required_p0_closures": [
+    "FROZEN_SEMANTICS_PER_FAMILY",
+    "EXACT_SELECTOR_TRAINING_INITIAL_STATE",
+    "FINITE_SPECULATIVE_UPDATE_ROLLBACK",
+    "M1_FRONTEND_LATE_REDIRECT_PROOF",
+    "COMPLETE_PERSISTENT_AND_TRANSIENT_BITS",
+    "EXACT_HASH_TAG_INDEX_FORMULAE",
+    "DIRECTED_TESTS_AND_BASELINE_EQUIVALENCE",
+    "EXTERNAL_VALIDATION_CORPUS_DEFINED_OR_LIMITATION_ACKNOWLEDGED"
+  ],
+  "workloads": [
+    "aha-mont64",
+    "crc32",
+    "cubic",
+    "edn",
+    "huffbench",
+    "matmult-int",
+    "minver",
+    "nbody",
+    "nettle-aes",
+    "nettle-sha256",
+    "nsichneu",
+    "picojpeg",
+    "qrduino",
+    "sglib-combined",
+    "slre",
+    "st",
+    "statemate",
+    "ud",
+    "wikisort"
+  ],
+  "profiles": [
+    {
+      "id": "C1_E64",
+      "family": "C1",
+      "mode": "base",
+      "geometry": {
+        "entries": 64,
+        "entry_bits": 38,
+        "tag_bits": 10,
+        "trip_bits": 10,
+        "iteration_bits": 10,
+        "confidence_bits": 3,
+        "age_bits": 2
+      },
+      "aux_bits_expected": 2432,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C1_E128",
+      "family": "C1",
+      "mode": "base",
+      "geometry": {
+        "entries": 128,
+        "entry_bits": 38,
+        "tag_bits": 10,
+        "trip_bits": 10,
+        "iteration_bits": 10,
+        "confidence_bits": 3,
+        "age_bits": 2
+      },
+      "aux_bits_expected": 4864,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C1_E256",
+      "family": "C1",
+      "mode": "base",
+      "geometry": {
+        "entries": 256,
+        "entry_bits": 38,
+        "tag_bits": 10,
+        "trip_bits": 10,
+        "iteration_bits": 10,
+        "confidence_bits": 3,
+        "age_bits": 2
+      },
+      "aux_bits_expected": 9728,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C2_L64_P256",
+      "family": "C2",
+      "mode": "base",
+      "geometry": {
+        "local_history_entries": 64,
+        "local_history_bits": 10,
+        "pht_entries": 256,
+        "pht_counter_bits": 2
+      },
+      "aux_bits_expected": 1152,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C2_L128_P512",
+      "family": "C2",
+      "mode": "base",
+      "geometry": {
+        "local_history_entries": 128,
+        "local_history_bits": 10,
+        "pht_entries": 512,
+        "pht_counter_bits": 2
+      },
+      "aux_bits_expected": 2304,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C2_L256_P1024",
+      "family": "C2",
+      "mode": "base",
+      "geometry": {
+        "local_history_entries": 256,
+        "local_history_bits": 10,
+        "pht_entries": 1024,
+        "pht_counter_bits": 2
+      },
+      "aux_bits_expected": 4608,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C3_PC_BIAS_E64",
+      "family": "C3",
+      "mode": "PC_BIAS",
+      "geometry": {
+        "entries": 64,
+        "entry_bits": 16,
+        "valid_bits": 1,
+        "tag_bits": 10,
+        "residual_counter_bits": 3,
+        "replacement_bits": 2
+      },
+      "aux_bits_expected": 1024,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C3_PC_BIAS_E128",
+      "family": "C3",
+      "mode": "PC_BIAS",
+      "geometry": {
+        "entries": 128,
+        "entry_bits": 16,
+        "valid_bits": 1,
+        "tag_bits": 10,
+        "residual_counter_bits": 3,
+        "replacement_bits": 2
+      },
+      "aux_bits_expected": 2048,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C3_PC_BIAS_E256",
+      "family": "C3",
+      "mode": "PC_BIAS",
+      "geometry": {
+        "entries": 256,
+        "entry_bits": 16,
+        "valid_bits": 1,
+        "tag_bits": 10,
+        "residual_counter_bits": 3,
+        "replacement_bits": 2
+      },
+      "aux_bits_expected": 4096,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C3_HIST_TAG_E64",
+      "family": "C3",
+      "mode": "HIST_TAG",
+      "geometry": {
+        "entries": 64,
+        "entry_bits": 16,
+        "valid_bits": 1,
+        "tag_bits": 10,
+        "residual_counter_bits": 3,
+        "replacement_bits": 2
+      },
+      "aux_bits_expected": 1024,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C3_HIST_TAG_E128",
+      "family": "C3",
+      "mode": "HIST_TAG",
+      "geometry": {
+        "entries": 128,
+        "entry_bits": 16,
+        "valid_bits": 1,
+        "tag_bits": 10,
+        "residual_counter_bits": 3,
+        "replacement_bits": 2
+      },
+      "aux_bits_expected": 2048,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C3_HIST_TAG_E256",
+      "family": "C3",
+      "mode": "HIST_TAG",
+      "geometry": {
+        "entries": 256,
+        "entry_bits": 16,
+        "valid_bits": 1,
+        "tag_bits": 10,
+        "residual_counter_bits": 3,
+        "replacement_bits": 2
+      },
+      "aux_bits_expected": 4096,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C4_E128",
+      "family": "C4",
+      "mode": "base",
+      "geometry": {
+        "banks": 4,
+        "entries_per_bank": 128,
+        "bank_counter_bits": 5,
+        "bias_entries": 128,
+        "bias_counter_bits": 3,
+        "history_lengths": [
+          0,
+          8,
+          24,
+          64
+        ]
+      },
+      "aux_bits_expected": 2944,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C4_E256",
+      "family": "C4",
+      "mode": "base",
+      "geometry": {
+        "banks": 4,
+        "entries_per_bank": 256,
+        "bank_counter_bits": 5,
+        "bias_entries": 256,
+        "bias_counter_bits": 3,
+        "history_lengths": [
+          0,
+          8,
+          24,
+          64
+        ]
+      },
+      "aux_bits_expected": 5888,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C4_E512",
+      "family": "C4",
+      "mode": "base",
+      "geometry": {
+        "banks": 4,
+        "entries_per_bank": 512,
+        "bank_counter_bits": 5,
+        "bias_entries": 512,
+        "bias_counter_bits": 3,
+        "history_lengths": [
+          0,
+          8,
+          24,
+          64
+        ]
+      },
+      "aux_bits_expected": 11776,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C5_E128",
+      "family": "C5",
+      "mode": "base",
+      "geometry": {
+        "banks": 4,
+        "entries_per_bank": 128,
+        "bank_weight_bits": 5,
+        "local_history_entries": 32,
+        "local_history_bits": 6,
+        "backward_history_bits": 16,
+        "features": [
+          "global8",
+          "global64",
+          "local6",
+          "backward16"
+        ]
+      },
+      "aux_bits_expected": 2768,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C5_E256",
+      "family": "C5",
+      "mode": "base",
+      "geometry": {
+        "banks": 4,
+        "entries_per_bank": 256,
+        "bank_weight_bits": 5,
+        "local_history_entries": 32,
+        "local_history_bits": 6,
+        "backward_history_bits": 16,
+        "features": [
+          "global8",
+          "global64",
+          "local6",
+          "backward16"
+        ]
+      },
+      "aux_bits_expected": 5328,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C5_E512",
+      "family": "C5",
+      "mode": "base",
+      "geometry": {
+        "banks": 4,
+        "entries_per_bank": 512,
+        "bank_weight_bits": 5,
+        "local_history_entries": 32,
+        "local_history_bits": 6,
+        "backward_history_bits": 16,
+        "features": [
+          "global8",
+          "global64",
+          "local6",
+          "backward16"
+        ]
+      },
+      "aux_bits_expected": 10448,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C7_E256",
+      "family": "C7",
+      "mode": "base",
+      "geometry": {
+        "entries": 256,
+        "counter_bits": 5,
+        "imlico_bits": 8,
+        "imli_valid_bits": 1
+      },
+      "aux_bits_expected": 1289,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C7_E512",
+      "family": "C7",
+      "mode": "base",
+      "geometry": {
+        "entries": 512,
+        "counter_bits": 5,
+        "imlico_bits": 8,
+        "imli_valid_bits": 1
+      },
+      "aux_bits_expected": 2569,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    },
+    {
+      "id": "C7_E1024",
+      "family": "C7",
+      "mode": "base",
+      "geometry": {
+        "entries": 1024,
+        "counter_bits": 5,
+        "imlico_bits": 8,
+        "imli_valid_bits": 1
+      },
+      "aux_bits_expected": 5129,
+      "gates": [
+        "G0",
+        "G1"
+      ],
+      "timing_primary": "M1",
+      "status": "PRE_FREEZE_UNIMPLEMENTED"
+    }
+  ],
+  "expected": {
+    "families": 6,
+    "profiles": 21,
+    "roi_first_pass": 399
+  }
+}
