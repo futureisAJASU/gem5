@@ -545,6 +545,7 @@ class TAGEBase : public SimObject
     const unsigned perceptronGateMode;
     const int perceptronTrainThreshold;
     const int perceptronOverrideThreshold;
+    const int perceptronTagePrior;
     std::vector<int8_t> perceptronWeights;
 
     std::vector<bool> btablePrediction;
