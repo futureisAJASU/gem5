@@ -6,6 +6,9 @@ from m5.objects import (
     L2XBar,
     LittleMicroTAGE,
     LittleTAGE5Iso45K,
+    LittleTAGE5Perceptron,
+    LittleTAGE5PerceptronAlways,
+    LittleTAGE5PerceptronWM,
     LittleTAGE7Iso65K,
     TAGE,
     RiscvISA,
@@ -1155,6 +1158,21 @@ class LittleV052Rv64Core(BaseCPUCore):
             tage5.instShiftAmt = effective_cond_shift
             tage5.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = tage5
+        elif bp_type == "tage5-perc-v1":
+            tage5p = LittleTAGE5Perceptron()
+            tage5p.instShiftAmt = effective_cond_shift
+            tage5p.tage.instShiftAmt = effective_cond_shift
+            cpu.branchPred.conditionalBranchPred = tage5p
+        elif bp_type == "tage5-perc-wm":
+            tage5p = LittleTAGE5PerceptronWM()
+            tage5p.instShiftAmt = effective_cond_shift
+            tage5p.tage.instShiftAmt = effective_cond_shift
+            cpu.branchPred.conditionalBranchPred = tage5p
+        elif bp_type == "tage5-perc-always":
+            tage5p = LittleTAGE5PerceptronAlways()
+            tage5p.instShiftAmt = effective_cond_shift
+            tage5p.tage.instShiftAmt = effective_cond_shift
+            cpu.branchPred.conditionalBranchPred = tage5p
         elif bp_type == "tage7-iso65k":
             tage7 = LittleTAGE7Iso65K()
             tage7.instShiftAmt = effective_cond_shift
@@ -1774,6 +1792,9 @@ def parse_args() -> argparse.Namespace:
             "tournament",
             "tage",
             "tage5-iso45k",
+            "tage5-perc-v1",
+            "tage5-perc-wm",
+            "tage5-perc-always",
             "tage7-iso65k",
             "micro-tage",
         ),
@@ -1783,6 +1804,7 @@ def parse_args() -> argparse.Namespace:
             "historical proxy; tage selects gem5 stock 8-component "
             "63.5-Kbit TAGE; tage5-iso45k and tage7-iso65k are "
             "budget-normalized BPU-4B geometry-audit profiles; "
+            "tage5-perc-v1/wm/always are BPU-6 G5+perceptron variants; "
             "micro-tage selects the Little v0.52 3-tagged-table family."
         ),
     )
