@@ -1,0 +1,56 @@
+name: BPU-7 C3 PC_BIAS P0 Directed Tests
+
+on:
+  push:
+    branches: [little-v052-bpu7-c3-pcbias-p0]
+    paths:
+      - .github/workflows/bpu7-c3-pcbias-p0.yaml
+      - src/cpu/pred/little_c3_pc_bias.hh
+      - src/cpu/pred/tage_base.hh
+      - src/cpu/pred/tage_base.cc
+      - src/cpu/pred/BranchPredictor.py
+      - configs/02_little_v052_rv64_proxy.py
+      - tests/bpu7/c3_pc_bias_directed.cc
+      - docs/BPU_B7_C3_PCBIAS_P0_REVIEW_2026-10-08.md
+  workflow_dispatch:
+
+jobs:
+  c3-standalone-state-machine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Compile C3 production header with warnings as errors
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -pedantic -O2 \
+              -Isrc tests/bpu7/c3_pc_bias_directed.cc \
+              -o /tmp/c3_pc_bias_directed
+      - name: Run real finite-state C++ directed tests
+        run: /tmp/c3_pc_bias_directed
+      - name: Syntax-check gem5 Python SimObject and CLI registration
+        run: |
+          python3 -m py_compile src/cpu/pred/BranchPredictor.py
+          python3 -m py_compile configs/02_little_v052_rv64_proxy.py
+      - name: Check C3 remains shadow-only and gated for M1
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c = Path("src/cpu/pred/tage_base.cc").read_text()
+          d = Path("src/cpu/pred/BranchPredictor.py").read_text()
+          p = Path("configs/02_little_v052_rv64_proxy.py").read_text()
+          start = c.index("    // Shadow-only: actual return")
+          end = c.index("    return bi->finalPred;", start)
+          shadow = c[start:end]
+          assert "bi->finalPred =" not in shadow, "C3 MUST NOT redirect in P0"
+          assert "c3PcBias->lookup(" in shadow
+          assert "c3PcBias->train(snap, bi->tagePred != taken)" in c
+          assert 'c3PcBiasEnabled = Param.Bool(' in d
+          for suffix in ("64", "128", "256"):
+              assert f"tage5-c3-pcbias-shadow-e{suffix}" in p
+          assert "c3PcBiasEntries) * 16" in c
+          print("BPU7_C3_SHADOW_NO_M1_REDIRECT=PASS")
+          PY
+      - name: Check source whitespace
+        run: git diff HEAD^ HEAD --check
