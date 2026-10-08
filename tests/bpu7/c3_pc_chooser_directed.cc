@@ -134,6 +134,26 @@ testAliasingAndStaleSnapshot()
 }
 
 static void
+testStaleTagCannotUpdateEvictedChooser()
+{
+    LittleC3PcChooser c({64, 1, 10, 2, 3});
+    constexpr uint64_t a = 0x200, b = a + 128;
+    c.train(c.lookup(a, true, true), false);
+    const auto savedA = c.lookup(a, true, true);
+    assert(savedA.tagHit);
+    const auto installB = c.train(c.lookup(b, true, true), true);
+    assert(installB.allocated && installB.evicted);
+    // An already in-flight prediction for A now sees B's tag in the row.
+    // It must NOT update B's chooser using a saved A prediction.
+    const auto u = c.train(savedA, false);
+    assert(u.stalePrediction);
+    assert(!u.chooserUpdated);
+    assert(u.allocated && u.evicted); // replaces B, whose protection was 0
+    const auto nextA = c.lookup(a, true, true);
+    assert(nextA.tagHit && nextA.chooserCount == 1);
+}
+
+static void
 testSaturationAndConfiguration()
 {
     LittleC3PcChooser c({256, 1, 10, 2, 3});
@@ -164,5 +184,6 @@ main()
     testColdBiasLearnsTakenAndNotTaken();
     testGateDoesNotReadOrTrain();
     testAliasingAndStaleSnapshot();
+    testStaleTagCannotUpdateEvictedChooser();
     testSaturationAndConfiguration();
 }
