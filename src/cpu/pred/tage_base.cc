@@ -66,6 +66,13 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
       tagTableTagWidths(p.tagTableTagWidths),
       logTagTableSizes(p.logTagTableSizes),
       fixedIndexHashLogSize(p.fixedIndexHashLogSize),
+      perceptronEnabled(p.perceptronEnabled),
+      perceptronEntries(p.perceptronEntries),
+      perceptronHistoryLength(p.perceptronHistoryLength),
+      perceptronWeightBits(p.perceptronWeightBits),
+      perceptronGateMode(p.perceptronGateMode),
+      perceptronTrainThreshold(p.perceptronTrainThreshold),
+      perceptronOverrideThreshold(p.perceptronOverrideThreshold),
       threadHistory(p.numThreads),
       logUResetPeriod(p.logUResetPeriod),
       initialTCounterValue(p.initialTCounterValue),
@@ -111,6 +118,27 @@ TAGEBase::init()
     tCounter = initialTCounterValue;
 
     assert(histBufferSize > maxHist * 3);
+
+    if (perceptronEnabled) {
+        fatal_if(perceptronEntries == 0 ||
+                 (perceptronEntries & (perceptronEntries - 1)),
+                 "perceptronEntries must be a non-zero power of two");
+        fatal_if(perceptronHistoryLength == 0 ||
+                 perceptronHistoryLength > 64,
+                 "perceptronHistoryLength must be in [1,64]");
+        fatal_if(perceptronHistoryLength > maxHist,
+                 "perceptronHistoryLength (%u) exceeds TAGE maxHist (%u)",
+                 perceptronHistoryLength, maxHist);
+        fatal_if(perceptronWeightBits < 2 || perceptronWeightBits > 8,
+                 "perceptronWeightBits must be in [2,8]");
+        fatal_if(perceptronGateMode < 1 || perceptronGateMode > 3,
+                 "perceptronGateMode must be 1(always), 2(W+M), or 3(V1)");
+        fatal_if(perceptronTrainThreshold < 0 ||
+                 perceptronOverrideThreshold < 0,
+                 "perceptron thresholds must be non-negative");
+        perceptronWeights.assign(
+            perceptronEntries * (perceptronHistoryLength + 1), 0);
+    }
 
     useAltPredForNewlyAllocated.resize(numUseAltOnNa, 0);
 
