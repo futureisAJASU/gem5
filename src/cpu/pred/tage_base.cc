@@ -73,6 +73,7 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
       perceptronGateMode(p.perceptronGateMode),
       perceptronTrainThreshold(p.perceptronTrainThreshold),
       perceptronOverrideThreshold(p.perceptronOverrideThreshold),
+      perceptronTagePrior(p.perceptronTagePrior),
       threadHistory(p.numThreads),
       logUResetPeriod(p.logUResetPeriod),
       initialTCounterValue(p.initialTCounterValue),
@@ -134,8 +135,9 @@ TAGEBase::init()
         fatal_if(perceptronGateMode < 1 || perceptronGateMode > 3,
                  "perceptronGateMode must be 1(always), 2(W+M), or 3(V1)");
         fatal_if(perceptronTrainThreshold < 0 ||
-                 perceptronOverrideThreshold < 0,
-                 "perceptron thresholds must be non-negative");
+                 perceptronOverrideThreshold < 0 ||
+                 perceptronTagePrior < 0,
+                 "perceptron thresholds/prior must be non-negative");
         perceptronWeights.assign(
             perceptronEntries * (perceptronHistoryLength + 1), 0);
     }
@@ -515,6 +517,14 @@ TAGEBase::perceptronPredict(ThreadID tid, Addr branch_pc, BranchInfo* bi)
     }
 
     bi->perceptronHistoryBits = historyBits;
+
+    // BPU-6A may give the already-trained TAGE direction an explicit prior
+    // vote before the compact perceptron is allowed to overturn it.  A zero
+    // prior exactly preserves the BPU-6 standalone-perceptron seed.
+    if (perceptronTagePrior > 0) {
+        sum += bi->tagePred ? perceptronTagePrior : -perceptronTagePrior;
+    }
+
     bi->perceptronSum = sum;
     bi->perceptronPred = sum >= 0;
     bi->perceptronOverride =
