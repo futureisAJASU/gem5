@@ -1069,6 +1069,27 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
     stats.selectedProviderBank[bi->selectedProviderBank]++;
     stats.providerConfidence[bi->providerConfidence]++;
 
+    if (bi->finalPred == taken) {
+        stats.finalConditionalCorrect++;
+    } else {
+        stats.finalConditionalWrong++;
+    }
+
+    if (perceptronEnabled && bi->perceptronEligible) {
+        stats.perceptronEligiblePredictions++;
+        if (bi->perceptronPred != bi->tagePred) {
+            stats.perceptronDisagreements++;
+        }
+        if (bi->perceptronOverride) {
+            stats.perceptronOverrides++;
+            if (bi->tagePred != taken && bi->finalPred == taken) {
+                stats.perceptronWouldFix++;
+            } else if (bi->tagePred == taken && bi->finalPred != taken) {
+                stats.perceptronWouldBreak++;
+            }
+        }
+    }
+
     // Research-only trace of every committed conditional branch. Disabled
     // unless TageResearchAll is explicitly enabled. This captures the
     // prediction-time metadata already checked above and never changes
@@ -1143,6 +1164,8 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
         stats.altMatchProvider[bi->altBank]++;
         break;
     }
+
+    perceptronTrain(taken, bi);
 }
 
 unsigned
