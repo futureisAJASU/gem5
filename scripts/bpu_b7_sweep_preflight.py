@@ -79,7 +79,24 @@ def validate(matrix):
     assert len(profiles) == 21, "Expected 21 primary geometry profiles"
     assert Counter(p["family"] for p in profiles) == FAMILY_COUNT
     assert len({p["id"] for p in profiles}) == 21
-    assert {p["mode"] for p in profiles if p["family"] == "C3"} == {"PC_BIAS", "HIST_TAG"}
+    assert Counter(p["mode"] for p in profiles if p["family"] == "C3") == {
+        "PC_BIAS": 3, "HIST_TAG": 3,
+    }, "C3 must have exactly three capacity levels in each mode"
+    expected_ids = {
+        "C1_E64", "C1_E128", "C1_E256",
+        "C2_L64_P256", "C2_L128_P512", "C2_L256_P1024",
+        "C3_PC_BIAS_E64", "C3_PC_BIAS_E128", "C3_PC_BIAS_E256",
+        "C3_HIST_TAG_E64", "C3_HIST_TAG_E128", "C3_HIST_TAG_E256",
+        "C4_E128", "C4_E256", "C4_E512",
+        "C5_E128", "C5_E256", "C5_E512",
+        "C7_E256", "C7_E512", "C7_E1024",
+    }
+    assert {p["id"] for p in profiles} == expected_ids, (
+        "Missing/unexpected C1/C2/C3/C4/C5/C7 geometry profile"
+    )
+    assert all(p["mode"] == "base" for p in profiles if p["family"] != "C3"), (
+        "Only C3 is two-mode in Round I"
+    )
 
     for p in profiles:
         expected = compute_bits(p)
