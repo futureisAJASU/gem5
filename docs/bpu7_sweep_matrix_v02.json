@@ -27,7 +27,8 @@
     "candidate_family_elimination": "realistic_full19_only",
     "oracle_only_elimination": false,
     "training_selector_rule": "FREEZE_AT_P0",
-    "no_posthoc_tuning": true
+    "no_posthoc_tuning": true,
+    "primary_selector": "G0_AND_NATIVE_G1_SINGLE_PROFILE"
   },
   "required_p0_closures": [
     "FROZEN_SEMANTICS_PER_FAMILY",
@@ -76,8 +77,7 @@
       },
       "aux_bits_expected": 2432,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -97,8 +97,7 @@
       },
       "aux_bits_expected": 4864,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -118,8 +117,7 @@
       },
       "aux_bits_expected": 9728,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -136,8 +134,7 @@
       },
       "aux_bits_expected": 1152,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -154,8 +151,7 @@
       },
       "aux_bits_expected": 2304,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -172,8 +168,7 @@
       },
       "aux_bits_expected": 4608,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -192,8 +187,7 @@
       },
       "aux_bits_expected": 1024,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -212,8 +206,7 @@
       },
       "aux_bits_expected": 2048,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -232,8 +225,7 @@
       },
       "aux_bits_expected": 4096,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -252,8 +244,7 @@
       },
       "aux_bits_expected": 1024,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -272,8 +263,7 @@
       },
       "aux_bits_expected": 2048,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -292,8 +282,7 @@
       },
       "aux_bits_expected": 4096,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -317,8 +306,7 @@
       },
       "aux_bits_expected": 2944,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -342,8 +330,7 @@
       },
       "aux_bits_expected": 5888,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -367,8 +354,7 @@
       },
       "aux_bits_expected": 11776,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -393,8 +379,7 @@
       },
       "aux_bits_expected": 2768,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -419,8 +404,7 @@
       },
       "aux_bits_expected": 5328,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -445,8 +429,7 @@
       },
       "aux_bits_expected": 10448,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -458,13 +441,12 @@
       "geometry": {
         "entries": 256,
         "counter_bits": 5,
-        "imlico_bits": 8,
-        "imli_valid_bits": 1
+        "imli_valid_bits": 1,
+        "imli_counter_bits": 8
       },
       "aux_bits_expected": 1289,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -476,13 +458,12 @@
       "geometry": {
         "entries": 512,
         "counter_bits": 5,
-        "imlico_bits": 8,
-        "imli_valid_bits": 1
+        "imli_valid_bits": 1,
+        "imli_counter_bits": 8
       },
       "aux_bits_expected": 2569,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
@@ -494,13 +475,12 @@
       "geometry": {
         "entries": 1024,
         "counter_bits": 5,
-        "imlico_bits": 8,
-        "imli_valid_bits": 1
+        "imli_valid_bits": 1,
+        "imli_counter_bits": 8
       },
       "aux_bits_expected": 5129,
       "gates": [
-        "G0",
-        "G1"
+        "G0_AND_NATIVE_G1"
       ],
       "timing_primary": "M1",
       "status": "PRE_FREEZE_UNIMPLEMENTED"
