@@ -30,6 +30,18 @@ jobs:
               -o /tmp/c3_pc_bias_directed
       - name: Run real finite-state C++ directed tests
         run: /tmp/c3_pc_bias_directed
+      - name: Cross-compile C3 state-machine with Clang and run
+        run: |
+          clang++ -std=c++17 -Wall -Wextra -Werror -pedantic -O2 \
+              -Isrc tests/bpu7/c3_pc_bias_directed.cc \
+              -o /tmp/c3_pc_bias_clang
+          /tmp/c3_pc_bias_clang
+      - name: GCC undefined-behavior sanitizer directed run
+        run: |
+          g++ -std=c++17 -O1 -g -fsanitize=undefined \
+              -fno-sanitize-recover=all -Isrc \
+              tests/bpu7/c3_pc_bias_directed.cc -o /tmp/c3_pc_bias_ubsan
+          /tmp/c3_pc_bias_ubsan
       - name: Syntax-check gem5 Python SimObject and CLI registration
         run: |
           python3 -m py_compile src/cpu/pred/BranchPredictor.py
