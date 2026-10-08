@@ -1,0 +1,68 @@
+name: BPU-7 C3 Chooser P1 Directed Verification
+
+on:
+  push:
+    branches: [little-v052-bpu7-c3-chooser-p1]
+    paths:
+      - .github/workflows/bpu7-c3-chooser-p1.yaml
+      - src/cpu/pred/little_c3_pc_chooser.hh
+      - src/cpu/pred/tage_base.hh
+      - src/cpu/pred/tage_base.cc
+      - src/cpu/pred/BranchPredictor.py
+      - configs/02_little_v052_rv64_proxy.py
+      - tests/bpu7/c3_pc_chooser_directed.cc
+  workflow_dispatch:
+
+jobs:
+  c3-chooser-correctness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run actual P1 chooser state machine with GCC
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+              -Isrc tests/bpu7/c3_pc_chooser_directed.cc \
+              -o /tmp/c3_chooser_gcc
+          /tmp/c3_chooser_gcc
+      - name: Independent Clang compiler test
+        run: |
+          clang++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+              -Isrc tests/bpu7/c3_pc_chooser_directed.cc \
+              -o /tmp/c3_chooser_clang
+          /tmp/c3_chooser_clang
+      - name: Undefined-behavior sanitizer test
+        run: |
+          g++ -std=c++17 -O1 -g -fsanitize=undefined \
+              -fno-sanitize-recover=all -Isrc \
+              tests/bpu7/c3_pc_chooser_directed.cc \
+              -o /tmp/c3_chooser_ubsan
+          /tmp/c3_chooser_ubsan
+      - name: Ensure original C3 residual implementation still passes
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror \
+              -Isrc tests/bpu7/c3_pc_bias_directed.cc -o /tmp/c3_residual
+          /tmp/c3_residual
+      - name: Syntax-check updated SimObject/CLI
+        run: |
+          python3 -m py_compile src/cpu/pred/BranchPredictor.py
+          python3 -m py_compile configs/02_little_v052_rv64_proxy.py
+      - name: Verify new candidate remains a separate shadow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path("src/cpu/pred/tage_base.cc").read_text()
+          q = Path("src/cpu/pred/BranchPredictor.py").read_text()
+          c = Path("configs/02_little_v052_rv64_proxy.py").read_text()
+          assert "bi->c3PcChooserLookup = c3PcChooser->lookup(" in s
+          assert "c3PcChooser->train(snap, taken)" in s
+          assert "c3PcChooserEnabled(p.c3PcChooserEnabled)" in s
+          start = s.index("    if (c3PcChooserEnabled) {", s.index("bool\nTAGEBase::tagePredict"))
+          end = s.index("    return bi->finalPred;", start)
+          assert "bi->finalPred =" not in s[start:end]
+          assert "c3PcChooserEntries) * 17" in s
+          assert "c3PcChooserEnabled = True" in q
+          for n in (64, 128, 256):
+              assert f"tage5-c3-pcchooser-shadow-e{n}" in c
+          print("P1_C3_INDEPENDENT_CHOOSER_SHADOW_WIRING=PASS")
+          PY
