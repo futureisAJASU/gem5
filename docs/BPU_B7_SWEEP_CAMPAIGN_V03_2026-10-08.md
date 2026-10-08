@@ -86,3 +86,23 @@ Run now, as a **preparation-only** check: python3 scripts/bpu_b7_sweep_preflight
 Next milestones: (1) commit each candidate's real finite-state microarchitecture + directed correctness, (2) implement M1 frontend proof, (3) freeze all CLI/selector/training/hash details, (4) fresh R0/R1, (5) full B7-1 399 candidate ROI, (6) B7-2 Pareto report, (7) adaptive and declared B7-3 single-axis sweeps, (8) B7-5 final independent validation/RTL-PPA.
 
 No performance winner, optimum numeric configuration, extra energy saved, or completed sweep is claimed by this planning document.
+
+## 7. Separate A0 TAGE Access-Reduction Track (EXPLICITLY REGISTERED, NOT C8)
+
+- **A0 is in scope as a separate *energy/PPA* research program**, not omitted and not included in the 21 C-family direction-corrector profiles / 399-ROI Round-I matrix. It is NOT a new candidate that should be scored for net branch-error correction against C1–C7. The Notion related-work and BPU-7 implementation contract are the semantic source.
+- Motivation and prior art: MORSL's allocation-guided filtering and other published low-activity TAGE concepts; their architectural mechanisms must NOT be claimed as novel.
+- Implement only when predictor timing and physical bank access metadata permit a legal early read-elision decision. A gate depending on post-read TAGE confidence **cannot** claim to eliminate the read which produced that confidence.
+- Pre-register independent G5-only baseline, filter state, filter index, pre-read branch information, table access/cancel protocol, false-negative accuracy cost, extra comparators/ports, +1-stage timing and speculative metadata.
+- Sweep *filter capacity / tag or encoding / false-negative-acceptance policy / number of suppressible TAGE banks* under bounded activity and state budgets; select using exact G5 correctness, array reads, RTL clock slack, area, real switching power, and leakage. Activation ratio is not energy.
+- **No A0 power-saving number exists yet.** Keep A0 results and plots separate; combining a finished A0 with a winning C-family predictor requires a fresh, versioned joint study so neither component receives the other's credit.
+
+## 8. Campaign completeness ledger
+
+- **Primary mandatory replay anchors:** R0 G5, R1 G7.
+- **Frozen prior-art negative control:** C0 classic perceptron, no prior22 retuning.
+- **All serious new corrector families:** C1 Loop, C2 Local, C3 Tagged (PC_BIAS and HIST_TAG), C4 MGSC, C5 Hashed MPP, C7 IMLI-SIC. No family may disappear from the baseline Round-I manifest.
+- **Conditional later corrector composition:** C6 at most two *already tested* parents and only with documented residual-error complementarity, state/activity/timing plus native selector conflict semantics.
+- **Distinct energy research:** A0 existing G5 table-access reduction. Explicitly not a C-family correction sweep.
+- **Not part of initial Round-I:** full MORSL, full MPP, IMLI-OH, value-based predictors, YAGS/Gskew main replacements. Deferred does not imply disproven.
+
+**Execution state:** all new C1–C7 implementations and M1 late redirect are still PRE-IMPLEMENTATION; the source matrix with PRE_FREEZE and execution_permitted=false is a deliberately non-executable plan.
