@@ -74,6 +74,8 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
       perceptronTrainThreshold(p.perceptronTrainThreshold),
       perceptronOverrideThreshold(p.perceptronOverrideThreshold),
       perceptronTagePrior(p.perceptronTagePrior),
+      c3PcBiasEnabled(p.c3PcBiasEnabled),
+      c3PcBiasEntries(p.c3PcBiasEntries),
       threadHistory(p.numThreads),
       logUResetPeriod(p.logUResetPeriod),
       initialTCounterValue(p.initialTCounterValue),
@@ -140,6 +142,18 @@ TAGEBase::init()
                  "perceptron thresholds/prior must be non-negative");
         perceptronWeights.assign(
             perceptronEntries * (perceptronHistoryLength + 1), 0);
+    }
+
+    if (c3PcBiasEnabled) {
+        fatal_if(perceptronEnabled,
+                 "BPU-7 C3 shadow and BPU-6 perceptron are exclusive");
+        fatal_if(c3PcBiasEntries != 64 && c3PcBiasEntries != 128 &&
+                 c3PcBiasEntries != 256,
+                 "BPU-7 C3 Round-I only allows E64/E128/E256");
+        LittleC3PcBias::Config cfg;
+        cfg.entries = c3PcBiasEntries;
+        cfg.pcShift = instShiftAmt;
+        c3PcBias = std::make_unique<LittleC3PcBias>(cfg);
     }
 
     useAltPredForNewlyAllocated.resize(numUseAltOnNa, 0);
@@ -455,6 +469,14 @@ TAGEBase::getUseAltIdx(BranchInfo* bi, Addr branch_pc)
 }
 
 bool
+TAGEBase::c3PcBiasGate(const BranchInfo* bi) const
+{
+    // Frozen G0 WEAK|MEDIUM|strength5. Post-G5-read only.
+    return bi->providerConfidence != CONFIDENCE_STRONG ||
+           bi->providerStrength == 5;
+}
+
+bool
 TAGEBase::perceptronGate(const BranchInfo* bi) const
 {
     if (!perceptronEnabled) {
@@ -680,6 +702,16 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
             bi->providerConfidence);
 
     perceptronPredict(tid, branch_pc, bi);
+
+    // Shadow-only: actual return remains the frozen G5 direction.
+    // A real M1 frontend correction/redirect has not been implemented.
+    if (c3PcBiasEnabled) {
+        bi->c3PcBiasLookup =
+            c3PcBias->lookup(branch_pc, c3PcBiasGate(bi));
+        if (bi->c3PcBiasLookup.eligible) {
+            stats.c3PcBiasBankReads++;
+        }
+    }
 
     return bi->finalPred;
 }
@@ -1176,6 +1208,31 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
     }
 
     perceptronTrain(taken, bi);
+
+    if (c3PcBiasEnabled) {
+        const auto& snap = bi->c3PcBiasLookup;
+        if (snap.eligible) {
+            stats.c3PcBiasEligibleCommitted++;
+            if (snap.tagHit) {
+                stats.c3PcBiasTagHits++;
+            }
+            if (snap.wouldFlip) {
+                stats.c3PcBiasWouldFlip++;
+                if (bi->tagePred != taken) {
+                    stats.c3PcBiasWouldFix++;
+                } else {
+                    stats.c3PcBiasWouldBreak++;
+                }
+            }
+            // Commit-only, outcome-relative signed residual learning.
+            // No C3 speculative table writes or rollback obligations.
+            const auto update = c3PcBias->train(snap, bi->tagePred != taken);
+            if (update.trained) stats.c3PcBiasTrainWrites++;
+            if (update.allocated) stats.c3PcBiasAllocations++;
+            if (update.evicted) stats.c3PcBiasEvictions++;
+            if (update.collisionBlocked) stats.c3PcBiasCollisionBlocked++;
+        }
+    }
 }
 
 unsigned
@@ -1269,6 +1326,26 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
       ADD_STAT(perceptronTrainings,
                statistics::units::Count::get(),
                "Perceptron weight-update events"),
+      ADD_STAT(c3PcBiasBankReads, statistics::units::Count::get(),
+               "C3 shadow reads including wrong-path lookups"),
+      ADD_STAT(c3PcBiasEligibleCommitted, statistics::units::Count::get(),
+               "C3 committed G0-eligible conditional branches"),
+      ADD_STAT(c3PcBiasTagHits, statistics::units::Count::get(),
+               "C3 committed predictions with valid PC-tag match"),
+      ADD_STAT(c3PcBiasWouldFlip, statistics::units::Count::get(),
+               "C3 hypothetical inversion requests; no fetch redirect"),
+      ADD_STAT(c3PcBiasWouldFix, statistics::units::Count::get(),
+               "C3 hypothetical inversions correcting G5"),
+      ADD_STAT(c3PcBiasWouldBreak, statistics::units::Count::get(),
+               "C3 hypothetical inversions harming G5"),
+      ADD_STAT(c3PcBiasTrainWrites, statistics::units::Count::get(),
+               "C3 committed entry training/allocation writes"),
+      ADD_STAT(c3PcBiasAllocations, statistics::units::Count::get(),
+               "C3 new PC-tag allocations"),
+      ADD_STAT(c3PcBiasEvictions, statistics::units::Count::get(),
+               "C3 replaced valid tags"),
+      ADD_STAT(c3PcBiasCollisionBlocked, statistics::units::Count::get(),
+               "C3 tag collisions deferred by protection"),
       ADD_STAT(historyStateRecords, statistics::units::Count::get(),
                "Prediction-time TAGE history snapshots recorded"),
       ADD_STAT(historyStateRestores, statistics::units::Count::get(),
@@ -1288,7 +1365,9 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
       ADD_STAT(otherStorageBits, statistics::units::Count::get(),
                "Persistent use-alt and reset-counter bits"),
       ADD_STAT(perceptronStorageBits, statistics::units::Count::get(),
-               "Persistent Little perceptron weight bits")
+               "Persistent Little perceptron weight bits"),
+      ADD_STAT(c3PcBiasStorageBits, statistics::units::Count::get(),
+               "C3 PC-bias logical persistent state bits")
 {
     longestMatchProvider.init(nHistoryTables + 1);
     altMatchProvider.init(nHistoryTables + 1);
@@ -1307,6 +1386,8 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
     otherStorageBits.method(parent, &TAGEBase::getOtherStorageBits);
     perceptronStorageBits.method(
         parent, &TAGEBase::getPerceptronStorageBits);
+    c3PcBiasStorageBits.method(
+        parent, &TAGEBase::getC3PcBiasStorageBits);
 }
 
 int8_t
@@ -1376,13 +1457,23 @@ TAGEBase::getPerceptronStorageBits() const
 }
 
 size_t
+TAGEBase::getC3PcBiasStorageBits() const
+{
+    if (!c3PcBiasEnabled) {
+        return 0;
+    }
+    return static_cast<size_t>(c3PcBiasEntries) * 16;
+}
+
+size_t
 TAGEBase::getSizeInBits() const
 {
     return getTaggedStorageBits() +
            getBimodalStorageBits() +
            getHistoryStorageBits() +
            getOtherStorageBits() +
-           getPerceptronStorageBits();
+           getPerceptronStorageBits() +
+           getC3PcBiasStorageBits();
 }
 
 } // namespace branch_prediction
