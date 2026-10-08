@@ -49,9 +49,11 @@
 #ifndef __CPU_PRED_TAGE_BASE_HH__
 #define __CPU_PRED_TAGE_BASE_HH__
 
+#include <memory>
 #include <vector>
 
 #include "base/statistics.hh"
+#include "cpu/pred/little_c3_pc_bias.hh"
 #include "cpu/null_static_inst.hh"
 #include "cpu/static_inst.hh"
 #include "params/TAGEBase.hh"
@@ -168,6 +170,9 @@ class TAGEBase : public SimObject
         unsigned perceptronIndex;
         int perceptronSum;
         uint64_t perceptronHistoryBits;
+
+        // C3 PC_BIAS prediction-time shadow metadata: no new history.
+        LittleC3PcBias::Lookup c3PcBiasLookup;
 
         // Pointer to dynamically allocated storage
         // to save table indices and folded histories.
@@ -517,6 +522,7 @@ class TAGEBase : public SimObject
     size_t getHistoryStorageBits() const;
     size_t getOtherStorageBits() const;
     size_t getPerceptronStorageBits() const;
+    size_t getC3PcBiasStorageBits() const;
 
   protected:
     const unsigned logRatioBiModalHystEntries;
@@ -547,6 +553,11 @@ class TAGEBase : public SimObject
     const int perceptronOverrideThreshold;
     const int perceptronTagePrior;
     std::vector<int8_t> perceptronWeights;
+
+    // C3 is SHADOW-ONLY until a proven M1 late redirect is available.
+    const bool c3PcBiasEnabled;
+    const unsigned c3PcBiasEntries;
+    std::unique_ptr<LittleC3PcBias> c3PcBias;
 
     std::vector<bool> btablePrediction;
     std::vector<bool> btableHysteresis;
@@ -612,6 +623,7 @@ class TAGEBase : public SimObject
     bool initialized;
 
     bool perceptronGate(const BranchInfo* bi) const;
+    bool c3PcBiasGate(const BranchInfo* bi) const;
     void perceptronPredict(ThreadID tid, Addr branch_pc, BranchInfo* bi);
     void perceptronTrain(bool taken, BranchInfo* bi);
     int8_t saturatePerceptronWeight(int value) const;
@@ -654,6 +666,18 @@ class TAGEBase : public SimObject
         statistics::Scalar perceptronWouldBreak;
         statistics::Scalar perceptronTrainings;
 
+        // C3 shadow diagnostics: would-fix/break never affect fetch.
+        statistics::Scalar c3PcBiasBankReads;
+        statistics::Scalar c3PcBiasEligibleCommitted;
+        statistics::Scalar c3PcBiasTagHits;
+        statistics::Scalar c3PcBiasWouldFlip;
+        statistics::Scalar c3PcBiasWouldFix;
+        statistics::Scalar c3PcBiasWouldBreak;
+        statistics::Scalar c3PcBiasTrainWrites;
+        statistics::Scalar c3PcBiasAllocations;
+        statistics::Scalar c3PcBiasEvictions;
+        statistics::Scalar c3PcBiasCollisionBlocked;
+
         // Directed-correctness audit counters.
         statistics::Scalar historyStateRecords;
         statistics::Scalar historyStateRestores;
@@ -668,6 +692,7 @@ class TAGEBase : public SimObject
         statistics::Value historyStorageBits;
         statistics::Value otherStorageBits;
         statistics::Value perceptronStorageBits;
+        statistics::Value c3PcBiasStorageBits;
     } stats;
 };
 

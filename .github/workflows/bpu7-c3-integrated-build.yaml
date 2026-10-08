@@ -1,0 +1,32 @@
+name: BPU-7 C3 Integrated RISCV Compile Gate
+
+on:
+  push:
+    branches: [little-v052-bpu7-c3-pcbias-p0]
+    paths:
+      - .github/workflows/bpu7-c3-integrated-build.yaml
+      - src/cpu/pred/little_c3_pc_bias.hh
+      - src/cpu/pred/tage_base.hh
+      - src/cpu/pred/tage_base.cc
+      - src/cpu/pred/BranchPredictor.py
+      - configs/02_little_v052_rv64_proxy.py
+  workflow_dispatch:
+
+jobs:
+  riscv-integrated-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build actual gem5 RISCV simulator with modified C3 TAGE source
+        timeout-minutes: 40
+        shell: bash
+        run: |
+          python3 /usr/bin/scons --ignore-style build/RISCV/gem5.opt -j2
+      - name: Verify produced simulator executable
+        shell: bash
+        run: |
+          test -x build/RISCV/gem5.opt
+          build/RISCV/gem5.opt --version

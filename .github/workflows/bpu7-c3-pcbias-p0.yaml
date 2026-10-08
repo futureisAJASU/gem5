@@ -1,0 +1,83 @@
+name: BPU-7 C3 PC_BIAS P0 Directed Tests
+
+on:
+  push:
+    branches: [little-v052-bpu7-c3-pcbias-p0]
+    paths:
+      - .github/workflows/bpu7-c3-pcbias-p0.yaml
+      - src/cpu/pred/little_c3_pc_bias.hh
+      - src/cpu/pred/tage_base.hh
+      - src/cpu/pred/tage_base.cc
+      - src/cpu/pred/BranchPredictor.py
+      - configs/02_little_v052_rv64_proxy.py
+      - tests/bpu7/c3_pc_bias_directed.cc
+      - scripts/bpu_b7_c3_shadow_smoke.py
+      - scripts/bpu_b7_c3_shadow_full19.py
+      - tests/bpu7/test_c3_shadow_runner.py
+      - docs/BPU_B7_C3_PCBIAS_P0_REVIEW_2026-10-08.md
+  workflow_dispatch:
+
+jobs:
+  c3-standalone-state-machine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Compile production C3 finite-state engine with GCC warnings as errors
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -pedantic -O2 \
+              -Isrc tests/bpu7/c3_pc_bias_directed.cc \
+              -o /tmp/c3_pc_bias_directed
+          /tmp/c3_pc_bias_directed
+      - name: Independently compile Clang and execute directed C3 tests
+        run: |
+          clang++ -std=c++17 -Wall -Wextra -Werror -pedantic -O2 \
+              -Isrc tests/bpu7/c3_pc_bias_directed.cc \
+              -o /tmp/c3_pc_bias_clang
+          /tmp/c3_pc_bias_clang
+      - name: GCC undefined behavior sanitizer directed run
+        run: |
+          g++ -std=c++17 -O1 -g -fsanitize=undefined \
+              -fno-sanitize-recover=all -Isrc \
+              tests/bpu7/c3_pc_bias_directed.cc -o /tmp/c3_pc_bias_ubsan
+          /tmp/c3_pc_bias_ubsan
+      - name: Python syntax checks for actual gem5 and sweep entry points
+        run: |
+          python3 -m py_compile src/cpu/pred/BranchPredictor.py
+          python3 -m py_compile configs/02_little_v052_rv64_proxy.py
+          python3 -m py_compile scripts/bpu_b7_c3_shadow_smoke.py
+          python3 -m py_compile scripts/bpu_b7_c3_shadow_full19.py
+      - name: Reproduce real gem5 stats terminator and resume prior ROI
+        run: |
+          python3 -m unittest discover -s tests/bpu7 \
+              -p 'test_c3_shadow_runner.py' -v
+      - name: Check complete C3 shadow matrix (95 jobs, not 152 M1)
+        run: |
+          python3 scripts/bpu_b7_c3_shadow_full19.py --list > /tmp/bpu7_c3_list.txt
+          grep -Fq 'SHADOW_ONLY_ROI_PLAN=95; M1_CORRECTION=NOT_IMPLEMENTED' /tmp/bpu7_c3_list.txt
+          test "$(grep -c '^c3_e' /tmp/bpu7_c3_list.txt)" -eq 57
+          test "$(grep -c '^g5 ' /tmp/bpu7_c3_list.txt)" -eq 19
+          test "$(grep -c '^g7 ' /tmp/bpu7_c3_list.txt)" -eq 19
+      - name: Confirm C3 still cannot alter G5 fetch direction
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c = Path("src/cpu/pred/tage_base.cc").read_text()
+          d = Path("src/cpu/pred/BranchPredictor.py").read_text()
+          p = Path("configs/02_little_v052_rv64_proxy.py").read_text()
+          start = c.index("    // Shadow-only: actual return")
+          end = c.index("    return bi->finalPred;", start)
+          shadow = c[start:end]
+          assert "bi->finalPred =" not in shadow
+          assert "c3PcBias->lookup(" in shadow
+          assert "c3PcBias->train(snap, bi->tagePred != taken)" in c
+          assert 'c3PcBiasEnabled = Param.Bool(' in d
+          for suffix in ("64", "128", "256"):
+              assert f"tage5-c3-pcbias-shadow-e{suffix}" in p
+          assert "c3PcBiasEntries) * 16" in c
+          print("BPU7_C3_SHADOW_NO_M1_REDIRECT=PASS")
+          PY
+      - name: Whitespace check
+        run: git diff HEAD^ HEAD --check
