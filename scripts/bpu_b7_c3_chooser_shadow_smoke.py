@@ -35,29 +35,44 @@ def sha256(path):
 
 
 def parse_first_dump(path):
-    t = path.read_text()
-    begin = "---------- Begin Simulation Statistics ----------"
+    # Same prefix semantics as the historical BPU-4C runner.
+    # gem5 text.cc emits THREE spaces before the end marker's dashes.
+    from decimal import Decimal
+    lines = path.read_text().splitlines()
+    begin = "---------- Begin Simulation Statistics"
     end = "---------- End Simulation Statistics"
-    if begin not in t or end not in t.split(begin, 1)[1]:
-        raise RuntimeError(f"no complete first stats section: {path}")
-    first = t.split(begin, 1)[1].split(end, 1)[0]
-    d = {}
-    for line in first.splitlines():
-        vals = line.split()
-        if len(vals) >= 2:
-            try:
-                d[vals[0]] = float(vals[1])
-            except ValueError:
-                pass
-    return d
+    start = next((i for i, v in enumerate(lines) if v.startswith(begin)), None)
+    if start is None:
+        raise RuntimeError(f"missing first ROI begin marker: {path}")
+    finish = next((i for i in range(start + 1, len(lines))
+                   if lines[i].startswith(end)), None)
+    if finish is None:
+        raise RuntimeError(f"missing complete first ROI end marker: {path}")
+    values = {}
+    for line in lines[start + 1:finish]:
+        fields = line.split()
+        if len(fields) < 2:
+            continue
+        try:
+            Decimal(fields[1])
+        except Exception:
+            continue
+        if fields[0] in values:
+            raise RuntimeError(f"duplicate ROI stat {fields[0]} in {path}")
+        values[fields[0]] = fields[1]
+    return values
 
 
 def unique_int(stats, suffix):
-    matches = [v for k, v in stats.items() if k.endswith(suffix)]
+    from decimal import Decimal
+    matches = [value for key, value in stats.items()
+               if key == suffix or key.endswith("." + suffix)]
     if len(matches) != 1:
-        raise RuntimeError(f"non-unique/missing stat {suffix}: {matches}")
-    return int(matches[0])
-
+        raise RuntimeError(f"non-unique/missing exact stat {suffix}: {matches}")
+    value = Decimal(matches[0])
+    if not value.is_finite() or value != int(value):
+        raise RuntimeError(f"non-integral stat {suffix}={value}")
+    return int(value)
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
