@@ -54,6 +54,7 @@
 
 #include "base/statistics.hh"
 #include "cpu/pred/little_c3_pc_bias.hh"
+#include "cpu/pred/little_c3_pc_chooser.hh"
 #include "cpu/null_static_inst.hh"
 #include "cpu/static_inst.hh"
 #include "params/TAGEBase.hh"
@@ -173,6 +174,7 @@ class TAGEBase : public SimObject
 
         // C3 PC_BIAS prediction-time shadow metadata: no new history.
         LittleC3PcBias::Lookup c3PcBiasLookup;
+        LittleC3PcChooser::Lookup c3PcChooserLookup;
 
         // Pointer to dynamically allocated storage
         // to save table indices and folded histories.
@@ -523,6 +525,7 @@ class TAGEBase : public SimObject
     size_t getOtherStorageBits() const;
     size_t getPerceptronStorageBits() const;
     size_t getC3PcBiasStorageBits() const;
+    size_t getC3PcChooserStorageBits() const;
 
   protected:
     const unsigned logRatioBiModalHystEntries;
@@ -558,6 +561,11 @@ class TAGEBase : public SimObject
     const bool c3PcBiasEnabled;
     const unsigned c3PcBiasEntries;
     std::unique_ptr<LittleC3PcBias> c3PcBias;
+
+    // Second C3 alternative: independent PC direction + learned chooser.
+    const bool c3PcChooserEnabled;
+    const unsigned c3PcChooserEntries;
+    std::unique_ptr<LittleC3PcChooser> c3PcChooser;
 
     std::vector<bool> btablePrediction;
     std::vector<bool> btableHysteresis;
@@ -677,6 +685,20 @@ class TAGEBase : public SimObject
         statistics::Scalar c3PcBiasAllocations;
         statistics::Scalar c3PcBiasEvictions;
         statistics::Scalar c3PcBiasCollisionBlocked;
+        statistics::Scalar c3PcChooserReads;
+        statistics::Scalar c3PcChooserEligibleCommitted;
+        statistics::Scalar c3PcChooserTagHits;
+        statistics::Scalar c3PcChooserDisagreements;
+        statistics::Scalar c3PcChooserWouldOverride;
+        statistics::Scalar c3PcChooserWouldFix;
+        statistics::Scalar c3PcChooserWouldBreak;
+        statistics::Scalar c3PcChooserRowWrites;
+        statistics::Scalar c3PcChooserDirectionUpdates;
+        statistics::Scalar c3PcChooserChooserUpdates;
+        statistics::Scalar c3PcChooserAllocations;
+        statistics::Scalar c3PcChooserEvictions;
+        statistics::Scalar c3PcChooserCollisionBlocked;
+        statistics::Scalar c3PcChooserStalePredictions;
 
         // Directed-correctness audit counters.
         statistics::Scalar historyStateRecords;
@@ -693,6 +715,7 @@ class TAGEBase : public SimObject
         statistics::Value otherStorageBits;
         statistics::Value perceptronStorageBits;
         statistics::Value c3PcBiasStorageBits;
+        statistics::Value c3PcChooserStorageBits;
     } stats;
 };
 
