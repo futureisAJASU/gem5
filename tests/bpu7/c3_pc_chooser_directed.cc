@@ -153,6 +153,38 @@ testStaleTagCannotUpdateEvictedChooser()
     assert(nextA.tagHit && nextA.chooserCount == 1);
 }
 
+// KNOWN P1 LIMITATION (not a pass for ABA safety):
+// The current 17-bit row contains no allocation generation. A -> B -> A
+// can therefore masquerade as a continuing A, so an old in-flight chooser
+// snapshot may train a reallocated row. This reproducer stays in the suite
+// to prevent inaccurately claiming the problem is already fixed.
+static void
+testSameTagAbaExposure_KnownLimitation()
+{
+    LittleC3PcChooser c({64, 1, 10, 2, 3});
+    constexpr uint64_t a = 0x200, b = a + 128;
+    c.train(c.lookup(a, true, true), false);
+    c.train(c.lookup(a, true, true), false);
+    c.train(c.lookup(a, true, true), false);
+    c.train(c.lookup(a, true, true), false);
+    const auto savedA = c.lookup(a, true, true);
+    assert(savedA.tagHit && savedA.wouldOverride && savedA.chooserCount == 3);
+
+    for (int k = 0; k < 3; ++k) {
+        c.train(c.lookup(b, true, true), true);
+    }
+    assert(c.lookup(b, true, true).tagHit);
+    auto reinstall = c.train(c.lookup(a, true, true), true);
+    assert(reinstall.allocated && reinstall.evicted);
+    const auto freshA = c.lookup(a, true, true);
+    assert(freshA.tagHit && freshA.chooserCount == 1);
+    // Old A and fresh A look identical to a tag-only membership check.
+    const auto u = c.train(savedA, false);
+    assert(!u.stalePrediction && u.chooserUpdated);
+    assert(c.lookup(a, true, true).chooserCount == 2);
+    // This test documents a real semantic limitation, NOT an ABA fix.
+}
+
 static void
 testSaturationAndConfiguration()
 {
@@ -185,5 +217,6 @@ main()
     testGateDoesNotReadOrTrain();
     testAliasingAndStaleSnapshot();
     testStaleTagCannotUpdateEvictedChooser();
+    testSameTagAbaExposure_KnownLimitation();
     testSaturationAndConfiguration();
 }
