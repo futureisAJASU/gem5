@@ -1297,7 +1297,7 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
                     "idx=%u tag=%u hit=%u strong=%u disagree=%u "
                     "dircnt=%u choosecnt=%u override=%u fix=%u break=%u "
                     "rowwrite=%u dirupd=%u chooseupd=%u alloc=%u "
-                    "evict=%u blocked=%u stale=%u\\n",
+                    "evict=%u blocked=%u stale=%u\n",
                     bi->branchPC,
                     static_cast<unsigned>(bi->c3DiagGhr16),
                     static_cast<unsigned>(snap.g5Taken),
