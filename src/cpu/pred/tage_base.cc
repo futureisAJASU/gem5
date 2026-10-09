@@ -736,7 +736,7 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
             // These 16 bits are sampled at prediction time, not re-read at
             // commit (when global history may have changed). Only needed
             // for explicit trace mode; ordinary P1 semantics are untouched.
-            if (DTRACE(TageC3Diag)) {
+            if (debug::TageC3Diag) {
                 bi->c3DiagGhr16 = static_cast<uint16_t>(getGHR(tid));
             }
         }
