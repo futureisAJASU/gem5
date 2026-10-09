@@ -12,6 +12,8 @@ on:
       - configs/02_little_v052_rv64_proxy.py
       - tests/bpu7/c3_pc_chooser_directed.cc
       - scripts/bpu_b7_c3_chooser_shadow_smoke.py
+      - scripts/bpu_b7_c3_p0_p1_full19.py
+      - tests/bpu7/test_c3_p0_p1_runner.py
   workflow_dispatch:
 
 jobs:
@@ -49,6 +51,11 @@ jobs:
           python3 -m py_compile src/cpu/pred/BranchPredictor.py
           python3 -m py_compile configs/02_little_v052_rv64_proxy.py
           python3 -m py_compile scripts/bpu_b7_c3_chooser_shadow_smoke.py
+      - name: Verify new 152-ROI P0/P1 parser, storage and training accounting
+        run: |
+          python3 -m py_compile scripts/bpu_b7_c3_p0_p1_full19.py
+          python3 -m unittest discover -s tests/bpu7 \
+              -p 'test_c3_p0_p1_runner.py' -v
       - name: Verify new candidate remains a separate shadow
         run: |
           python3 - <<'PY'
