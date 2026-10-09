@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Re-run existing P0 and P1 C++ state-machine tests
         run: |
           g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
