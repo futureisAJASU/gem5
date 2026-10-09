@@ -95,5 +95,7 @@ DebugFlag('Branch')
 DebugFlag('Tage')
 DebugFlag('TageResearch')
 DebugFlag('TageResearchAll')
+# Opt-in commit-only C3 P1 diagnostics; emits no logs in ordinary runs.
+DebugFlag('TageC3Diag')
 DebugFlag('LTage')
 DebugFlag('TageSCL')
