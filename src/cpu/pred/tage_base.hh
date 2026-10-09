@@ -175,6 +175,9 @@ class TAGEBase : public SimObject
         // C3 PC_BIAS prediction-time shadow metadata: no new history.
         LittleC3PcBias::Lookup c3PcBiasLookup;
         LittleC3PcChooser::Lookup c3PcChooserLookup;
+        // Debug-only transient snapshot of the 16 newest speculative GHR
+        // bits at P1 lookup. Not a physical RTL state budget or HIST_TAG.
+        uint16_t c3DiagGhr16 = 0;
 
         // Pointer to dynamically allocated storage
         // to save table indices and folded histories.
