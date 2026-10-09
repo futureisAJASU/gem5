@@ -1,0 +1,59 @@
+name: BPU-7 C3 P2 PC/GHR Diagnostic Directed Verification
+
+on:
+  push:
+    branches: [little-v052-bpu7-c3-pcdiag-p2]
+    paths:
+      - .github/workflows/bpu7-c3-pcdiag-p2.yaml
+      - src/cpu/pred/SConscript
+      - src/cpu/pred/tage_base.cc
+      - src/cpu/pred/tage_base.hh
+      - scripts/bpu_b7_c3_pcdiag_p2.py
+      - tests/bpu7/test_c3_pcdiag_p2.py
+      - docs/BPU_B7_C3_PCDIAG_P2_2026-10-09.md
+  workflow_dispatch:
+
+jobs:
+  pc-history-diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Re-run existing P0 and P1 C++ state-machine tests
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            -Isrc tests/bpu7/c3_pc_bias_directed.cc -o /tmp/c3_p0
+          /tmp/c3_p0
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            -Isrc tests/bpu7/c3_pc_chooser_directed.cc -o /tmp/c3_p1
+          /tmp/c3_p1
+      - name: Test diagnostics parser, strict cases and per-PC aggregation
+        run: |
+          python3 -m py_compile scripts/bpu_b7_c3_pcdiag_p2.py
+          python3 -m unittest discover -s tests/bpu7 \
+              -p 'test_c3_pcdiag_p2.py' -v
+      - name: Check opt-in only and source instrumented from predictor snapshot
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          cc = Path("src/cpu/pred/tage_base.cc").read_text()
+          hh = Path("src/cpu/pred/tage_base.hh").read_text()
+          sc = Path("src/cpu/pred/SConscript").read_text()
+          assert "DebugFlag('TageC3Diag')" in sc
+          assert '#include "debug/TageC3Diag.hh"' in cc
+          assert "bi->c3DiagGhr16 = static_cast<uint16_t>(getGHR(tid))" in cc
+          assert "uint16_t c3DiagGhr16 = 0;" in hh
+          assert cc.count("DPRINTF(TageC3Diag,") == 1
+          a = cc.index("    if (c3PcChooserEnabled) {", cc.index("bool\nTAGEBase::tagePredict"))
+          b = cc.index("    return bi->finalPred;", a)
+          assert "bi->finalPred =" not in cc[a:b]
+          assert "c3PcChooser->train(snap, taken)" in cc
+          assert "c3PcChooserEntries) * 17" in cc
+          print("P2_C3_TRACE_SHADOW_ONLY_SOURCE_GATE=PASS")
+          PY
+      - name: Validate all original 152-profile runner synthetic contracts
+        run: |
+          python3 -m unittest discover -s tests/bpu7 \
+              -p 'test_c3_p0_p1_runner.py' -v
+      - name: Check source whitespace
+        run: git diff HEAD^ HEAD --check
