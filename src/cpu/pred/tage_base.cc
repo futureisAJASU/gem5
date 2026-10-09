@@ -46,6 +46,7 @@
 #include "debug/Tage.hh"
 #include "debug/TageResearch.hh"
 #include "debug/TageResearchAll.hh"
+#include "debug/TageC3Diag.hh"
 
 namespace gem5
 {
@@ -732,6 +733,12 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
             branch_pc, bi->tagePred, c3PcBiasGate(bi));
         if (bi->c3PcChooserLookup.eligible) {
             stats.c3PcChooserReads++;
+            // These 16 bits are sampled at prediction time, not re-read at
+            // commit (when global history may have changed). Only needed
+            // for explicit trace mode; ordinary P1 semantics are untouched.
+            if (DTRACE(TageC3Diag)) {
+                bi->c3DiagGhr16 = static_cast<uint16_t>(getGHR(tid));
+            }
         }
     }
 
@@ -1278,6 +1285,47 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
             if (u.evicted) stats.c3PcChooserEvictions++;
             if (u.collisionBlocked) stats.c3PcChooserCollisionBlocked++;
             if (u.stalePrediction) stats.c3PcChooserStalePredictions++;
+
+            // One trace record per committed, G0-eligible P1 branch. This
+            // observes prediction-time metadata and the actual commit
+            // outcome, never modifies G5/C3 predictions or training.
+            // NOTE: trace is whole execution, not necessarily first-ROI
+            // scoped; independent ROI counter reconciliation is required.
+            DPRINTF(TageC3Diag,
+                    "C3DIAG pc=%#lx ghr16=%#x g5=%u c3=%u actual=%u "
+                    "conf=%u strength=%u provider=%u bank=%u "
+                    "idx=%u tag=%u hit=%u strong=%u disagree=%u "
+                    "dircnt=%u choosecnt=%u override=%u fix=%u break=%u "
+                    "rowwrite=%u dirupd=%u chooseupd=%u alloc=%u "
+                    "evict=%u blocked=%u stale=%u\\n",
+                    bi->branchPC,
+                    static_cast<unsigned>(bi->c3DiagGhr16),
+                    static_cast<unsigned>(snap.g5Taken),
+                    static_cast<unsigned>(snap.c3Taken),
+                    static_cast<unsigned>(taken),
+                    static_cast<unsigned>(bi->providerConfidence),
+                    bi->providerStrength,
+                    bi->provider,
+                    bi->selectedProviderBank,
+                    static_cast<unsigned>(snap.index),
+                    snap.tag,
+                    static_cast<unsigned>(snap.tagHit),
+                    static_cast<unsigned>(snap.strongDirection),
+                    static_cast<unsigned>(snap.disagrees),
+                    snap.directionCount,
+                    snap.chooserCount,
+                    static_cast<unsigned>(snap.wouldOverride),
+                    static_cast<unsigned>(snap.wouldOverride &&
+                                          snap.c3Taken == taken),
+                    static_cast<unsigned>(snap.wouldOverride &&
+                                          snap.c3Taken != taken),
+                    static_cast<unsigned>(u.rowWrite),
+                    static_cast<unsigned>(u.directionUpdated),
+                    static_cast<unsigned>(u.chooserUpdated),
+                    static_cast<unsigned>(u.allocated),
+                    static_cast<unsigned>(u.evicted),
+                    static_cast<unsigned>(u.collisionBlocked),
+                    static_cast<unsigned>(u.stalePrediction));
         }
     }
 }
