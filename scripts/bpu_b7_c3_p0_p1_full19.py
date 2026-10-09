@@ -300,7 +300,7 @@ def main():
     parser.add_argument("--resume", action="store_true",
                         help="Continue same --out, verifying manifest and completed row hashes")
     parser.add_argument("--list", action="store_true",
-                        help="Print planned 95 jobs and exit without building/running")
+                        help="Print planned 152 jobs and exit without building/running")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be >= 1")
@@ -324,6 +324,11 @@ def main():
                     "-o", "/tmp/bpu_b7_c3_directed_full19"],
                    cwd=ROOT, check=True)
     subprocess.run(["/tmp/bpu_b7_c3_directed_full19"], check=True)
+    subprocess.run(["g++", "-std=c++17", "-O2", "-Wall", "-Wextra",
+                    "-Werror", "-Isrc", "tests/bpu7/c3_pc_chooser_directed.cc",
+                    "-o", "/tmp/bpu_b7_c3_chooser_directed_full19"],
+                   cwd=ROOT, check=True)
+    subprocess.run(["/tmp/bpu_b7_c3_chooser_directed_full19"], check=True)
     if not args.no_build:
         subprocess.run(["scons", "build/RISCV/gem5.opt",
                         "--ignore-style", f"-j{args.jobs}"], cwd=ROOT, check=True)
@@ -383,39 +388,13 @@ def main():
         if not manifest_path.exists():
             raise RuntimeError("--resume requires existing manifest.json")
         old = json.loads(manifest_path.read_text())
-        # A parser-only runner hotfix changes source HEAD and script SHA.
-        # It DOES NOT change an already-built gem5 binary, its executable
-        # configuration, or the recorded Embench binaries. Allow only these
-        # two transparent analysis/provenance differences when resuming.
-        non_experimental = {"repo_head", "runner_sha256"}
-        changes = {
-            key: {"original": old.get(key), "current": manifest.get(key)}
-            for key in (set(old) | set(manifest))
-            if old.get(key) != manifest.get(key)
-        }
-        material = set(changes) - non_experimental
-        if material:
+        if old != manifest:
             raise RuntimeError(
-                "FAIL-CLOSED: experimental manifest fields changed: " +
-                ", ".join(sorted(material)) +
-                "; refusing mixed gem5/config/binary evidence"
+                "FAIL-CLOSED: immutable SHA256 manifest differs from current "
+                "source, runner, gem5, config or Embench corpus. "
+                "Keep original run and inspect differences before rerunning."
             )
-        if changes:
-            # Preserve original manifest.json completely unmodified.
-            with (out / "resume_audit.jsonl").open("a") as audit:
-                audit.write(json.dumps({
-                    "event": "RUNNER_PARSER_HOTFIX",
-                    "old_manifest_sha256": sha(manifest_path),
-                    "changed_non_experimental_fields": changes,
-                    "immutable_inputs_verified": True,
-                    "note": "No code changes to the executed gem5 binary. "
-                            "Old raw stats preserved and reparsed."
-                }, sort_keys=True) + "\n")
-            print("[2] Resume: original manifest preserved; gem5, configuration "
-                  "and all 19 benchmark SHA256 match. Analysis-source "
-                  "change recorded in resume_audit.jsonl", flush=True)
-        else:
-            print("[2] Resume: exact manifest identity verified", flush=True)
+        print("[2] Resume: exact manifest identity verified", flush=True)
     else:
         if out.exists():
             raise RuntimeError("Output directory already exists. Supply --resume or a new --out.")
@@ -504,8 +483,8 @@ def main():
             print(f"  [{number:3d}/{len(work)}] REUSE {workload}/{profile}",
                   flush=True)
         else:
-            # Recover the user's FIRST G5 ROI, which had already completed
-            # before the former exact-spaces end-marker parser rejected it.
+            # Preserve fully executed ROI evidence and verify it in place
+            # after a process interruption before .verified.json was written.
             with finished.open("x") as fv:
                 fv.write(json.dumps(verification, indent=2) + "\n")
             print(f"  [{number:3d}/{len(work)}] "
