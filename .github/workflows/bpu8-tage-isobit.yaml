@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - name: Syntax and fail-closed synthetic parser checks
         run: |
           python3 -m py_compile scripts/bpu_b8_tage_isobit_full19.py configs/02_little_v052_rv64_proxy.py
