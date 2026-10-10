@@ -1,0 +1,321 @@
+{
+  "experiment": "BPU8_R2C_FIXED_HASH11_FREEZE_GATE_V01",
+  "status": "PRE_REGISTERED_NOT_RUN",
+  "base_commit": "2e99ba76ade9172b93d0d71e9dbd378760dc5b35",
+  "method": {
+    "scope": "Diagnostic fixed width hash sensitivity. No TAGE C++ changes.",
+    "hash_log": 11,
+    "native_hash_log": 0,
+    "logical_state_bits_unchanged": true,
+    "previously_inspected_embench_not_holdout": true,
+    "existing_native_raw_dir_required": true,
+    "source_profiles": [
+      "tg5_45",
+      "tg7_50",
+      "r2a_both52",
+      "r2b_6b_53",
+      "r2a_mid60",
+      "r2b_6b_60",
+      "g7"
+    ],
+    "exact_physical_gem5_sha256": "96717e980f10f22c8899ede11ecd4b88a762d53f79f8c1c918e5b0a9f202dced",
+    "decision_rules": "No post-run deletion; preserve delta per profile; rank reversals/large hot3-only effects fail robustness. This closes index-hash sensitivity only, not holdout/RTL-PPA."
+  },
+  "frontend": {
+    "bp_inst_shift": 1,
+    "bp_cond_shift": 1,
+    "bp_btb_shift": 2,
+    "bp_indirect_shift": 1,
+    "btb_entries": 4096
+  },
+  "workloads": [
+    "aha-mont64",
+    "crc32",
+    "cubic",
+    "edn",
+    "huffbench",
+    "matmult-int",
+    "minver",
+    "nbody",
+    "nettle-aes",
+    "nettle-sha256",
+    "nsichneu",
+    "picojpeg",
+    "qrduino",
+    "sglib-combined",
+    "slre",
+    "st",
+    "statemate",
+    "ud",
+    "wikisort"
+  ],
+  "profiles": {
+    "tg5_45": {
+      "bp_type": "tage5-iso45k",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "tg5_45_h11": {
+      "bp_type": "tage-r2c-h11-tg5-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ],
+      "fixed_index_hash_log_size": 11,
+      "original_profile": "tg5_45"
+    },
+    "tg7_50_h11": {
+      "bp_type": "tage-r2c-h11-tg7-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        11
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ],
+      "fixed_index_hash_log_size": 11,
+      "original_profile": "tg7_50"
+    },
+    "r2a_both52_h11": {
+      "bp_type": "tage-r2c-h11-r2a-both52",
+      "total_bits": 52904,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ],
+      "fixed_index_hash_log_size": 11,
+      "original_profile": "r2a_both52"
+    },
+    "r2b_6b_53_h11": {
+      "bp_type": "tage-r2c-h11-r2b-6b-53",
+      "total_bits": 52904,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ],
+      "fixed_index_hash_log_size": 11,
+      "original_profile": "r2b_6b_53"
+    },
+    "r2a_mid60_h11": {
+      "bp_type": "tage-r2c-h11-r2a-mid60",
+      "total_bits": 60072,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        1024,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ],
+      "fixed_index_hash_log_size": 11,
+      "original_profile": "r2a_mid60"
+    },
+    "r2b_6b_60_h11": {
+      "bp_type": "tage-r2c-h11-r2b-6b-60",
+      "total_bits": 60072,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        1024,
+        1024,
+        512,
+        256,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ],
+      "fixed_index_hash_log_size": 11,
+      "original_profile": "r2b_6b_60"
+    },
+    "g7_h11": {
+      "bp_type": "tage-r2c-h11-g7",
+      "total_bits": 65192,
+      "fixed_index_hash_log_size": 11,
+      "original_profile": "g7"
+    }
+  },
+  "comparisons": {
+    "native_vs_fixed": [
+      {
+        "native": "tg5_45",
+        "fixed": "tg5_45_h11"
+      },
+      {
+        "native": "tg7_50",
+        "fixed": "tg7_50_h11"
+      },
+      {
+        "native": "r2a_both52",
+        "fixed": "r2a_both52_h11"
+      },
+      {
+        "native": "r2b_6b_53",
+        "fixed": "r2b_6b_53_h11"
+      },
+      {
+        "native": "r2a_mid60",
+        "fixed": "r2a_mid60_h11"
+      },
+      {
+        "native": "r2b_6b_60",
+        "fixed": "r2b_6b_60_h11"
+      },
+      {
+        "native": "g7",
+        "fixed": "g7_h11"
+      }
+    ],
+    "fixed_equal_bits": [
+      [
+        "r2a_both52_h11",
+        "r2b_6b_53_h11"
+      ],
+      [
+        "r2a_mid60_h11",
+        "r2b_6b_60_h11"
+      ]
+    ]
+  },
+  "claim_boundary": "Seven preregistered fixed index-hash width 11 profiles plus canonical native G5 run: 8×19=152 first-ROI jobs, 8×2=16 selected smoke. Native corresponding seven configurations read from pre-audited R2B immutable original run directories; require manifest and SHA proofs. No new frontier geometry, no original source changes, not unseen holdout, no PPA."
+}
