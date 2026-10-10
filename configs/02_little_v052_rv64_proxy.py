@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 from m5.objects import (
@@ -34,6 +35,14 @@ from gem5.isas import ISA
 from gem5.resources.resource import BinaryResource
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
+
+# BPU-8 experimental TAGE-only profiles. Read from a pinned repo-local
+# pre-result matrix; do not modify any original BPU-4C or C3 class.
+BPU8_MATRIX = json.loads((Path(__file__).resolve().parents[1] /
+                          "docs/bpu8_tage_isobit_r1.json").read_text())
+BPU8_GEO_TYPES = {v["bp_type"]: v for v in BPU8_MATRIX["profiles"].values()
+                  if v["bp_type"].startswith("tage-geo-")}
+
 
 
 
@@ -1155,6 +1164,32 @@ class LittleV052Rv64Core(BaseCPUCore):
             stock_tage.instShiftAmt = effective_cond_shift
             stock_tage.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = stock_tage
+        elif bp_type in BPU8_GEO_TYPES:
+            geo = BPU8_GEO_TYPES[bp_type]
+            # Use the same G5 TAGE implementation with only simulation-time
+            # geometry parameter overrides; no predictor semantic patches.
+            entries = geo["entries"]
+            tags = geo["tag_bits"]
+            hist = geo["histories"]
+            if (len(entries) != len(tags) or len(tags) != len(hist)
+                    or not all(x > 0 and x & (x - 1) == 0 for x in entries)
+                    or sorted(hist) != hist or hist[-1] != 130
+                    or geo["base_entries"] != 2048):
+                raise ValueError("Invalid frozen BPU-8 geometry: " + bp_type)
+            computed_bits = (2560 + 130 + 16 + 22 +
+                             sum(e * (5 + t) for e, t in zip(entries, tags)))
+            if computed_bits != geo["total_bits"]:
+                raise ValueError("BPU-8 exact logical-state budget mismatch")
+            pred = LittleTAGE5Iso45K()
+            pred.instShiftAmt = effective_cond_shift
+            pred.tage.instShiftAmt = effective_cond_shift
+            pred.tage.nHistoryTables = len(entries)
+            pred.tage.minHist = hist[0]
+            pred.tage.maxHist = hist[-1]
+            pred.tage.explicitHistLengths = hist
+            pred.tage.tagTableTagWidths = [0] + tags
+            pred.tage.logTagTableSizes = [11] + [e.bit_length() - 1 for e in entries]
+            cpu.branchPred.conditionalBranchPred = pred
         elif bp_type == "tage5-iso45k":
             tage5 = LittleTAGE5Iso45K()
             tage5.instShiftAmt = effective_cond_shift
@@ -1810,6 +1845,7 @@ def parse_args() -> argparse.Namespace:
             "tage5-perc-v1-prior22",
             "tage5-perc-wm-prior22",
             "tage7-iso65k",
+            *tuple(BPU8_GEO_TYPES),
             "micro-tage",
         ),
         default="tournament",
