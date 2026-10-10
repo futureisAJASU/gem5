@@ -1,0 +1,34 @@
+name: BPU-8 TAGE exact-state sweep safety checks
+on:
+  push:
+    branches: [little-v052-bpu8-tage-isobit-r1]
+  pull_request:
+    paths:
+      - 'configs/02_little_v052_rv64_proxy.py'
+      - 'src/cpu/pred/BranchPredictor.py'
+      - 'docs/bpu8_tage_isobit_r1.json'
+      - 'scripts/bpu_b8_tage_isobit_full19.py'
+      - 'tests/bpu8/**'
+      - '.github/workflows/bpu8-tage-isobit.yaml'
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and fail-closed synthetic parser checks
+        run: |
+          python3 -m py_compile scripts/bpu_b8_tage_isobit_full19.py configs/02_little_v052_rv64_proxy.py
+          python3 -m unittest discover -s tests/bpu8 -p 'test_*.py' -v
+          python3 scripts/bpu_b8_tage_isobit_full19.py --list | grep -F 'BPU8_JOBS_PLANNED=190 FULL19=True'
+          python3 scripts/bpu_b8_tage_isobit_full19.py --smoke --list | grep -F 'BPU8_JOBS_PLANNED=20 FULL19=False'
+      - name: Source invariant (no C3 or frontend redirection)
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          s=pathlib.Path('configs/02_little_v052_rv64_proxy.py').read_text()
+          block=s.split('elif bp_type in BPU8_GEO_TYPES:',1)[1].split('elif bp_type == "tage5-iso45k":',1)[0]
+          assert 'LittleTAGE5Iso45K()' in block
+          assert 'cpu.branchPred.conditionalBranchPred = pred' in block
+          assert 'c3PcChooser' not in block and 'perceptronEnabled' not in block
+          PY
+          git diff --check HEAD^ HEAD
