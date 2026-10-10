@@ -1,0 +1,42 @@
+name: BPU-8 R2B exact-iso geometry frontier preflight
+on:
+  push:
+    branches: [little-v052-bpu8-r2b-geometry-frontier]
+  pull_request:
+    paths:
+      - 'configs/02_little_v052_rv64_proxy.py'
+      - 'docs/bpu8_r2b_geometry_frontier_v01.json'
+      - 'scripts/bpu_b8_r2b_geometry_full19.py'
+      - 'tests/bpu8/test_r2b_frontier.py'
+      - '.github/workflows/bpu8-r2b-frontier.yaml'
+jobs:
+  source-only-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Exact ISO state, immutable controls and runner invariants
+        run: |
+          python3 -m py_compile configs/02_little_v052_rv64_proxy.py scripts/bpu_b8_r2b_geometry_full19.py
+          python3 -m unittest discover -s tests/bpu8 -p 'test_*.py' -v
+          python3 scripts/bpu_b8_r2b_geometry_full19.py --list | grep -F 'BPU8_R2B_JOBS_PLANNED=304 FULL19=True'
+          python3 scripts/bpu_b8_r2b_geometry_full19.py --smoke --list | grep -F 'BPU8_R2B_JOBS_PLANNED=32 FULL19=False'
+          python3 scripts/bpu_b8_r2b_geometry_full19.py --list | sed -n '1p' | grep -F 'tg5_45'
+      - name: No changed TAGE C++ algorithm, C3, R1/R2A tables
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          s=Path("configs/02_little_v052_rv64_proxy.py").read_text()
+          assert "BPU8_R2B_GEO_TYPES" in s
+          assert "*tuple(BPU8_R2B_GEO_TYPES)" in s
+          block=s.split('elif bp_type in BPU8_ALL_GEO_TYPES:',1)[1].split('elif bp_type == "tage5-iso45k":',1)[0]
+          assert "LittleTAGE5Iso45K()" in block
+          assert "cpu.branchPred.conditionalBranchPred = pred" in block
+          assert "c3PcChooser" not in block and "perceptronEnabled" not in block
+          changed=subprocess.check_output(["git","diff","--name-only",
+            "HEAD^","HEAD"],text=True).splitlines()
+          assert all(not p.startswith("src/cpu/pred/") for p in changed)
+          PY
+          git diff --check HEAD^ HEAD
