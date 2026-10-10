@@ -376,7 +376,8 @@ def main():
         repo_head=git("rev-parse", "HEAD"), repo_clean=True,
         gem5_sha256=sha(gem5), config_sha256=sha(CONFIG_FILE),
         runner_sha256=sha(Path(__file__)), matrix_sha256=sha(MATRIX_FILE), r1_matrix_sha256=sha(R1_MATRIX_FILE),
-        r2a_matrix_sha256=sha(R2A_MATRIX_FILE),\n        r2b_matrix_sha256=sha(R2B_MATRIX_FILE), native_raw_evidence=native_identity,
+        r2a_matrix_sha256=sha(R2A_MATRIX_FILE),
+        r2b_matrix_sha256=sha(R2B_MATRIX_FILE), native_raw_evidence=native_identity,
         embench_head=embhead, benchmarks={w:sha(p) for w,p in bins.items()},
         profiles=profiles, workloads=workloads, job_count=len(jobs),
         frontend=matrix["frontend"])
@@ -443,7 +444,10 @@ def main():
         else:
             with proof.open("x") as f:
                 f.write(json.dumps(snap,sort_keys=True,indent=2)+"\n")
-        if p == "tg5_45":\n            old=native_controls[("tg5_45",w)]\n            if any(row[field]!=old[field] for field in BASE_FIELDS):\n                raise ValueError("R2C G5 differs from audited R2B native G5")
+        if p == "tg5_45":
+            old=native_controls[("tg5_45",w)]
+            if any(row[field]!=old[field] for field in BASE_FIELDS):
+                raise ValueError("R2C G5 differs from audited R2B native G5")
             g5_by_w[w] = row
         else:
             if row["simInsts"] != g5_by_w[w]["simInsts"]:
