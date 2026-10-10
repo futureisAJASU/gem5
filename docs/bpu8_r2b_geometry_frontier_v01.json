@@ -1,0 +1,580 @@
+{
+  "experiment": "BPU8_R2B_GEOMETRY_FRONTIER_V01",
+  "status": "PRE_REGISTERED_NOT_RUN",
+  "base_commit": "774a296ae0309a45acff8643227b0c28d1cf8ab7",
+  "method": {
+    "core_algorithm": "Same original TAGEBase, no C3/perceptron",
+    "physical_hash_mode": "default fixedIndexHashLogSize=0, bank resizing also alters index mixing",
+    "base_bimodal_entries": 2048,
+    "logical_fixed_bits": 2728,
+    "tagged_entry_bits": "tag + 3-bit direction + 2-bit usefulness",
+    "capacity_budgets_bits": [
+      50088,
+      52904,
+      60072
+    ],
+    "control_group_not_iso": "G5 45,736 and Stock/G7 65,192 serve as out-of-tier anchors"
+  },
+  "frontend": {
+    "bp_inst_shift": 1,
+    "bp_cond_shift": 1,
+    "bp_btb_shift": 2,
+    "bp_indirect_shift": 1,
+    "btb_entries": 4096
+  },
+  "workloads": [
+    "aha-mont64",
+    "crc32",
+    "cubic",
+    "edn",
+    "huffbench",
+    "matmult-int",
+    "minver",
+    "nbody",
+    "nettle-aes",
+    "nettle-sha256",
+    "nsichneu",
+    "picojpeg",
+    "qrduino",
+    "sglib-combined",
+    "slre",
+    "st",
+    "statemate",
+    "ud",
+    "wikisort"
+  ],
+  "profiles": {
+    "r2b_5a_53": {
+      "bp_type": "tage-r2b-r2b-5a-53",
+      "total_bits": 52904,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        1024,
+        1024,
+        256,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "r2b_5b_53": {
+      "bp_type": "tage-r2b-r2b-5b-53",
+      "total_bits": 52904,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        1024,
+        512,
+        512,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "r2b_6a_53": {
+      "bp_type": "tage-r2b-r2b-6a-53",
+      "total_bits": 52904,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        1024,
+        512,
+        512,
+        256,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ]
+    },
+    "r2b_6b_53": {
+      "bp_type": "tage-r2b-r2b-6b-53",
+      "total_bits": 52904,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ]
+    },
+    "r2b_5a_60": {
+      "bp_type": "tage-r2b-r2b-5a-60",
+      "total_bits": 60072,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        1024,
+        1024,
+        512,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "r2b_5b_60": {
+      "bp_type": "tage-r2b-r2b-5b-60",
+      "total_bits": 60072,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        2048,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "r2b_6a_60": {
+      "bp_type": "tage-r2b-r2b-6a-60",
+      "total_bits": 60072,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        1024,
+        512,
+        512,
+        512,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ]
+    },
+    "r2b_6b_60": {
+      "bp_type": "tage-r2b-r2b-6b-60",
+      "total_bits": 60072,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        1024,
+        1024,
+        512,
+        256,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ]
+    },
+    "tg5_50": {
+      "bp_type": "tage-geo-tg5-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        1024,
+        512,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "tg6_50": {
+      "bp_type": "tage-geo-tg6-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ]
+    },
+    "tg7_50": {
+      "bp_type": "tage-geo-tg7-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        11
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "r2a_both52": {
+      "bp_type": "tage-r2a-r2a-both52",
+      "total_bits": 52904,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "r2a_mid60": {
+      "bp_type": "tage-r2a-r2a-mid60",
+      "total_bits": 60072,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        1024,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "tg5_45": {
+      "bp_type": "tage5-iso45k",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "stock": {
+      "bp_type": "tage",
+      "total_bits": 65192
+    },
+    "g7": {
+      "bp_type": "tage7-iso65k",
+      "total_bits": 65192
+    }
+  },
+  "tiers": {
+    "B50_50088": {
+      "bits": 50088,
+      "reference": "tg7_50",
+      "comparators": [
+        "tg5_50",
+        "tg6_50"
+      ]
+    },
+    "B53_52904": {
+      "bits": 52904,
+      "reference": "r2a_both52",
+      "comparators": [
+        "r2b_5a_53",
+        "r2b_5b_53",
+        "r2b_6a_53",
+        "r2b_6b_53"
+      ]
+    },
+    "B60_60072": {
+      "bits": 60072,
+      "reference": "r2a_mid60",
+      "comparators": [
+        "r2b_5a_60",
+        "r2b_5b_60",
+        "r2b_6a_60",
+        "r2b_6b_60"
+      ]
+    }
+  },
+  "paired_comparisons": [
+    {
+      "tier": "B50_50088",
+      "reference": "tg7_50",
+      "candidate": "tg5_50",
+      "same_budget": true
+    },
+    {
+      "tier": "B50_50088",
+      "reference": "tg7_50",
+      "candidate": "tg6_50",
+      "same_budget": true
+    },
+    {
+      "tier": "B53_52904",
+      "reference": "r2a_both52",
+      "candidate": "r2b_5a_53",
+      "same_budget": true
+    },
+    {
+      "tier": "B53_52904",
+      "reference": "r2a_both52",
+      "candidate": "r2b_5b_53",
+      "same_budget": true
+    },
+    {
+      "tier": "B53_52904",
+      "reference": "r2a_both52",
+      "candidate": "r2b_6a_53",
+      "same_budget": true
+    },
+    {
+      "tier": "B53_52904",
+      "reference": "r2a_both52",
+      "candidate": "r2b_6b_53",
+      "same_budget": true
+    },
+    {
+      "tier": "B60_60072",
+      "reference": "r2a_mid60",
+      "candidate": "r2b_5a_60",
+      "same_budget": true
+    },
+    {
+      "tier": "B60_60072",
+      "reference": "r2a_mid60",
+      "candidate": "r2b_5b_60",
+      "same_budget": true
+    },
+    {
+      "tier": "B60_60072",
+      "reference": "r2a_mid60",
+      "candidate": "r2b_6a_60",
+      "same_budget": true
+    },
+    {
+      "tier": "B60_60072",
+      "reference": "r2a_mid60",
+      "candidate": "r2b_6b_60",
+      "same_budget": true
+    },
+    {
+      "tier": "B53_52904",
+      "reference": "r2b_5a_53",
+      "candidate": "r2b_5b_53",
+      "same_budget": true
+    },
+    {
+      "tier": "B53_52904",
+      "reference": "r2b_6a_53",
+      "candidate": "r2b_6b_53",
+      "same_budget": true
+    },
+    {
+      "tier": "B60_60072",
+      "reference": "r2b_5a_60",
+      "candidate": "r2b_5b_60",
+      "same_budget": true
+    },
+    {
+      "tier": "B60_60072",
+      "reference": "r2b_6a_60",
+      "candidate": "r2b_6b_60",
+      "same_budget": true
+    }
+  ],
+  "selection_notes": {
+    "r2b_5a_53": "h11 plus and h58 less; minimum-change balance",
+    "r2b_5b_53": "h5 and h11 emphasis, h25 smaller",
+    "r2b_6a_53": "h10 emphasis, h75 smaller",
+    "r2b_6b_53": "h20 emphasis, h130 smaller",
+    "r2b_5a_60": "h5 plus h11 growth",
+    "r2b_5b_60": "h25 expansion, h130 reduction",
+    "r2b_6a_60": "h5 plus h10 growth",
+    "r2b_6b_60": "h10 plus h20, h75 reduction"
+  },
+  "claim_boundary": "Exact iso-state geometry comparison within each of three budgets; two new 5- and 6-table allocations at upper budgets, not an exhaustive Pareto optimality proof. R1 and R2A existing development data, no unseen holdout, no physical RTL PPA."
+}
