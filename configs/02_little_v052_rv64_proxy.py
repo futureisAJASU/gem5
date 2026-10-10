@@ -43,6 +43,17 @@ BPU8_MATRIX = json.loads((Path(__file__).resolve().parents[1] /
 BPU8_GEO_TYPES = {v["bp_type"]: v for v in BPU8_MATRIX["profiles"].values()
                   if v["bp_type"].startswith("tage-geo-")}
 
+# BPU-8 R2A: isolated PRE-RESULT 7-bank capacity variants. R1 data and
+# existing R1 predictor mappings are immutable. New geometries share only
+# the same TAGEBase implementation; no C3 correction or C++ semantics changed.
+BPU8_R2A_MATRIX = json.loads((Path(__file__).resolve().parents[1] /
+                             "docs/bpu8_r2a_capacity_knee_v01.json").read_text())
+BPU8_R2A_GEO_TYPES = {
+    v["bp_type"]: v for v in BPU8_R2A_MATRIX["profiles"].values()
+    if v["bp_type"].startswith("tage-r2a-")
+}
+BPU8_ALL_GEO_TYPES = {**BPU8_GEO_TYPES, **BPU8_R2A_GEO_TYPES}
+
 
 
 
@@ -1164,8 +1175,8 @@ class LittleV052Rv64Core(BaseCPUCore):
             stock_tage.instShiftAmt = effective_cond_shift
             stock_tage.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = stock_tage
-        elif bp_type in BPU8_GEO_TYPES:
-            geo = BPU8_GEO_TYPES[bp_type]
+        elif bp_type in BPU8_ALL_GEO_TYPES:
+            geo = BPU8_ALL_GEO_TYPES[bp_type]
             # Use the same G5 TAGE implementation with only simulation-time
             # geometry parameter overrides; no predictor semantic patches.
             entries = geo["entries"]
@@ -1846,6 +1857,7 @@ def parse_args() -> argparse.Namespace:
             "tage5-perc-wm-prior22",
             "tage7-iso65k",
             *tuple(BPU8_GEO_TYPES),
+            *tuple(BPU8_R2A_GEO_TYPES),
             "micro-tage",
         ),
         default="tournament",
