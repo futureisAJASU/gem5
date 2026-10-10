@@ -212,7 +212,11 @@ def main():
     matrix = load_matrix()
     workloads = ("huffbench", "qrduino") if args.smoke else tuple(matrix["workloads"])
     profiles = matrix["profiles"]
-    jobs = [(p, w) for w in workloads for p in profiles]
+    # Each workload's canonical G5 must be verified BEFORE a different
+    # geometry is allowed to compare committed instructions against it.
+    # Dict registry order is editorial, never a runnable dependency order.
+    run_order = ("tg5_45",) + tuple(p for p in profiles if p != "tg5_45")
+    jobs = [(p, w) for w in workloads for p in run_order]
     if args.list:
         for w in workloads:
             for p in profiles:
