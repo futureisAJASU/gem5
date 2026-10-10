@@ -52,7 +52,16 @@ BPU8_R2A_GEO_TYPES = {
     v["bp_type"]: v for v in BPU8_R2A_MATRIX["profiles"].values()
     if v["bp_type"].startswith("tage-r2a-")
 }
-BPU8_ALL_GEO_TYPES = {**BPU8_GEO_TYPES, **BPU8_R2A_GEO_TYPES}
+# R2B's exact-budget 5/6-bank alternatives: original R1/R2A profiles
+# remain unchanged; this is an additive adapter only.
+BPU8_R2B_MATRIX = json.loads((Path(__file__).resolve().parents[1] /
+                             "docs/bpu8_r2b_geometry_frontier_v01.json").read_text())
+BPU8_R2B_GEO_TYPES = {
+    v["bp_type"]: v for v in BPU8_R2B_MATRIX["profiles"].values()
+    if v["bp_type"].startswith("tage-r2b-")
+}
+BPU8_ALL_GEO_TYPES = {**BPU8_GEO_TYPES, **BPU8_R2A_GEO_TYPES,
+                      **BPU8_R2B_GEO_TYPES}
 
 
 
@@ -1858,6 +1867,7 @@ def parse_args() -> argparse.Namespace:
             "tage7-iso65k",
             *tuple(BPU8_GEO_TYPES),
             *tuple(BPU8_R2A_GEO_TYPES),
+            *tuple(BPU8_R2B_GEO_TYPES),
             "micro-tage",
         ),
         default="tournament",
