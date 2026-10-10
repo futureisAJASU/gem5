@@ -319,7 +319,9 @@ def main():
                     datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")))
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--list", action="store_true")
-    ap.add_argument("--native-r2b-dir", type=Path,\n                    default=Path.home()/"bpu8_r2b_full19_01")\n    ap.add_argument("--smoke", action="store_true",
+    ap.add_argument("--native-r2b-dir", type=Path,
+                    default=Path.home()/"bpu8_r2b_full19_01")
+    ap.add_argument("--smoke", action="store_true",
                     help="only huffbench and qrduino; never mislabel as Full-19")
     args = ap.parse_args()
     if args.jobs < 1:
