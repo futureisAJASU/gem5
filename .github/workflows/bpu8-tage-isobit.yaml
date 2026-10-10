@@ -22,6 +22,7 @@ jobs:
           python3 -m py_compile scripts/bpu_b8_tage_isobit_full19.py configs/02_little_v052_rv64_proxy.py
           python3 -m unittest discover -s tests/bpu8 -p 'test_*.py' -v
           python3 scripts/bpu_b8_tage_isobit_full19.py --list | grep -F 'BPU8_JOBS_PLANNED=190 FULL19=True'
+          python3 scripts/bpu_b8_tage_isobit_full19.py --list | head -1 | grep -F 'tg5_45'
           python3 scripts/bpu_b8_tage_isobit_full19.py --smoke --list | grep -F 'BPU8_JOBS_PLANNED=20 FULL19=False'
       - name: Source invariant (no C3 or frontend redirection)
         run: |
