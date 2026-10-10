@@ -1,0 +1,397 @@
+{
+  "experiment": "BPU8_R2A_CAPACITY_KNEE_V01",
+  "status": "PRE_REGISTERED_NOT_RUN",
+  "from_r1_commit": "6aeed4f092c86f8c3b25654cf71f9398457bdc06",
+  "from_r1_matrix": "docs/bpu8_tage_isobit_r1.json",
+  "claim_boundary": "Seven-bank fixed-history/tag entry-depth ablations. Default gem5 index hash can change with logTableSize. Not a universal TAGE knee, not RTL PPA or independent holdout. All planned profiles must be retained.",
+  "frontend": {
+    "bp_inst_shift": 1,
+    "bp_cond_shift": 1,
+    "bp_btb_shift": 2,
+    "bp_indirect_shift": 1,
+    "btb_entries": 4096
+  },
+  "method": {
+    "tag_counter_bits": 3,
+    "useful_counter_bits": 2,
+    "base_hysteresis_ratio_log2": 2,
+    "path_history_bits": 16,
+    "other_state_bits": 22,
+    "maximum_global_history": 130,
+    "tag_widths_fixed_for_seven_banks": [
+      8,
+      8,
+      9,
+      9,
+      9,
+      10,
+      10
+    ],
+    "history_lengths_fixed_for_seven_banks": [
+      5,
+      9,
+      15,
+      25,
+      44,
+      76,
+      130
+    ],
+    "logical_bits_formula": "2728 + sum(entries[i] * (5 + tag_bits[i]))",
+    "hash_log_size": 0
+  },
+  "workloads": [
+    "aha-mont64",
+    "crc32",
+    "cubic",
+    "edn",
+    "huffbench",
+    "matmult-int",
+    "minver",
+    "nbody",
+    "nettle-aes",
+    "nettle-sha256",
+    "nsichneu",
+    "picojpeg",
+    "qrduino",
+    "sglib-combined",
+    "slre",
+    "st",
+    "statemate",
+    "ud",
+    "wikisort"
+  ],
+  "profiles": {
+    "r2a_dn43": {
+      "bp_type": "tage-r2a-r2a-dn43",
+      "total_bits": 43816,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        128
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "r2a_ref45": {
+      "bp_type": "tage-geo-tg7-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        256
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "r2a_sh49": {
+      "bp_type": "tage-r2a-r2a-sh49",
+      "total_bits": 49064,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512,
+        256
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "r2a_lg49": {
+      "bp_type": "tage-r2a-r2a-lg49",
+      "total_bits": 49576,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "r2a_both52": {
+      "bp_type": "tage-r2a-r2a-both52",
+      "total_bits": 52904,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "r2a_mid60": {
+      "bp_type": "tage-r2a-r2a-mid60",
+      "total_bits": 60072,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        1024,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "r2a_long60": {
+      "bp_type": "tage-r2a-r2a-long60",
+      "total_bits": 60584,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        1024,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "tg7_50": {
+      "bp_type": "tage-geo-tg7-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        11
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "tg5_45": {
+      "bp_type": "tage5-iso45k",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "stock": {
+      "bp_type": "tage",
+      "total_bits": 65192
+    },
+    "g7": {
+      "bp_type": "tage7-iso65k",
+      "total_bits": 65192
+    }
+  },
+  "paired_comparisons": [
+    {
+      "from": "r2a_dn43",
+      "to": "r2a_ref45",
+      "cause": "grow h130 128 to 256"
+    },
+    {
+      "from": "r2a_ref45",
+      "to": "r2a_sh49",
+      "cause": "grow h5 256 to 512"
+    },
+    {
+      "from": "r2a_ref45",
+      "to": "r2a_lg49",
+      "cause": "grow h130 256 to 512"
+    },
+    {
+      "from": "r2a_lg49",
+      "to": "tg7_50",
+      "cause": "tagwidth on h130 10 to 11 at 512 entries"
+    },
+    {
+      "from": "r2a_sh49",
+      "to": "r2a_both52",
+      "cause": "grow h130 256 to 512 after h5 grown"
+    },
+    {
+      "from": "r2a_lg49",
+      "to": "r2a_both52",
+      "cause": "grow h5 256 to 512 after h130 grown"
+    },
+    {
+      "from": "r2a_both52",
+      "to": "r2a_mid60",
+      "cause": "grow h25 512 to 1024"
+    },
+    {
+      "from": "r2a_both52",
+      "to": "r2a_long60",
+      "cause": "grow h76 512 to 1024"
+    }
+  ]
+}
