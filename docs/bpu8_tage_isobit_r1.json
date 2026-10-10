@@ -1,0 +1,271 @@
+{
+  "experiment": "BPU8_TAGE_ISOBIT_R1",
+  "status": "PRE_REGISTERED_NOT_RUN",
+  "frontend": {
+    "bp_inst_shift": 1,
+    "bp_cond_shift": 1,
+    "bp_btb_shift": 2,
+    "bp_indirect_shift": 1,
+    "btb_entries": 4096
+  },
+  "method": {
+    "tag_counter_bits": 3,
+    "useful_counter_bits": 2,
+    "base_hysteresis_ratio_log2": 2,
+    "path_history_bits": 16,
+    "other_state_bits": 22,
+    "maximum_global_history": 130
+  },
+  "workloads": [
+    "aha-mont64",
+    "crc32",
+    "cubic",
+    "edn",
+    "huffbench",
+    "matmult-int",
+    "minver",
+    "nbody",
+    "nettle-aes",
+    "nettle-sha256",
+    "nsichneu",
+    "picojpeg",
+    "qrduino",
+    "sglib-combined",
+    "slre",
+    "st",
+    "statemate",
+    "ud",
+    "wikisort"
+  ],
+  "profiles": {
+    "tg4_45": {
+      "bp_type": "tage-geo-tg4-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        1024,
+        1024,
+        512
+      ],
+      "tag_bits": [
+        8,
+        9,
+        9,
+        10
+      ],
+      "histories": [
+        5,
+        17,
+        52,
+        130
+      ]
+    },
+    "tg5_45": {
+      "bp_type": "tage5-iso45k",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "tg6_45": {
+      "bp_type": "tage-geo-tg6-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ]
+    },
+    "tg7_45": {
+      "bp_type": "tage-geo-tg7-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        256
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "tg4_50": {
+      "bp_type": "tage-geo-tg4-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        1024,
+        1024,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        9,
+        9,
+        10
+      ],
+      "histories": [
+        5,
+        17,
+        52,
+        130
+      ]
+    },
+    "tg5_50": {
+      "bp_type": "tage-geo-tg5-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        1024,
+        512,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ]
+    },
+    "tg6_50": {
+      "bp_type": "tage-geo-tg6-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        1024
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ]
+    },
+    "tg7_50": {
+      "bp_type": "tage-geo-tg7-50",
+      "total_bits": 50088,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        11
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ]
+    },
+    "stock": {
+      "bp_type": "tage",
+      "total_bits": 65192
+    },
+    "g7": {
+      "bp_type": "tage7-iso65k",
+      "total_bits": 65192
+    }
+  },
+  "claim_boundary": "Real G5/G7/Stock and new TAGE-only same-ROI cycles, not C3 shadow real M1 or RTL PPA. Previously inspected Embench development set."
+}
