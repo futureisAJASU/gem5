@@ -1,0 +1,40 @@
+name: BPU-8 R2C hash11 bounded closure preflight
+on:
+  push:
+    branches: [little-v052-bpu8-r2c-hash11-freeze-gate]
+  pull_request:
+    paths:
+      - 'docs/bpu8_r2c_fixed_hash11_freeze_gate_v01.json'
+      - 'configs/02_little_v052_rv64_proxy.py'
+      - 'scripts/bpu_b8_r2c_fixed_hash_full19.py'
+      - 'tests/bpu8/test_r2c_hash11.py'
+      - '.github/workflows/bpu8-r2c-hash11.yaml'
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Syntax, archived-shape invariance, native RAW control requirement
+        run: |
+          python3 -m py_compile configs/02_little_v052_rv64_proxy.py scripts/bpu_b8_r2c_fixed_hash_full19.py tests/bpu8/test_r2c_hash11.py
+          python3 -m unittest discover -s tests/bpu8 -p 'test_*.py' -v
+          python3 scripts/bpu_b8_r2c_fixed_hash_full19.py --list | grep -F 'BPU8_R2C_JOBS_PLANNED=152 FULL19=True'
+          python3 scripts/bpu_b8_r2c_fixed_hash_full19.py --smoke --list | grep -F 'BPU8_R2C_JOBS_PLANNED=16 FULL19=False'
+          python3 scripts/bpu_b8_r2c_fixed_hash_full19.py --list | sed -n '1p' | grep -F 'tg5_45'
+      - name: Additive hash parameter only, no predictor logic patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c=Path("configs/02_little_v052_rv64_proxy.py").read_text()
+          assert "tage-r2c-h11-g7" in c and "tage-r2c-h11-tg5-45" in c
+          assert 'pred.tage.fixedIndexHashLogSize = 11' in c
+          assert 'tage7_h11.tage.fixedIndexHashLogSize = 11' in c
+          assert 'tage5_h11.tage.fixedIndexHashLogSize = 11' in c
+          assert "BPU8_R2C_HASH_GEO_TYPES" in c
+          assert c.count("fixedIndexHashLogSize = 11")==3
+          assert 'BPU8_R2C_HASH11_FAIL_CLOSED' in Path(
+                "scripts/bpu_b8_r2c_fixed_hash_full19.py").read_text()
+          PY
+          git diff --check HEAD^ HEAD
