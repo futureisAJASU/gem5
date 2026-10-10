@@ -60,8 +60,17 @@ BPU8_R2B_GEO_TYPES = {
     v["bp_type"]: v for v in BPU8_R2B_MATRIX["profiles"].values()
     if v["bp_type"].startswith("tage-r2b-")
 }
+# R2C diagnostic: identical physical banks and history, but a fixed index
+# fold/mix width 11. Never changes the default/natively hashed R1/R2A/R2B.
+BPU8_R2C_MATRIX = json.loads((Path(__file__).resolve().parents[1] /
+                             "docs/bpu8_r2c_fixed_hash11_freeze_gate_v01.json").read_text())
+BPU8_R2C_HASH_GEO_TYPES = {
+    v["bp_type"]: v for v in BPU8_R2C_MATRIX["profiles"].values()
+    if v.get("fixed_index_hash_log_size") == 11
+    and v.get("original_profile") not in ("tg5_45", "g7")
+}
 BPU8_ALL_GEO_TYPES = {**BPU8_GEO_TYPES, **BPU8_R2A_GEO_TYPES,
-                      **BPU8_R2B_GEO_TYPES}
+                      **BPU8_R2B_GEO_TYPES, **BPU8_R2C_HASH_GEO_TYPES}
 
 
 
@@ -1209,12 +1218,23 @@ class LittleV052Rv64Core(BaseCPUCore):
             pred.tage.explicitHistLengths = hist
             pred.tage.tagTableTagWidths = [0] + tags
             pred.tage.logTagTableSizes = [11] + [e.bit_length() - 1 for e in entries]
+            if "fixed_index_hash_log_size" in geo:
+                if (geo["fixed_index_hash_log_size"] != 11
+                        or max(entries).bit_length() - 1 > 11):
+                    raise ValueError("Invalid R2C fixed-index hash contract")
+                pred.tage.fixedIndexHashLogSize = 11
             cpu.branchPred.conditionalBranchPred = pred
         elif bp_type == "tage5-iso45k":
             tage5 = LittleTAGE5Iso45K()
             tage5.instShiftAmt = effective_cond_shift
             tage5.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = tage5
+        elif bp_type == "tage-r2c-h11-tg5-45":
+            tage5_h11 = LittleTAGE5Iso45K()
+            tage5_h11.instShiftAmt = effective_cond_shift
+            tage5_h11.tage.instShiftAmt = effective_cond_shift
+            tage5_h11.tage.fixedIndexHashLogSize = 11
+            cpu.branchPred.conditionalBranchPred = tage5_h11
         elif bp_type == "tage5-perc-v1":
             tage5p = LittleTAGE5Perceptron()
             tage5p.instShiftAmt = effective_cond_shift
@@ -1245,6 +1265,12 @@ class LittleV052Rv64Core(BaseCPUCore):
             tage7.instShiftAmt = effective_cond_shift
             tage7.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = tage7
+        elif bp_type == "tage-r2c-h11-g7":
+            tage7_h11 = LittleTAGE7Iso65K()
+            tage7_h11.instShiftAmt = effective_cond_shift
+            tage7_h11.tage.instShiftAmt = effective_cond_shift
+            tage7_h11.tage.fixedIndexHashLogSize = 11
+            cpu.branchPred.conditionalBranchPred = tage7_h11
         elif bp_type == "micro-tage":
             micro_tage = LittleMicroTAGE()
             micro_tage.instShiftAmt = effective_cond_shift
@@ -1868,6 +1894,9 @@ def parse_args() -> argparse.Namespace:
             *tuple(BPU8_GEO_TYPES),
             *tuple(BPU8_R2A_GEO_TYPES),
             *tuple(BPU8_R2B_GEO_TYPES),
+            *tuple(BPU8_R2C_HASH_GEO_TYPES),
+            "tage-r2c-h11-tg5-45",
+            "tage-r2c-h11-g7",
             "micro-tage",
         ),
         default="tournament",
