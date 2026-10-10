@@ -218,9 +218,9 @@ def main():
     run_order = ("tg5_45",) + tuple(p for p in profiles if p != "tg5_45")
     jobs = [(p, w) for w in workloads for p in run_order]
     if args.list:
-        for w in workloads:
-            for p in profiles:
-                print(f"{p:12s} {w}")
+        # Print the exact executable job order, not the editorial registry order.
+        for p, w in jobs:
+            print(f"{p:12s} {w}")
         print(f"BPU8_JOBS_PLANNED={len(jobs)} FULL19={not args.smoke}")
         return
 
