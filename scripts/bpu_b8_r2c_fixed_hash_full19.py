@@ -451,8 +451,7 @@ def main():
                 raise RuntimeError(f"{p}/{w}: committed conditional count changed under hash11")
             if row["storageBits"]!=old["storageBits"]:
                 raise RuntimeError(f"{p}/{w}: hash11 changed logical state bits")
-            if False:
-                raise RuntimeError(f"{p}/{w}: committed inst mismatch vs G5")
+
         rows.append(row)
         write_csv(out,rows)
         print(f"  [{i:3d}/{len(jobs)}] {p:8s} {w:18s} "
