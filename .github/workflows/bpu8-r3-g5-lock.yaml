@@ -1,0 +1,52 @@
+name: BPU-8 R3 G5 lock hash geometry and TAGE diagnostics
+on:
+  push:
+    branches:
+      - little-v052-bpu8-r3-g5-lock-hash-geometry
+  pull_request:
+    paths:
+      - 'docs/bpu8_r3_g5_lock_v01.json'
+      - 'src/cpu/pred/tage_base.cc'
+      - 'src/cpu/pred/tage_base.hh'
+      - 'src/cpu/pred/BranchPredictor.py'
+      - 'configs/02_little_v052_rv64_proxy.py'
+      - 'scripts/bpu_b8_r3_g5_lock_full19.py'
+      - 'tests/bpu8/test_r3_g5_lock.py'
+      - '.github/workflows/bpu8-r3-g5-lock.yaml'
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Python syntax and independent synthetic mutators
+        run: |
+          python3 -m py_compile configs/02_little_v052_rv64_proxy.py scripts/bpu_b8_r3_g5_lock_full19.py tests/bpu8/test_r3_g5_lock.py
+          python3 -m unittest discover -s tests/bpu8 -p 'test_*.py' -v
+          python3 scripts/bpu_b8_r3_g5_lock_full19.py --list | grep -F 'BPU8_R3_JOBS_PLANNED=114 FULL19=True'
+          python3 scripts/bpu_b8_r3_g5_lock_full19.py --smoke --list | grep -F 'BPU8_R3_JOBS_PLANNED=12 FULL19=False'
+      - name: Source invariance and hard fail-closed guard
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          cfg=Path("configs/02_little_v052_rv64_proxy.py").read_text()
+          cpp=Path("src/cpu/pred/tage_base.cc").read_text()
+          runner=Path("scripts/bpu_b8_r3_g5_lock_full19.py").read_text()
+          assert cfg.count("r3TageDiagnosticsEnabled = True")==2
+          assert "tage-r3-native-tg5-45" in cfg and "tage-r3-h11-tg5-45" in cfg
+          assert "BPU8_R3_HASH_GEO_TYPES" in cfg
+          assert "stats.r3Allocations++" in cpp and "stats.r3HitBank[bi->hitBank]++" in cpp
+          assert "BPU8_R3_FAIL_CLOSED" in runner
+          assert 'validate_r3_ini(folder/"config.ini",p,profiles)' in runner
+          assert 'r3CauseJson' in runner and 'r3SelectedBankWrong' in runner
+          PY
+  linked-riscv:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linked RISCV gem5.opt compile (not Embench execution)
+        run: |
+          python3 /usr/bin/scons --ignore-style build/RISCV/gem5.opt -j2
