@@ -1,0 +1,108 @@
+{
+  "experiment": "BPU8_R3C_EXTERNAL_HOLDOUT_P0",
+  "status": "PRE_RESULT_CANDIDATE_SUITE_NOT_YET_FEASIBILITY_LOCKED",
+  "date": "2026-10-12",
+  "base_commit": "f3f3fa41fcf883a3e077296ac4b2c7a02e74e1d6",
+  "no_actual_holdout_runs": true,
+  "notion_audit": "https://app.notion.com/p/3f66f08ed244815eb632df751fad6d7a",
+  "notion_contract": "https://app.notion.com/p/3f66f08ed24481fda9f7c3209d8f2060",
+  "study_questions": [
+    "generalization of TG7-45 vs G5-45 on never inspected external input-locked RV64 cases",
+    "hash0 versus hash11 sensitivity without changing table entries or geometry",
+    "physical SRAM/logic cost is separate R3P lane, not measured here"
+  ],
+  "fixed_profiles": [
+    "g5_native",
+    "g5_h11",
+    "tg6_native",
+    "tg6_h11",
+    "tg7_native",
+    "tg7_h11"
+  ],
+  "fixed_profiles_source": "docs/bpu8_r3_g5_lock_v01.json",
+  "original_r3_source_commit": "f3f3fa41fcf883a3e077296ac4b2c7a02e74e1d6",
+  "original_full19_archive_sha256": "5f5ffcd35a608ee64a464085ebc8ad55d1bff5b9685af87619e2e07292b06f93",
+  "tracked_bits_each": 45736,
+  "source_references": {
+    "mibench": "https://vhosts.eecs.umich.edu/mibench/",
+    "coremark": "https://github.com/eembc/coremark"
+  },
+  "suite_candidates": [
+    {
+      "source": "mibench",
+      "id": "basicmath",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "bitcount",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "qsort",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "susan_edges",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "dijkstra",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "patricia",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "rijndael_encrypt",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "fft",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "adpcm_encode",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "mibench",
+      "id": "stringsearch",
+      "input": "TO_FREEZE"
+    },
+    {
+      "source": "coremark",
+      "id": "coremark_performance",
+      "input": "TO_FREEZE"
+    }
+  ],
+  "proposed_if_all_qualified": {
+    "cases": 11,
+    "configs_per_case": 6,
+    "jobs": 66
+  },
+  "mandatory_p0_gates": [
+    "check whether any candidate exact program and input hash were previously used for geometry development",
+    "verify license and build feasibility under static RV64 Linux with current toolchain",
+    "record exact upstream source revisions, input file bytes/hashes, command line, seeds and ABI",
+    "validate output on a trusted RV64 reference environment and simulator before paired profile performance",
+    "commit a *separate* frozen r3c_corpus_lock.json before running any cross-profile performance; fail closed for exclusions and track amendments",
+    "no metric peek and no geometry retuning; do not include reselected workloads without a prereg amendment"
+  ],
+  "full_execution_gates": [
+    "one same gem5.opt SHA and identical ELF SHA/inputs across 6 configs of each case",
+    "one correctly extracted first ROI per job, consistent dynamic instruction and conditional branch count within each paired case",
+    "original ROI stats and config and trace checksum plus all R3B conservation counters",
+    "report per-benchmark signed log ratios, geomean, W/L/T, worst regression, and all non-significant or negative outcomes",
+    "holdout alone cannot freeze RTL; R3P macro-aware area/timing/energy gate independent"
+  ],
+  "caution": "This JSON is a PROPOSED candidate registration only: no input source revisions, compile feasibility, or immutable corpus lock yet. Do not label any benchmark result as verified. EEMBC official CoreMark public score/rules differ from internal first-ROI simulation."
+}
