@@ -315,6 +315,9 @@ class TAGEBase(SimObject):
     logTagTableSizes = VectorParam.Int(
         [13, 9, 9, 9, 9, 9, 9, 9], "Log2 of TAGE table sizes"
     )
+    r3TageDiagnosticsEnabled = Param.Bool(
+        False, "R3B opt-in TAGE commit and allocation diagnostics"
+    )
     fixedIndexHashLogSize = Param.Unsigned(
         0,
         "Diagnostic-only tagged-index hash width; 0 uses each physical "

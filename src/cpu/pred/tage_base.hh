@@ -536,6 +536,7 @@ class TAGEBase : public SimObject
     // When nonzero, index folding/mixing uses this fixed width while the
     // final table index is still masked to each physical table's capacity.
     const unsigned fixedIndexHashLogSize;
+    const bool r3TageDiagnosticsEnabled; // R3B observation only
 
     // Little selective perceptron research structure. Disabled by default.
     const bool perceptronEnabled;
@@ -643,6 +644,19 @@ class TAGEBase : public SimObject
         statistics::Vector providerConfidence;
         statistics::Vector providerConfidenceCorrect;
         statistics::Vector providerConfidenceWrong;
+        // R3B: opt-in, commit-aligned cause diagnostics.
+        statistics::Vector r3HitBank;
+        statistics::Vector r3HitBankWrong;
+        statistics::Vector r3SelectedBankWrong;
+        statistics::Vector r3AltBank;
+        statistics::Vector r3AllocByBank;
+        statistics::Scalar r3PseudoNewAlloc;
+        statistics::Scalar r3AlternateDisagreements;
+        statistics::Scalar r3AlternateWouldFix;
+        statistics::Scalar r3AllocAttempts;
+        statistics::Scalar r3Allocations;
+        statistics::Scalar r3ForcedUsefulClears;
+
 
         // Little selective-perceptron commit-time instrumentation.
         statistics::Scalar finalConditionalCorrect;
