@@ -587,7 +587,7 @@ def main():
         if not cfgfile.is_file():
             raise RuntimeError(f"{profile}/{workload}: missing original config.ini")
         import re
-        vals = re.findall(r"(?m)^fixedIndexHashLogSize=(\\d+)\\s*$",
+        vals = re.findall(r"(?m)^fixedIndexHashLogSize=(\d+)\s*$",
                           cfgfile.read_text())
         expect(len(vals) >= 1 and all(val == "0" for val in vals),
                f"{profile}/{workload}: index-hash override != native0")
