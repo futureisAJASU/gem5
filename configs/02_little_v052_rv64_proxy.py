@@ -8,6 +8,7 @@ from m5.objects import (
     LittleTAGE5Iso45K,
     LittleTAGE5C3PcBiasShadow,
     LittleTAGE5C3PcChooserShadow,
+    LittleTAGE5C3G1Strong5VetoShadow,
     LittleTAGE5Perceptron,
     LittleTAGE5PerceptronAlways,
     LittleTAGE5PerceptronPrior22,
@@ -1162,6 +1163,12 @@ class LittleV052Rv64Core(BaseCPUCore):
             tage5.instShiftAmt = effective_cond_shift
             tage5.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = tage5
+        elif bp_type.startswith("tage5-c3-g1-strong5-veto-e"):
+            candidate = LittleTAGE5C3G1Strong5VetoShadow()
+            candidate.instShiftAmt = effective_cond_shift
+            candidate.tage.instShiftAmt = effective_cond_shift
+            candidate.tage.c3PcChooserEntries = int(bp_type.rsplit("-e", 1)[1])
+            cpu.branchPred.conditionalBranchPred = candidate
         elif bp_type.startswith("tage5-c3-pcchooser-shadow-e"):
             # Standalone C3 PC chooser P1: compare independent direction
             # to prediction-time G5, learn on disagreement, no redirect.
@@ -1829,6 +1836,9 @@ def parse_args() -> argparse.Namespace:
             "tage5-c3-pcchooser-shadow-e64",
             "tage5-c3-pcchooser-shadow-e128",
             "tage5-c3-pcchooser-shadow-e256",
+            "tage5-c3-g1-strong5-veto-e64",
+            "tage5-c3-g1-strong5-veto-e128",
+            "tage5-c3-g1-strong5-veto-e256",
             "tage5-c3-pcbias-shadow-e64",
             "tage5-c3-pcbias-shadow-e128",
             "tage5-c3-pcbias-shadow-e256",

@@ -79,6 +79,7 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
       c3PcBiasEntries(p.c3PcBiasEntries),
       c3PcChooserEnabled(p.c3PcChooserEnabled),
       c3PcChooserEntries(p.c3PcChooserEntries),
+      c3PcChooserStrong5VetoEnabled(p.c3PcChooserStrong5VetoEnabled),
       threadHistory(p.numThreads),
       logUResetPeriod(p.logUResetPeriod),
       initialTCounterValue(p.initialTCounterValue),
@@ -170,6 +171,9 @@ TAGEBase::init()
         cfg.pcShift = instShiftAmt;
         c3PcChooser = std::make_unique<LittleC3PcChooser>(cfg);
     }
+
+    fatal_if(c3PcChooserStrong5VetoEnabled && !c3PcChooserEnabled,
+             "P3 veto cannot run without original P1 PC chooser");
 
     useAltPredForNewlyAllocated.resize(numUseAltOnNa, 0);
 
@@ -731,6 +735,12 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
     if (c3PcChooserEnabled) {
         bi->c3PcChooserLookup = c3PcChooser->lookup(
             branch_pc, bi->tagePred, c3PcBiasGate(bi));
+        // Same P1 G0 access. Snapshot only the G1 acceptance veto here.
+        bi->c3G1Vetoed = c3G1Strong5Veto(
+            c3PcChooserStrong5VetoEnabled,
+            bi->c3PcChooserLookup.wouldOverride,
+            bi->providerConfidence == CONFIDENCE_STRONG,
+            bi->providerStrength);
         if (bi->c3PcChooserLookup.eligible) {
             stats.c3PcChooserReads++;
             // These 16 bits are sampled at prediction time, not re-read at
@@ -1277,6 +1287,75 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
                     stats.c3PcChooserWouldBreak++;
                 }
             }
+            // P1 raw proposal fix/break above are deliberately unchanged.
+            const bool veto = bi->c3G1Vetoed;
+            const bool rawFix = snap.wouldOverride && snap.c3Taken == taken;
+            const bool rawBreak = snap.wouldOverride && snap.c3Taken != taken;
+            if (snap.wouldOverride) {
+                if (veto) {
+                    stats.c3G1VetoedOverrides++;
+                    if (rawFix) stats.c3G1VetoedFix++;
+                    if (rawBreak) stats.c3G1VetoedBreak++;
+                } else {
+                    stats.c3G1AcceptedOverrides++;
+                    if (rawFix) stats.c3G1AcceptedFix++;
+                    if (rawBreak) stats.c3G1AcceptedBreak++;
+                }
+            }
+            // Every G0-eligible prediction is weak, medium, or strong5.
+            assert(bi->providerConfidence != CONFIDENCE_STRONG ||
+                   bi->providerStrength == 5);
+            if (bi->providerConfidence == CONFIDENCE_WEAK) {
+                stats.c3G1WeakEligible++;
+                if (snap.wouldOverride) {
+                    stats.c3G1WeakProposed++;
+                    if (rawFix) stats.c3G1WeakRawFix++;
+                    if (rawBreak) stats.c3G1WeakRawBreak++;
+                    if (veto) {
+                        stats.c3G1WeakVetoed++;
+                        if (rawFix) stats.c3G1WeakVetoFix++;
+                        if (rawBreak) stats.c3G1WeakVetoBreak++;
+                    } else {
+                        stats.c3G1WeakAccepted++;
+                        if (rawFix) stats.c3G1WeakAcceptedFix++;
+                        if (rawBreak) stats.c3G1WeakAcceptedBreak++;
+                    }
+                }
+            }
+            if (bi->providerConfidence == CONFIDENCE_MEDIUM) {
+                stats.c3G1MediumEligible++;
+                if (snap.wouldOverride) {
+                    stats.c3G1MediumProposed++;
+                    if (rawFix) stats.c3G1MediumRawFix++;
+                    if (rawBreak) stats.c3G1MediumRawBreak++;
+                    if (veto) {
+                        stats.c3G1MediumVetoed++;
+                        if (rawFix) stats.c3G1MediumVetoFix++;
+                        if (rawBreak) stats.c3G1MediumVetoBreak++;
+                    } else {
+                        stats.c3G1MediumAccepted++;
+                        if (rawFix) stats.c3G1MediumAcceptedFix++;
+                        if (rawBreak) stats.c3G1MediumAcceptedBreak++;
+                    }
+                }
+            }
+            if (bi->providerConfidence == CONFIDENCE_STRONG) {
+                stats.c3G1Strong5Eligible++;
+                if (snap.wouldOverride) {
+                    stats.c3G1Strong5Proposed++;
+                    if (rawFix) stats.c3G1Strong5RawFix++;
+                    if (rawBreak) stats.c3G1Strong5RawBreak++;
+                    if (veto) {
+                        stats.c3G1Strong5Vetoed++;
+                        if (rawFix) stats.c3G1Strong5VetoFix++;
+                        if (rawBreak) stats.c3G1Strong5VetoBreak++;
+                    } else {
+                        stats.c3G1Strong5Accepted++;
+                        if (rawFix) stats.c3G1Strong5AcceptedFix++;
+                        if (rawBreak) stats.c3G1Strong5AcceptedBreak++;
+                    }
+                }
+            }
             const auto u = c3PcChooser->train(snap, taken);
             if (u.rowWrite) stats.c3PcChooserRowWrites++;
             if (u.directionUpdated) stats.c3PcChooserDirectionUpdates++;
@@ -1469,6 +1548,78 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
                "C3 PC chooser tag conflicts deferred"),
       ADD_STAT(c3PcChooserStalePredictions, statistics::units::Count::get(),
                "C3 chooser previously matching but currently missing tags"),
+      ADD_STAT(c3G1AcceptedOverrides, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1AcceptedOverrides; NOT M1"),
+      ADD_STAT(c3G1AcceptedFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1AcceptedFix; NOT M1"),
+      ADD_STAT(c3G1AcceptedBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1AcceptedBreak; NOT M1"),
+      ADD_STAT(c3G1VetoedOverrides, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1VetoedOverrides; NOT M1"),
+      ADD_STAT(c3G1VetoedFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1VetoedFix; NOT M1"),
+      ADD_STAT(c3G1VetoedBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1VetoedBreak; NOT M1"),
+      ADD_STAT(c3G1WeakEligible, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakEligible; NOT M1"),
+      ADD_STAT(c3G1WeakProposed, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakProposed; NOT M1"),
+      ADD_STAT(c3G1WeakAccepted, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakAccepted; NOT M1"),
+      ADD_STAT(c3G1WeakVetoed, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakVetoed; NOT M1"),
+      ADD_STAT(c3G1WeakRawFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakRawFix; NOT M1"),
+      ADD_STAT(c3G1WeakRawBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakRawBreak; NOT M1"),
+      ADD_STAT(c3G1WeakAcceptedFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakAcceptedFix; NOT M1"),
+      ADD_STAT(c3G1WeakAcceptedBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakAcceptedBreak; NOT M1"),
+      ADD_STAT(c3G1WeakVetoFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakVetoFix; NOT M1"),
+      ADD_STAT(c3G1WeakVetoBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1WeakVetoBreak; NOT M1"),
+      ADD_STAT(c3G1MediumEligible, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumEligible; NOT M1"),
+      ADD_STAT(c3G1MediumProposed, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumProposed; NOT M1"),
+      ADD_STAT(c3G1MediumAccepted, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumAccepted; NOT M1"),
+      ADD_STAT(c3G1MediumVetoed, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumVetoed; NOT M1"),
+      ADD_STAT(c3G1MediumRawFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumRawFix; NOT M1"),
+      ADD_STAT(c3G1MediumRawBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumRawBreak; NOT M1"),
+      ADD_STAT(c3G1MediumAcceptedFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumAcceptedFix; NOT M1"),
+      ADD_STAT(c3G1MediumAcceptedBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumAcceptedBreak; NOT M1"),
+      ADD_STAT(c3G1MediumVetoFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumVetoFix; NOT M1"),
+      ADD_STAT(c3G1MediumVetoBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1MediumVetoBreak; NOT M1"),
+      ADD_STAT(c3G1Strong5Eligible, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5Eligible; NOT M1"),
+      ADD_STAT(c3G1Strong5Proposed, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5Proposed; NOT M1"),
+      ADD_STAT(c3G1Strong5Accepted, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5Accepted; NOT M1"),
+      ADD_STAT(c3G1Strong5Vetoed, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5Vetoed; NOT M1"),
+      ADD_STAT(c3G1Strong5RawFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5RawFix; NOT M1"),
+      ADD_STAT(c3G1Strong5RawBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5RawBreak; NOT M1"),
+      ADD_STAT(c3G1Strong5AcceptedFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5AcceptedFix; NOT M1"),
+      ADD_STAT(c3G1Strong5AcceptedBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5AcceptedBreak; NOT M1"),
+      ADD_STAT(c3G1Strong5VetoFix, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5VetoFix; NOT M1"),
+      ADD_STAT(c3G1Strong5VetoBreak, statistics::units::Count::get(),
+               "P3 C3 G1 shadow counter c3G1Strong5VetoBreak; NOT M1"),
       ADD_STAT(historyStateRecords, statistics::units::Count::get(),
                "Prediction-time TAGE history snapshots recorded"),
       ADD_STAT(historyStateRestores, statistics::units::Count::get(),

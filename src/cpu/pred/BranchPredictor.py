@@ -404,6 +404,9 @@ class TAGEBase(SimObject):
     c3PcChooserEntries = Param.Unsigned(
         128, "C3 chooser shadow rows: 64/128/256"
     )
+    c3PcChooserStrong5VetoEnabled = Param.Bool(
+        False, "P3 G1 STRONG5 acceptance-only veto; still SHADOW"
+    )
 
 
 # TAGE branch predictor as described in https://www.jilp.org/vol8/v8paper1.pdf
@@ -463,6 +466,16 @@ class LittleTAGE5C3PcChooserShadow(TAGE):
     """P1 diagnostic only: G5 direction and timing always retained."""
 
     tage = LittleTAGE5C3PcChooserShadowBase()
+
+
+class LittleTAGE5C3G1Strong5VetoShadowBase(LittleTAGE5C3PcChooserShadowBase):
+    """P3: same G0 and original P1 training, acceptance-only veto."""
+    c3PcChooserStrong5VetoEnabled = True
+
+
+class LittleTAGE5C3G1Strong5VetoShadow(TAGE):
+    """No actual frontend redirect/cycle improvement; P3 only."""
+    tage = LittleTAGE5C3G1Strong5VetoShadowBase()
 
 
 class LittleTAGE5C3PcBiasShadowBase(LittleTAGE5Iso45KBase):

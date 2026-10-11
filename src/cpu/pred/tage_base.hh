@@ -55,6 +55,7 @@
 #include "base/statistics.hh"
 #include "cpu/pred/little_c3_pc_bias.hh"
 #include "cpu/pred/little_c3_pc_chooser.hh"
+#include "cpu/pred/little_c3_strong5_veto.hh"
 #include "cpu/null_static_inst.hh"
 #include "cpu/static_inst.hh"
 #include "params/TAGEBase.hh"
@@ -175,6 +176,8 @@ class TAGEBase : public SimObject
         // C3 PC_BIAS prediction-time shadow metadata: no new history.
         LittleC3PcBias::Lookup c3PcBiasLookup;
         LittleC3PcChooser::Lookup c3PcChooserLookup;
+        // Transient prediction-time veto snapshot. No new persistent SRAM.
+        bool c3G1Vetoed = false;
         // Debug-only transient snapshot of the 16 newest speculative GHR
         // bits at P1 lookup. Not a physical RTL state budget or HIST_TAG.
         uint16_t c3DiagGhr16 = 0;
@@ -568,6 +571,7 @@ class TAGEBase : public SimObject
     // Second C3 alternative: independent PC direction + learned chooser.
     const bool c3PcChooserEnabled;
     const unsigned c3PcChooserEntries;
+    const bool c3PcChooserStrong5VetoEnabled;
     std::unique_ptr<LittleC3PcChooser> c3PcChooser;
 
     std::vector<bool> btablePrediction;
@@ -702,6 +706,44 @@ class TAGEBase : public SimObject
         statistics::Scalar c3PcChooserEvictions;
         statistics::Scalar c3PcChooserCollisionBlocked;
         statistics::Scalar c3PcChooserStalePredictions;
+
+        // P3 G1 per-first-ROI confidence/acceptance accounting.
+        statistics::Scalar c3G1AcceptedOverrides;
+        statistics::Scalar c3G1AcceptedFix;
+        statistics::Scalar c3G1AcceptedBreak;
+        statistics::Scalar c3G1VetoedOverrides;
+        statistics::Scalar c3G1VetoedFix;
+        statistics::Scalar c3G1VetoedBreak;
+        statistics::Scalar c3G1WeakEligible;
+        statistics::Scalar c3G1WeakProposed;
+        statistics::Scalar c3G1WeakAccepted;
+        statistics::Scalar c3G1WeakVetoed;
+        statistics::Scalar c3G1WeakRawFix;
+        statistics::Scalar c3G1WeakRawBreak;
+        statistics::Scalar c3G1WeakAcceptedFix;
+        statistics::Scalar c3G1WeakAcceptedBreak;
+        statistics::Scalar c3G1WeakVetoFix;
+        statistics::Scalar c3G1WeakVetoBreak;
+        statistics::Scalar c3G1MediumEligible;
+        statistics::Scalar c3G1MediumProposed;
+        statistics::Scalar c3G1MediumAccepted;
+        statistics::Scalar c3G1MediumVetoed;
+        statistics::Scalar c3G1MediumRawFix;
+        statistics::Scalar c3G1MediumRawBreak;
+        statistics::Scalar c3G1MediumAcceptedFix;
+        statistics::Scalar c3G1MediumAcceptedBreak;
+        statistics::Scalar c3G1MediumVetoFix;
+        statistics::Scalar c3G1MediumVetoBreak;
+        statistics::Scalar c3G1Strong5Eligible;
+        statistics::Scalar c3G1Strong5Proposed;
+        statistics::Scalar c3G1Strong5Accepted;
+        statistics::Scalar c3G1Strong5Vetoed;
+        statistics::Scalar c3G1Strong5RawFix;
+        statistics::Scalar c3G1Strong5RawBreak;
+        statistics::Scalar c3G1Strong5AcceptedFix;
+        statistics::Scalar c3G1Strong5AcceptedBreak;
+        statistics::Scalar c3G1Strong5VetoFix;
+        statistics::Scalar c3G1Strong5VetoBreak;
 
         // Directed-correctness audit counters.
         statistics::Scalar historyStateRecords;
