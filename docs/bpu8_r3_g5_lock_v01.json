@@ -1,0 +1,268 @@
+{
+  "experiment": "BPU8_R3_G5_LOCK_HASH_GEOMETRY_V01",
+  "status": "PRE_REGISTERED_NOT_RUN",
+  "parent_source_commit": "883d685d31dc026a0e7a30d201c00abdc9c2bd68",
+  "claim_boundary": "R3A first-ROI same-budget measured performance; R3B observational commit statistics only. NOT unseen holdout or RTL PPA.",
+  "frontend": {
+    "bp_inst_shift": 1,
+    "bp_cond_shift": 1,
+    "bp_btb_shift": 2,
+    "bp_indirect_shift": 1,
+    "btb_entries": 4096
+  },
+  "workloads": [
+    "aha-mont64",
+    "crc32",
+    "cubic",
+    "edn",
+    "huffbench",
+    "matmult-int",
+    "minver",
+    "nbody",
+    "nettle-aes",
+    "nettle-sha256",
+    "nsichneu",
+    "picojpeg",
+    "qrduino",
+    "sglib-combined",
+    "slre",
+    "st",
+    "statemate",
+    "ud",
+    "wikisort"
+  ],
+  "profiles": {
+    "g5_native": {
+      "bp_type": "tage-r3-native-tg5-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ],
+      "source_profile": "tg5_45",
+      "fixed_index_hash_log_size": 0,
+      "r3_diagnostics": true
+    },
+    "g5_h11": {
+      "bp_type": "tage-r3-h11-tg5-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ],
+      "source_profile": "tg5_45",
+      "fixed_index_hash_log_size": 11,
+      "r3_diagnostics": true
+    },
+    "tg6_native": {
+      "bp_type": "tage-r3-native-tg6-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ],
+      "source_profile": "tg6_45",
+      "fixed_index_hash_log_size": 0,
+      "r3_diagnostics": true
+    },
+    "tg6_h11": {
+      "bp_type": "tage-r3-h11-tg6-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ],
+      "source_profile": "tg6_45",
+      "fixed_index_hash_log_size": 11,
+      "r3_diagnostics": true
+    },
+    "tg7_native": {
+      "bp_type": "tage-r3-native-tg7-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        256
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ],
+      "source_profile": "tg7_45",
+      "fixed_index_hash_log_size": 0,
+      "r3_diagnostics": true
+    },
+    "tg7_h11": {
+      "bp_type": "tage-r3-h11-tg7-45",
+      "total_bits": 45736,
+      "base_entries": 2048,
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        256
+      ],
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ],
+      "source_profile": "tg7_45",
+      "fixed_index_hash_log_size": 11,
+      "r3_diagnostics": true
+    }
+  },
+  "smoke_workloads": [
+    "huffbench",
+    "qrduino"
+  ],
+  "expected_full19_jobs": 114,
+  "expected_smoke_jobs": 12,
+  "comparisons": {
+    "native_fixed": [
+      [
+        "g5_native",
+        "g5_h11"
+      ],
+      [
+        "tg6_native",
+        "tg6_h11"
+      ],
+      [
+        "tg7_native",
+        "tg7_h11"
+      ]
+    ],
+    "same_hash": [
+      [
+        "g5_native",
+        "tg6_native"
+      ],
+      [
+        "g5_native",
+        "tg7_native"
+      ],
+      [
+        "g5_h11",
+        "tg6_h11"
+      ],
+      [
+        "g5_h11",
+        "tg7_h11"
+      ]
+    ]
+  }
+}
