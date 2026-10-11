@@ -66,6 +66,7 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
       tagTableTagWidths(p.tagTableTagWidths),
       logTagTableSizes(p.logTagTableSizes),
       fixedIndexHashLogSize(p.fixedIndexHashLogSize),
+      r3TageDiagnosticsEnabled(p.r3TageDiagnosticsEnabled),
       perceptronEnabled(p.perceptronEnabled),
       perceptronEntries(p.perceptronEntries),
       perceptronHistoryLength(p.perceptronHistoryLength),
@@ -695,6 +696,7 @@ TAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
                            int nrand)
 {
     if (alloc) {
+        if (r3TageDiagnosticsEnabled) stats.r3AllocAttempts++;
         // is there some "unuseful" entry to allocate
         uint8_t min = 1;
         for (int i = nHistoryTables; i > bi->hitBank; i--) {
@@ -716,6 +718,7 @@ TAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
         }
         // No entry available, forces one to be available
         if (min > 0) {
+            if (r3TageDiagnosticsEnabled) stats.r3ForcedUsefulClears++;
             gtable[X][bi->tableIndices[X]].u = 0;
         }
 
@@ -726,6 +729,10 @@ TAGEBase::handleAllocAndUReset(bool alloc, bool taken, BranchInfo* bi,
             if (gtable[i][bi->tableIndices[i]].u == 0) {
                 gtable[i][bi->tableIndices[i]].tag = bi->tableTags[i];
                 gtable[i][bi->tableIndices[i]].ctr = (taken) ? 0 : -1;
+                if (r3TageDiagnosticsEnabled) {
+                    stats.r3Allocations++;
+                    stats.r3AllocByBank[i]++;
+                }
                 ++numAllocated;
                 if (numAllocated == maxNumAlloc) {
                     break;
@@ -1078,6 +1085,21 @@ TAGEBase::updateStats(bool taken, BranchInfo* bi)
     stats.committedConditionalPredictions++;
     stats.selectedProviderBank[bi->selectedProviderBank]++;
     stats.providerConfidence[bi->providerConfidence]++;
+    if (r3TageDiagnosticsEnabled) {
+        // Prediction-time metadata, observed when a conditional commits.
+        stats.r3HitBank[bi->hitBank]++;
+        if (bi->tagePred != taken) {
+            stats.r3HitBankWrong[bi->hitBank]++;
+            stats.r3SelectedBankWrong[bi->selectedProviderBank]++;
+        }
+        if (bi->altBank > 0) stats.r3AltBank[bi->altBank]++;
+        if (bi->pseudoNewAlloc) stats.r3PseudoNewAlloc++;
+        if (bi->tagePred != bi->altTaken) {
+            stats.r3AlternateDisagreements++;
+            if (bi->tagePred != taken && bi->altTaken == taken)
+                stats.r3AlternateWouldFix++;
+        }
+    }
 
     if (bi->finalPred == taken) {
         stats.finalConditionalCorrect++;
@@ -1245,6 +1267,28 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
                "Correct committed predictions by confidence class"),
       ADD_STAT(providerConfidenceWrong, statistics::units::Count::get(),
                "Wrong committed predictions by confidence class"),
+      ADD_STAT(r3HitBank, statistics::units::Count::get(),
+               "R3 committed longest-match bank"),
+      ADD_STAT(r3HitBankWrong, statistics::units::Count::get(),
+               "R3 wrong predictions by longest-match bank"),
+      ADD_STAT(r3SelectedBankWrong, statistics::units::Count::get(),
+               "R3 wrong predictions by selected bank"),
+      ADD_STAT(r3AltBank, statistics::units::Count::get(),
+               "R3 committed alternate tagged bank"),
+      ADD_STAT(r3AllocByBank, statistics::units::Count::get(),
+               "R3 allocation target bank"),
+      ADD_STAT(r3PseudoNewAlloc, statistics::units::Count::get(),
+               "R3 committed pseudo-new providers"),
+      ADD_STAT(r3AlternateDisagreements, statistics::units::Count::get(),
+               "R3 TAGE alternate disagreements"),
+      ADD_STAT(r3AlternateWouldFix, statistics::units::Count::get(),
+               "R3 alternate would fix wrong TAGE"),
+      ADD_STAT(r3AllocAttempts, statistics::units::Count::get(),
+               "R3 allocation attempts at commit"),
+      ADD_STAT(r3Allocations, statistics::units::Count::get(),
+               "R3 tagged entries allocated"),
+      ADD_STAT(r3ForcedUsefulClears, statistics::units::Count::get(),
+               "R3 forced useful-bit clears"),
       ADD_STAT(finalConditionalCorrect, statistics::units::Count::get(),
                "Committed conditional predictions correct after optional "
                "Little perceptron correction"),
@@ -1296,6 +1340,12 @@ TAGEBase::TAGEBaseStats::TAGEBaseStats(
     providerConfidence.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
     providerConfidenceCorrect.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
     providerConfidenceWrong.init(NUM_PROVIDER_CONFIDENCE_CLASSES);
+    r3HitBank.init(nHistoryTables + 1);
+    r3HitBankWrong.init(nHistoryTables + 1);
+    r3SelectedBankWrong.init(nHistoryTables + 1);
+    r3AltBank.init(nHistoryTables + 1);
+    r3AllocByBank.init(nHistoryTables + 1);
+
 
     // Persistent-structure accounting must survive m5_reset_stats() at ROI
     // boundaries. Value stats proxy the current geometry and have a no-op

@@ -69,8 +69,16 @@ BPU8_R2C_HASH_GEO_TYPES = {
     if v.get("fixed_index_hash_log_size") == 11
     and v.get("original_profile") not in ("tg5_45", "g7")
 }
+# BPU-8 R3: isolated exact-45K factorial, no legacy policy change.
+BPU8_R3_MATRIX = json.loads((Path(__file__).resolve().parents[1] /
+                             "docs/bpu8_r3_g5_lock_v01.json").read_text())
+BPU8_R3_HASH_GEO_TYPES = {
+    p["bp_type"]: p for p in BPU8_R3_MATRIX["profiles"].values()
+    if p["source_profile"] in ("tg6_45", "tg7_45")
+}
 BPU8_ALL_GEO_TYPES = {**BPU8_GEO_TYPES, **BPU8_R2A_GEO_TYPES,
-                      **BPU8_R2B_GEO_TYPES, **BPU8_R2C_HASH_GEO_TYPES}
+                      **BPU8_R2B_GEO_TYPES, **BPU8_R2C_HASH_GEO_TYPES,
+                      **BPU8_R3_HASH_GEO_TYPES}
 
 
 
@@ -1218,7 +1226,12 @@ class LittleV052Rv64Core(BaseCPUCore):
             pred.tage.explicitHistLengths = hist
             pred.tage.tagTableTagWidths = [0] + tags
             pred.tage.logTagTableSizes = [11] + [e.bit_length() - 1 for e in entries]
-            if "fixed_index_hash_log_size" in geo:
+            if bp_type.startswith("tage-r3-"):
+                if geo["fixed_index_hash_log_size"] not in (0, 11):
+                    raise ValueError("Invalid R3 index hash")
+                pred.tage.fixedIndexHashLogSize = geo["fixed_index_hash_log_size"]
+                pred.tage.r3TageDiagnosticsEnabled = True
+            elif "fixed_index_hash_log_size" in geo:
                 if (geo["fixed_index_hash_log_size"] != 11
                         or max(entries).bit_length() - 1 > 11):
                     raise ValueError("Invalid R2C fixed-index hash contract")
@@ -1229,6 +1242,13 @@ class LittleV052Rv64Core(BaseCPUCore):
             tage5.instShiftAmt = effective_cond_shift
             tage5.tage.instShiftAmt = effective_cond_shift
             cpu.branchPred.conditionalBranchPred = tage5
+        elif bp_type in ("tage-r3-native-tg5-45", "tage-r3-h11-tg5-45"):
+            r3g5 = LittleTAGE5Iso45K()
+            r3g5.instShiftAmt = effective_cond_shift
+            r3g5.tage.instShiftAmt = effective_cond_shift
+            r3g5.tage.fixedIndexHashLogSize = (11 if bp_type.startswith("tage-r3-h11-") else 0)
+            r3g5.tage.r3TageDiagnosticsEnabled = True
+            cpu.branchPred.conditionalBranchPred = r3g5
         elif bp_type == "tage-r2c-h11-tg5-45":
             tage5_h11 = LittleTAGE5Iso45K()
             tage5_h11.instShiftAmt = effective_cond_shift
@@ -1895,6 +1915,7 @@ def parse_args() -> argparse.Namespace:
             *tuple(BPU8_R2A_GEO_TYPES),
             *tuple(BPU8_R2B_GEO_TYPES),
             *tuple(BPU8_R2C_HASH_GEO_TYPES),
+            *tuple(p["bp_type"] for p in BPU8_R3_MATRIX["profiles"].values()),
             "tage-r2c-h11-tg5-45",
             "tage-r2c-h11-g7",
             "micro-tage",
