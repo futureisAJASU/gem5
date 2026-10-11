@@ -1,0 +1,59 @@
+name: BPU-7 C3 P3 G1 STRONG5 Veto — Source and RISCV Link
+on:
+  push:
+    branches: [little-v052-bpu7-c3-g1-strong5-veto-p3]
+  workflow_dispatch:
+jobs:
+  source-and-directed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve P0/P1 directed state machines, ABA exposure and test P3 predicate
+        run: |
+          for test in c3_pc_bias_directed c3_pc_chooser_directed c3_g1_strong5_veto_directed; do
+            g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic -Isrc "tests/bpu7/$test.cc" -o "/tmp/$test"
+            "/tmp/$test"
+          done
+      - name: Python syntax and P0/P1/P2/P3 synthetic contract suites
+        run: |
+          python3 -m py_compile scripts/bpu_b7_c3_p3_g1_full19.py configs/02_little_v052_rv64_proxy.py src/cpu/pred/BranchPredictor.py
+          python3 -m unittest discover -s tests/bpu7 -p 'test_c3_p0_p1_runner.py' -v
+          python3 -m unittest discover -s tests/bpu7 -p 'test_c3_pcdiag_p2.py' -v
+          python3 -m unittest discover -s tests/bpu7 -p 'test_c3_g1_p3_runner.py' -v
+      - name: Confirm 152 full-19 and 16 smoke jobs, without claiming ROI
+        run: |
+          python3 scripts/bpu_b7_c3_p3_g1_full19.py --list | tail -1 | grep -F 'SHADOW_ONLY_ROI_PLAN=152; M1_CORRECTION=NOT_IMPLEMENTED'
+          python3 scripts/bpu_b7_c3_p3_g1_full19.py --smoke --list | tail -1 | grep -F 'SHADOW_ONLY_ROI_PLAN=16; M1_CORRECTION=NOT_IMPLEMENTED'
+      - name: Non-redirecting P1 training and G1 predicate scope
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          cc = Path('src/cpu/pred/tage_base.cc').read_text()
+          hh = Path('src/cpu/pred/tage_base.hh').read_text()
+          runner = Path('scripts/bpu_b7_c3_p3_g1_full19.py').read_text()
+          assert cc.count('bi->c3G1Vetoed = c3G1Strong5Veto(') == 1
+          assert cc.count('const auto u = c3PcChooser->train(snap, taken);') == 1
+          assert 'return bi->finalPred;' in cc
+          assert 'bool c3G1Vetoed = false;' in hh
+          assert 'FAIL-CLOSED P1/P3 perturbation' in runner
+          assert '"aba_generation_guard": False' in runner
+          print('P3_SOURCE_CONTRACT=PASS; ACTUAL_M1=NOT_IMPLEMENTED')
+          PY
+  linked-riscv:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    container:
+      image: ghcr.io/gem5/ubuntu-24.04_all-dependencies:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build real linked RISCV gem5.opt (not an OCI benchmark)
+        shell: bash
+        timeout-minutes: 45
+        run: |
+          python3 /usr/bin/scons --ignore-style build/RISCV/gem5.opt -j2
+      - name: Verify produced executable
+        shell: bash
+        run: |
+          test -x build/RISCV/gem5.opt
+          build/RISCV/gem5.opt --version
