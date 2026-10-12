@@ -300,6 +300,15 @@ def main() -> int:
                     elif case=="fft":
                         check.update(fft_signature(raw_native,raw_rv))
                         check["passed"] &= native["returncode"]==rv64["returncode"]==0
+                    elif case=="adpcm_encode":
+                        check["passed"]=(native["returncode"]==rv64["returncode"]==0
+                                         and raw_native==raw_rv
+                                         and len(raw_native)>0
+                                         and native["stderr_sha256"]==rv64["stderr_sha256"])
+                        check["encoded_bytes_exact_match"]=raw_native==raw_rv
+                        check["encoder_diagnostics_exact_match"]=(
+                            native["stderr_sha256"]==rv64["stderr_sha256"])
+                        check["note"]="original encoder prints final predictor state to stderr"
                     elif case=="susan_edges":
                         image_n=native_dir/"edges.pgm"
                         image_r=rv_dir/"edges.pgm"
