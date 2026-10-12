@@ -148,6 +148,8 @@ class TAGEBase : public SimObject
 
         int pathHist;
         int savedPtGhist;
+        // Simulator-only proof of the rollover generation at record time.
+        uint64_t savedHistoryRolloverGeneration;
         std::vector<uint8_t> savedGlobalHistWindow;
         int hitBank;
         int hitBankIndex;
@@ -202,6 +204,7 @@ class TAGEBase : public SimObject
         BranchInfo(const TAGEBase &tage, Addr pc, bool conditional)
             : branchPC(pc), condBranch(conditional),
               savedPtGhist(0),
+              savedHistoryRolloverGeneration(0),
               savedGlobalHistWindow(tage.maxHist, 0),
               hitBank(0), hitBankIndex(0),
               altBank(0), altBankIndex(0),
@@ -569,6 +572,10 @@ class TAGEBase : public SimObject
 
         // Index to most recent branch outcome
         int ptGhist;
+        // Simulator-only physical history-buffer relocation evidence.
+        // Excluded from the simulated predictor's persistent bit budget.
+        uint64_t historyRolloverGeneration;
+        int lastRolloverSourcePtGhist;
 
         // Speculative folded histories.
         FoldedHistory *computeIndices;
