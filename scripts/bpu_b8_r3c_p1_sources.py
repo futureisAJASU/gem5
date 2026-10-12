@@ -89,13 +89,30 @@ def main() -> int:
     cases = {name: file_record(mibench, rel) for name, rel in CANDIDATES.items()}
     core_files = ["LICENSE.md", "README.md", "Makefile", "core_main.c",
                   "core_list_join.c", "core_matrix.c", "core_state.c",
-                  "core_util.c", "coremark.h", "linux/core_portme.c",
-                  "linux/core_portme.h", "linux/core_portme.mak"]
+                  "core_util.c", "coremark.h", "linux/core_portme.mak",
+                  "posix/core_portme.mak", "posix/core_portme.c",
+                  "posix/core_portme.h",
+                  "posix/core_portme_posix_overrides.h"]
     core_status = {
         name: {"exists": (coremark / name).is_file(),
                "sha256": sha(coremark / name) if (coremark / name).is_file() else None}
         for name in core_files
     }
+    # eembc/coremark Linux port is a Makefile wrapper over POSIX sources.
+    # Do not require nonexistent linux/core_portme.c or .h files.
+    # These are source-contract checks only, NOT evidence of a working RV64 build.
+    linux_mak = coremark / "linux/core_portme.mak"
+    posix_mak = coremark / "posix/core_portme.mak"
+    if linux_mak.is_file():
+        linux_contents = linux_mak.read_text()
+        core_status["linux_make_includes_posix"] = {
+            "exists": "include posix/core_portme.mak" in linux_contents
+        }
+    if posix_mak.is_file():
+        posix_contents = posix_mak.read_text()
+        core_status["posix_make_uses_port_source"] = {
+            "exists": "PORT_SRCS = posix/core_portme.c" in posix_contents
+        }
     missing = [name for name, rec in cases.items() if not rec["exists"]]
     missing += ["coremark/" + name for name, rec in core_status.items() if not rec["exists"]]
     result = {
