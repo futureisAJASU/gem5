@@ -63,6 +63,52 @@ def file_record(p: Path) -> dict:
             "sha256": p2.sha(p)}
 
 
+# P2B's patch log stores *successive* states of a file, not independent
+# final-file hashes. Validate each transition against its prior state, then
+# compare the last reconstructed state to the actual staged file.
+EXPECTED_PATCH_PATHS = (
+    "network/patricia/patricia_test.c",
+    "security/rijndael/aes.h",
+    "security/rijndael/aesxam.c",
+    "security/rijndael/aesxam.c",
+    "security/rijndael/aesxam.c",
+    "security/rijndael/aesxam.c",
+    "security/rijndael/aesxam.c",
+)
+
+
+def validate_patch_journal(patches: list[dict], p2b_root: Path,
+                           pristine_mibench: Path) -> None:
+    if len(patches) != len(EXPECTED_PATCH_PATHS):
+        raise ValueError("P2B expected exactly seven explicit patch records")
+    staged_root = p2b_root / "overlay_source" / "mibench"
+    reconstructed: dict[str, bytes] = {}
+    for number, (record, relative) in enumerate(
+            zip(patches, EXPECTED_PATCH_PATHS, strict=True), 1):
+        stage = (staged_root / relative).resolve()
+        declared = Path(record["file"]).resolve()
+        if declared != stage:
+            raise ValueError(f"P2B patch {number} path mismatch: {declared}")
+        original = pristine_mibench / relative
+        if not original.is_file() or not stage.is_file():
+            raise ValueError(f"P2B patch {number} source missing: {relative}")
+        current = reconstructed[relative] if relative in reconstructed else original.read_bytes()
+        if hashlib.sha256(current).hexdigest() != record["source_sha256"]:
+            raise ValueError(f"P2B patch {number} predecessor SHA mismatch: {relative}")
+        old = record["old"].encode("utf-8")
+        new = record["new"].encode("utf-8")
+        if not old or old == new or current.count(old) != 1:
+            raise ValueError(f"P2B patch {number} content/replay mismatch: {relative}")
+        updated = current.replace(old, new, 1)
+        if hashlib.sha256(updated).hexdigest() != record["patched_sha256"]:
+            raise ValueError(f"P2B patch {number} successor SHA mismatch: {relative}")
+        reconstructed[relative] = updated
+    for relative, expected_bytes in reconstructed.items():
+        stage = staged_root / relative
+        if stage.read_bytes() != expected_bytes:
+            raise ValueError(f"P2B final staged source mismatch: {relative}")
+
+
 def validate_source_gate(p1: dict, p1path: Path, mibench: Path, coremark: Path,
                          p2b: dict, p2b_path: Path, p2b_root: Path) -> None:
     p2.verify_p1(p1, mibench, coremark)
@@ -74,14 +120,7 @@ def validate_source_gate(p1: dict, p1path: Path, mibench: Path, coremark: Path,
         raise ValueError("P2B MiBench source revision differs from P1")
     if p2b.get("prereg_sha256") != p1["prereg_sha256"]:
         raise ValueError("P2B original prereg drift")
-    if len(p2b.get("patches", [])) != 7:
-        raise ValueError("P2B expected exactly seven explicit patch records")
-    for patch in p2b["patches"]:
-        patch_path = Path(patch["file"]).resolve()
-        if not patch_path.is_relative_to(p2b_root.resolve()):
-            raise ValueError("P2B patch path outside immutable sidecar tree")
-        if not patch_path.is_file() or p2.sha(patch_path) != patch["patched_sha256"]:
-            raise ValueError("P2B stage patch mismatch: " + str(patch_path))
+    validate_patch_journal(p2b.get("patches", []), p2b_root, mibench)
     builds = {rec["case"]: rec for rec in p2b.get("builds", [])}
     if set(builds) != set(CASES):
         raise ValueError("P2B expected exactly two built cases")
