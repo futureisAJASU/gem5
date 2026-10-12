@@ -95,6 +95,16 @@ def build_cmd(name: str, mibench: Path, coremark: Path,
     cmd.extend(libs)
     return cmd, work
 
+def is_static_rv64_lp64d(elf_header: str, dynamic_section: str) -> bool:
+    """Validate readelf output; do not conflate compile success with ELF checks."""
+    return bool(
+        re.search(r"Class:\s+ELF64\b", elf_header)
+        and re.search(r"Machine:\s+RISC-V\b", elf_header)
+        and "double-float ABI" in elf_header
+        and "NEEDED" not in dynamic_section
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--p1", type=Path, required=True)
@@ -156,14 +166,12 @@ def main() -> int:
                 dyn = subprocess.run([readelf, "-d", str(outfile)],
                                      capture_output=True, text=True, timeout=15, check=True)
                 (out / (name + ".elf-header.txt")).write_text(elf.stdout)
-                rv64 = bool(re.search(r"Class:\\s+ELF64", elf.stdout)
-                            and re.search(r"Machine:\\s+RISC-V", elf.stdout)
-                            and "double-float ABI" in elf.stdout
-                            and "NEEDED" not in dyn.stdout)
+                rv64 = is_static_rv64_lp64d(elf.stdout, dyn.stdout)
                 item.update(size=outfile.stat().st_size, sha256=sha(outfile),
                             static_rv64_lp64d=rv64)
                 if not rv64:
-                    item["error"] = "RV64 64-bit LP64D/static check failed"
+                    item["error"] = ("compiled successfully, but ELF validation failed; "
+                                     "check the saved .elf-header.txt and readelf -d")
             else:
                 item["error"] = "compile failed; inspect preserved compile log"
             results.append(item)
