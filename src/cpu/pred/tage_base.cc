@@ -46,6 +46,7 @@
 #include "debug/Tage.hh"
 #include "debug/TageResearch.hh"
 #include "debug/TageResearchAll.hh"
+#include "cpu/pred/tage_rollover_restore.hh"
 
 namespace gem5
 {
@@ -150,6 +151,8 @@ TAGEBase::init()
         history.nonSpecPathHist = 0;
         history.globalHist.resize(histBufferSize, 0);
         history.ptGhist = 0;
+        history.historyRolloverGeneration = 0;
+        history.lastRolloverSourcePtGhist = 0;
     }
 
     histLengths = new int [nHistoryTables+1];
@@ -395,6 +398,10 @@ TAGEBase::updateGHist(ThreadID tid, uint64_t bv, uint8_t n)
     ThreadHistory& tHist = threadHistory[tid];
     if (tHist.ptGhist < n) {
         DPRINTF(Tage, "Rolling over the histories\n");
+        // Record the exact pre-copy physical coordinate; a branch saved
+        // earlier may belong to the relocated speculative window.
+        tHist.lastRolloverSourcePtGhist = tHist.ptGhist;
+        ++tHist.historyRolloverGeneration;
         // Copy beginning of globalHistoryBuffer to end, such that the last
         // maxHist outcomes are still reachable through
         // globalHist[0 .. maxHist - 1].
@@ -938,6 +945,8 @@ TAGEBase::recordHistState(ThreadID tid, BranchInfo* bi)
     ThreadHistory &tHist = threadHistory[tid];
     bi->pathHist = tHist.pathHist;
     bi->savedPtGhist = tHist.ptGhist;
+    bi->savedHistoryRolloverGeneration =
+        tHist.historyRolloverGeneration;
     for (unsigned i = 0; i < maxHist; ++i) {
         bi->savedGlobalHistWindow[i] =
             tHist.globalHist.at(tHist.ptGhist + i);
@@ -988,21 +997,28 @@ TAGEBase::restoreHistState(ThreadID tid, BranchInfo* bi)
 
     stats.historyStateRestores++;
 
-    // The first update can roll the circular history buffer from pointer 0
-    // into the copied rollback window. Restoring that update returns the
-    // same logical history at the relocated pointer, not necessarily the
-    // original numeric pointer. Validate the only legal relocation and then
-    // compare the entire max-history window exactly.
-    int expectedPtGhist = bi->savedPtGhist;
-    if (bi->savedPtGhist < bi->nGhist) {
-        expectedPtGhist =
-            histBufferSize - maxHist - historyRollbackBuffer;
-    }
-    fatal_if(tHist.ptGhist != expectedPtGhist,
+    // A rollover copies history from its *then-current* pointer into
+    // [histBufferSize - maxHist - historyRollbackBuffer, ...]. An older
+    // speculative record may be saved at 1 while a younger prediction
+    // causes the rollover at 0; its equivalent saved coordinate is base+1,
+    // not the original address 1. Prove the relocation using the recorded
+    // physical-copy origin and generation instead of guessing from nGhist.
+    // The original raw maxHist window and ALL folded histories are still
+    // checked below; a matching pointer alone is never a pass.
+    const int expectedPtGhist = expectedTageRestorePointer(
+        bi->savedPtGhist, bi->savedHistoryRolloverGeneration,
+        tHist.historyRolloverGeneration,
+        tHist.lastRolloverSourcePtGhist,
+        histBufferSize, maxHist, historyRollbackBuffer);
+    fatal_if(expectedPtGhist < 0 || tHist.ptGhist != expectedPtGhist,
              "TAGE history rollback pointer mismatch: got %d expected %d "
-             "(saved %d, nGhist %u)",
+             "(saved %d, nGhist %u, savedGen %llu, currGen %llu, "
+             "rolloverOrigin %d)",
              tHist.ptGhist, expectedPtGhist,
-             bi->savedPtGhist, bi->nGhist);
+             bi->savedPtGhist, bi->nGhist,
+             (unsigned long long)bi->savedHistoryRolloverGeneration,
+             (unsigned long long)tHist.historyRolloverGeneration,
+             tHist.lastRolloverSourcePtGhist);
 
     fatal_if(tHist.pathHist != bi->pathHist,
              "TAGE path-history rollback mismatch: got %#x expected %#x",
