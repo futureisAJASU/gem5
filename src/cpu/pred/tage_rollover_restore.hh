@@ -20,8 +20,8 @@ namespace branch_prediction
 
 // Returns -1 for a transition not proven by a single valid rollover.
 constexpr int
-expectedTageRestorePointer(int savedPointer, uint64_t savedGeneration,
-                           uint64_t currentGeneration, int sourcePointer,
+expectedTageRestorePointer(int savedPointer, std::uint64_t savedGeneration,
+                           std::uint64_t currentGeneration, int sourcePointer,
                            int bufferSize, int maxHistory,
                            int rollbackBuffer)
 {
