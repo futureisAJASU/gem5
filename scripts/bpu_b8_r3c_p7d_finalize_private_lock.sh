@@ -15,6 +15,10 @@ if [[ "$(git branch --show-current)" != "$BRANCH" ]]; then
   echo "P7D_BLOCKED: branch is not $BRANCH" >&2
   exit 1
 fi
+if [[ -z "$(git config user.name || true)" || -z "$(git config user.email || true)" ]]; then
+  echo "P7D_BLOCKED: set local git user.name and user.email before acknowledging licenses" >&2
+  exit 1
+fi
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "P7D_BLOCKED: working Git-tracked tree must be clean" >&2
   exit 1
