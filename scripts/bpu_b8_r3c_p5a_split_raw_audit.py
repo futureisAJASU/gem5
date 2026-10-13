@@ -26,6 +26,23 @@ def console_passes(path):
             for line in lines if line.startswith("R3C_P4B_G5_ONLY ")
             and line.endswith(": PASS")]
 
+def validate_interrupted_console(observed: list[str], allow_incomplete: bool) -> bool:
+    """Require the exact original 8/8, or explicit lower-tier subset only.
+
+    Caller prints raw observed names and SHA; no PASS line is ever invented.
+    """
+    complete=observed==list(FIRST)
+    if complete:
+        return True
+    require(allow_incomplete,
+            "first interrupted console incomplete: inspect saved original "
+            "log, or opt into explicitly downgraded RAW-only recovery")
+    require(len(set(observed))==len(observed)
+            and observed==[x for x in FIRST if x in observed],
+            "first console has unexpected, duplicated or out-of-order PASS")
+    return False
+
+
 def manifest(path):
     return json.loads(path.read_text()) if path.is_file() else None
 
@@ -125,18 +142,11 @@ def main():
     plan=json.loads(plan_path.read_text())
     control=p4b.verify_plan(plan,gem5,plan_path,v["p3a_dir"],v["p3b_dir"])
     first_seen=console_passes(v["first_console"])
-    first_console_complete=first_seen==list(FIRST)
-    if not first_console_complete:
+    if first_seen!=list(FIRST):
         print("R3C_P5A_FIRST_CONSOLE_OBSERVED="+repr(first_seen),flush=True)
         print("R3C_P5A_FIRST_CONSOLE_EXPECTED="+repr(list(FIRST)),flush=True)
-        require(args.allow_incomplete_first_console,
-                "first interrupted console incomplete: inspect saved original "
-                "log, or opt into explicitly downgraded RAW-only recovery")
-        # Even in degraded mode, reject any unknown, repeated, or out-of-
-        # order PASS lines. An absent line is not retroactively imputed PASS.
-        require(len(set(first_seen))==len(first_seen)
-                and first_seen==[x for x in FIRST if x in first_seen],
-                "first console has unexpected, duplicated or out-of-order PASS")
+    first_console_complete=validate_interrupted_console(
+        first_seen,args.allow_incomplete_first_console)
     require(console_passes(v["remaining_console"])==list(LAST),
             "resumed console missing expected 3/3 exact PASS")
     first=manifest(v["first_dir"]/"g5_functional_manifest.json")
