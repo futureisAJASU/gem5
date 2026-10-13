@@ -11,6 +11,7 @@ import argparse
 from copy import deepcopy
 from datetime import datetime,timezone
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -60,7 +61,13 @@ def make_brief(draft, pending, draft_sha, pending_sha):
               name+": pinned original license bytes changed")
         text=path.read_text(encoding="utf-8",errors="replace")
         expected=proposal["required_literal_license_phrases"]
-        check(all(anchor.casefold() in text.casefold() for anchor in expected),
+        # License statements often wrap lines (e.g. SUSAN: "must\\nnot be
+        # passed on"). Collapse whitespace ONLY after SHA256 verified the
+        # original bytes. Do not remove punctuation, change keywords, or
+        # relax any original per-file hash/case/approval guard.
+        normalized_text=re.sub(r"\\s+"," ",text).casefold()
+        check(all(re.sub(r"\\s+"," ",anchor).casefold() in normalized_text
+                  for anchor in expected),
               name+": pinned original license differs from AI-reviewed source! "
               "STOP and review actual original manually")
         rows.append({
