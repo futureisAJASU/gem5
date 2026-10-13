@@ -88,7 +88,9 @@ def recheck_one(case, root, plan, profile, gem5, p3a, p3b, snapshot):
     require((case_root/"command.json").is_file(),case+" missing command.json")
     require(json.loads((case_root/"command.json").read_text())==gate,
             case+" execution cmd / cwd / G5 profile drift")
-    require(p2.sha(contract["binary"])==contract["binary_sha256"],
+    # P4A stores the executable path as JSON text; p2.sha requires Path.
+    binary=Path(contract["binary"])
+    require(binary.is_file() and p2.sha(binary)==contract["binary_sha256"],
             case+" target RV64 ELF changed")
     for i in contract["input_files"]:
         src=work/i["name"]
