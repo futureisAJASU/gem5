@@ -65,8 +65,8 @@ def make_brief(draft, pending, draft_sha, pending_sha):
         # passed on"). Collapse whitespace ONLY after SHA256 verified the
         # original bytes. Do not remove punctuation, change keywords, or
         # relax any original per-file hash/case/approval guard.
-        normalized_text=re.sub(r"\\s+"," ",text).casefold()
-        check(all(re.sub(r"\\s+"," ",anchor).casefold() in normalized_text
+        normalized_text=re.sub(r"\s+"," ",text).casefold()
+        check(all(re.sub(r"\s+"," ",anchor).casefold() in normalized_text
                   for anchor in expected),
               name+": pinned original license differs from AI-reviewed source! "
               "STOP and review actual original manually")
