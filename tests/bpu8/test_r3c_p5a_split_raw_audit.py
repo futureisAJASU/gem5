@@ -13,6 +13,80 @@ sys.path.insert(0,str(ROOT/"scripts"))
 import bpu_b8_r3c_p5a_split_raw_audit as p5
 
 class P5ASplitTests(unittest.TestCase):
+    @staticmethod
+    def _roi(host_seconds="10.23", sim_ticks="865114530",
+             comment="Number of ticks simulated", include_host_memory=True,
+             duplicate_host=False):
+        host_rows=[
+            f"hostSeconds {host_seconds} # host time\n",
+            "hostTickRate 84599438 # host ticks per second\n",
+            "hostMemory 702544 # host memory\n",
+            "hostInstRate 311024 # host instruction rate\n",
+            "hostOpRate 311024 # host op rate\n",
+        ]
+        if not include_host_memory:
+            host_rows=[x for x in host_rows
+                       if not x.startswith("hostMemory ")]
+        if duplicate_host:
+            host_rows.append("hostSeconds 99.9 # duplicate\n")
+        return ("---------- Begin Simulation Statistics ----------\n"
+                +f"simTicks {sim_ticks} # {comment}\n"
+                +"simInsts 3180575 # instruction count\n"
+                +"".join(host_rows)
+                +"---------- End Simulation Statistics   ----------\n")
+
+    def test_two_roi_differ_only_in_host_seconds_is_valid_semantic_repeat(self):
+        with tempfile.TemporaryDirectory() as td:
+            a,b=Path(td)/"original.stats",Path(td)/"repeat.stats"
+            a.write_text(self._roi(host_seconds="10.23"))
+            b.write_text(self._roi(host_seconds="12.91"))
+            result=p5.verify_repeat_roi_semantics(a,b)
+            self.assertFalse(result["raw_roi_sha_identical"])
+            self.assertTrue(result["host_only_drift"])
+            self.assertEqual(set(result["changed_host_fields"]),{"hostSeconds"})
+            self.assertTrue(result["all_simulated_roi_bytes_identical_excluding_explicit_host_fields"])
+
+    def test_identical_raw_roi_remains_byte_identical(self):
+        with tempfile.TemporaryDirectory() as td:
+            a,b=Path(td)/"original.stats",Path(td)/"repeat.stats"
+            a.write_text(self._roi())
+            b.write_text(self._roi())
+            result=p5.verify_repeat_roi_semantics(a,b)
+            self.assertTrue(result["raw_roi_sha_identical"])
+            self.assertFalse(result["host_only_drift"])
+
+    def test_a_one_tick_simulation_drift_never_qualifies(self):
+        with tempfile.TemporaryDirectory() as td:
+            a,b=Path(td)/"original.stats",Path(td)/"repeat.stats"
+            a.write_text(self._roi())
+            b.write_text(self._roi(sim_ticks="865114531",host_seconds="10.24"))
+            with self.assertRaisesRegex(ValueError,"non-host ROI statistics changed"):
+                p5.verify_repeat_roi_semantics(a,b)
+
+    def test_unexpected_simulation_comment_change_never_qualifies(self):
+        with tempfile.TemporaryDirectory() as td:
+            a,b=Path(td)/"original.stats",Path(td)/"repeat.stats"
+            a.write_text(self._roi())
+            b.write_text(self._roi(comment="changed description"))
+            with self.assertRaisesRegex(ValueError,"non-host first-ROI text"):
+                p5.verify_repeat_roi_semantics(a,b)
+
+    def test_missing_host_stat_is_not_silently_ignored(self):
+        with tempfile.TemporaryDirectory() as td:
+            a,b=Path(td)/"original.stats",Path(td)/"repeat.stats"
+            a.write_text(self._roi())
+            b.write_text(self._roi(include_host_memory=False))
+            with self.assertRaisesRegex(ValueError,"missing or unexpected host-only"):
+                p5.verify_repeat_roi_semantics(a,b)
+
+    def test_duplicate_host_stat_is_not_silently_ignored(self):
+        with tempfile.TemporaryDirectory() as td:
+            a,b=Path(td)/"original.stats",Path(td)/"repeat.stats"
+            a.write_text(self._roi())
+            b.write_text(self._roi(duplicate_host=True))
+            with self.assertRaises(ValueError):
+                p5.verify_repeat_roi_semantics(a,b)
+
     def test_recheck_one_reads_json_str_binary_path_through_real_hasher(self):
         """Real p2.sha(Path) of staged ELF, full recheck return, no gem5 run."""
         with tempfile.TemporaryDirectory() as td:
