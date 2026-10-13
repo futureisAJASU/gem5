@@ -70,6 +70,10 @@ def validate_ledger(plan: dict, p5: dict, p5b_mf: dict, g5: Path,
           "geometry bit budget changed")
     check(g5.is_file() and p2.sha(g5)==p5a.EXPECTED_GEM5,
           "linked gem5 SHA mismatch")
+    original_mf=original_dir/"g5_functional_manifest.json"
+    check(original_mf.is_file()
+          and p2.sha(original_mf)==p5.get("original_final_manifest_sha256"),
+          "original full11 gem5 manifest changed after P5A")
     check(len(p5.get("cases",[]))==11
           and [c.get("workload") for c in p5["cases"]]==list(order)
           and all(c.get("passed") is True for c in p5["cases"]),
@@ -118,6 +122,15 @@ def validate_ledger(plan: dict, p5: dict, p5b_mf: dict, g5: Path,
         stderr=original_dir/name/"work"/"program.stderr"
         check(first.is_file() and p2.sha(first)==info["roi_sha256"],
               name+": original first ROI SHA drift")
+        for part,hash_value in info["raw_sha256"].items():
+            raw=original_dir/name/"sim"/part
+            check(raw.is_file() and p2.sha(raw)==hash_value,
+                  name+": original complete RAW SHA changed for "+part)
+        for stream in ("gem5.stdout","gem5.stderr"):
+            full=original_dir/name/stream
+            check(full.is_file() and p2.sha(full)==info[
+                      stream.replace(".","_")+"_sha256"],
+                  name+": original gem5 log SHA changed for "+stream)
         check(stdout.is_file() and p2.sha(stdout)==info["app_stdout_sha256"]
               and stderr.is_file() and p2.sha(stderr)==info["app_stderr_sha256"],
               name+": original output SHA drift")
