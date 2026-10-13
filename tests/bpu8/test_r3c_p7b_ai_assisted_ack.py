@@ -78,9 +78,9 @@ class AssistedLicenseTests(unittest.TestCase):
         # This reproduces the real source's line break after "must" and
         # its separate line before "not". Prior literal substring failed.
         p=self.root/"susan_edges.LICENSE"
-        p.write_text("This code is issued for research purposes only.\\n"
-                     "This code must\\nnot be passed on without its header.\\n"
-                     "This code must not be sold.\\n")
+        p.write_text("This code is issued for research purposes only.\n"
+                     "This code must\nnot be passed on without its header.\n"
+                     "This code must not be sold.\n")
         digest=p7b.p2.sha(p)
         self.draft["case_list"][3]["license"]["files"][0]["sha256"]=digest
         self.pending["per_case_license_review"][3]["license_files"][0]["sha256"]=digest
@@ -92,9 +92,9 @@ class AssistedLicenseTests(unittest.TestCase):
 
     def test_wrapped_clause_is_still_rejected_if_words_change(self):
         p=self.root/"susan_edges.LICENSE"
-        p.write_text("This code is issued for research purposes only.\\n"
-                     "This code must\\nnot be redistributed for sale.\\n"
-                     "This code must not be sold.\\n")
+        p.write_text("This code is issued for research purposes only.\n"
+                     "This code must\nnot be redistributed for sale.\n"
+                     "This code must not be sold.\n")
         digest=p7b.p2.sha(p)
         self.draft["case_list"][3]["license"]["files"][0]["sha256"]=digest
         self.pending["per_case_license_review"][3]["license_files"][0]["sha256"]=digest
