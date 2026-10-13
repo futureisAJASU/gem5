@@ -29,6 +29,13 @@ class P5ASplitTests(unittest.TestCase):
                             "R3C_P4B_G5_ONLY patricia: PASS\n")
             self.assertEqual(p5.console_passes(path),["patricia"])
 
+    def test_explicit_negative_console_witness_detected(self):
+        with tempfile.TemporaryDirectory() as td:
+            file=Path(td)/"log"
+            file.write_text("R3C_P4B_G5_ONLY qsort: FAIL\n"
+                            "R3C_P4B_G5_ONLY patricia: PASS\n")
+            self.assertEqual(p5.console_failures(file),["qsort"])
+
     def test_missing_console_fails_closed(self):
         with tempfile.TemporaryDirectory() as td:
             with self.assertRaisesRegex(ValueError,"missing original console"):
