@@ -18,7 +18,15 @@ class AssistedLicenseTests(unittest.TestCase):
         self.addCleanup(td.cleanup)
         self.root=Path(td.name)
         notes=[]
-        self.draft={"case_list":[]}
+        self.draft={
+            "case_list":[],
+            "source_evidence_sha256":{},
+            "frozen_r3_geometry_sha256":"f"*64,
+            "frozen_geometry_profiles":{},
+            "profile_order":list(p7b.EXPECTED_PROFILES),
+            "linked_simulator_gem5_sha256":"e"*64,
+            "source_revisions":{},
+        }
         for name in p7b.EXPECTED_CASES:
             file=self.root/(name+".LICENSE")
             file.write_text(name+" anchored usage clause, private-only")
