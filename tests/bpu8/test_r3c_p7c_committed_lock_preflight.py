@@ -74,7 +74,7 @@ class P7CCommittedGate(unittest.TestCase):
         src=(ROOT/"scripts/bpu_b8_r3c_p7c_committed_lock_preflight.py").read_text()
         self.assertIn('"comparison_executions_completed_by_this_tool":0',src)
         self.assertIn("future_runner_must_recheck_every_gate",src)
-        self.assertIn("HEAD:"+LOCK_REL if False else '\"HEAD:\"+LOCK_REL',src)
+        self.assertIn('"HEAD:"+LOCK_REL',src)
 
 if __name__=="__main__":
     unittest.main()
