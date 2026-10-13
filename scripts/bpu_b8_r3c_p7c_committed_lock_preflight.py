@@ -38,7 +38,9 @@ def verify_committed_lock(lock_file:Path) -> tuple[str,str]:
     require(lock_file.resolve()==(p2.ROOT/LOCK_REL).resolve(),
             "run gate requires exact docs/r3c_corpus_lock.json path")
     require(lock_file.is_file(),"committed lock file missing")
-    tracked=git("ls-files","--error-unmatch",LOCK_REL)
+    # Without --error-unmatch, an untracked lock yields an empty list and
+    # reaches the explicit, stable fail-closed diagnostic below.
+    tracked=git("ls-files","--",LOCK_REL)
     require(tracked.strip()==LOCK_REL,
             "lock is not tracked by Git")
     require(not git("status","--porcelain","--untracked-files=no").strip(),
