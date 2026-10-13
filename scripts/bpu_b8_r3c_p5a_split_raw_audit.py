@@ -15,6 +15,11 @@ FIRST=("basicmath","bitcount","qsort","susan_edges","dijkstra",
        "patricia","rijndael_encrypt","fft")
 LAST=("adpcm_encode","stringsearch","coremark_performance")
 EXPECTED_GEM5="12681de7975d5082b64dee6e085585dbbd1d078fa7be7f477f4553ab98344a1a"
+# Real original R3 stats.txt contains these five host-derived measurements.
+# The simulator's remaining first-ROI text MUST match byte-for-byte.
+HOST_ONLY_FIRST_ROI_FIELDS=frozenset((
+    "hostSeconds","hostTickRate","hostMemory","hostInstRate","hostOpRate"
+))
 
 def require(ok,msg):
     if not ok: raise ValueError(msg)
@@ -76,6 +81,62 @@ def classify_original_run(observed: list[str], first_manifest: dict | None,
     if validate_interrupted_console(observed, allow_incomplete):
         return "FIRST8_COMPLETE_CONSOLE"
     return "FIRST8_RAW_WITH_INCOMPLETE_CONSOLE"
+
+def _canonicalize_host_only_roi(path: Path):
+    """Normalize ONLY verified host-derived values, preserving all sim bytes.
+
+    Fail if a host field is absent/duplicated, and independently reparse
+    the complete first ROI to enforce valid metric syntax and unique keys.
+    """
+    raw=path.read_text()
+    parsed,first=r3.parse_first_roi(path)
+    require(first==raw,"ROI is not exactly one complete first-statistics block: "+str(path))
+    out=[]
+    host={}
+    for line in raw.splitlines(keepends=True):
+        words=line.split()
+        key=words[0] if words else ""
+        if key in HOST_ONLY_FIRST_ROI_FIELDS:
+            require(len(words)>=2 and key not in host and key in parsed,
+                    "duplicate/missing host statistic: "+key)
+            host[key]=words[1]
+            # Discard only the explicitly allowed host statistic line.
+            # Keep an ordered marker to catch deletion/movement of a line.
+            out.append("P5A_HOST_FIELD:"+key+"\\n")
+        else:
+            out.append(line)
+    require(set(host)==HOST_ONLY_FIRST_ROI_FIELDS,
+            "missing or unexpected host-only ROI keys: "+repr(sorted(host)))
+    return "".join(out),host,parsed
+
+
+def verify_repeat_roi_semantics(original: Path, repeated: Path) -> dict:
+    """Check exact simulated first-ROI text, ignoring ONLY five host values.
+
+    Never overwrite raw ROI SHA. Unapproved changed statistics fail closed.
+    """
+    orig_canon,orig_host,orig_map=_canonicalize_host_only_roi(original)
+    repeat_canon,repeat_host,repeat_map=_canonicalize_host_only_roi(repeated)
+    changed={k:{"original":orig_map.get(k),"repeat":repeat_map.get(k)}
+             for k in sorted(set(orig_map)|set(repeat_map))
+             if orig_map.get(k)!=repeat_map.get(k)}
+    other={k:v for k,v in changed.items()
+           if k not in HOST_ONLY_FIRST_ROI_FIELDS}
+    require(not other,
+            "non-host ROI statistics changed: "+repr(list(other.items())[:16]))
+    require(orig_canon==repeat_canon,
+            "non-host first-ROI text/order/comments changed despite equal numeric stats")
+    actual_host={k:{"original":orig_host[k],"repeat":repeat_host[k]}
+                 for k in sorted(HOST_ONLY_FIRST_ROI_FIELDS)
+                 if orig_host[k]!=repeat_host[k]}
+    return {
+        "raw_roi_sha_identical":p2.sha(original)==p2.sha(repeated),
+        "all_simulated_roi_bytes_identical_excluding_explicit_host_fields":True,
+        "changed_host_fields":actual_host,
+        "host_only_drift":bool(actual_host),
+        "host_only_fields_whitelist":sorted(HOST_ONLY_FIRST_ROI_FIELDS),
+    }
+
 
 def recheck_one(case, root, plan, profile, gem5, p3a, p3b, snapshot):
     case_root=root/case; sim=case_root/"sim"; work=case_root/"work"
@@ -256,21 +317,30 @@ def main():
                           "simInsts","committedConditionalPredictions",
                           "committedConditionalWrong","mpki","storageBits",
                           "r3CauseJson","historyRestoreChecks",
-                          "historyStateRestores","roi_sha256",
+                          "historyStateRestores",
                           "app_stdout_sha256","app_stderr_sha256",
                           "output_file_sha256")
             drift={k:{"original":prior[k],"repeat":again[k]}
                    for k in exact_fields if prior[k]!=again[k]}
             require(not drift,case+": repeat G5 deterministic output/ROI drift "+
                     repr(drift))
-            repeated.append({"case":case,"original_roi_sha256":prior["roi_sha256"],
-                             "repeat_roi_sha256":again["roi_sha256"],
-                             "pass":True})
-            print("R3C_P5A_DUPLICATE "+case+": PASS",flush=True)
+            semantic=verify_repeat_roi_semantics(
+                v["first_dir"]/case/"sim"/"roi.stats",
+                v["remaining_dir"]/case/"sim"/"roi.stats")
+            repeated.append({
+                "case":case,
+                "original_roi_sha256":prior["roi_sha256"],
+                "repeat_roi_sha256":again["roi_sha256"],
+                "roi_semantic_verification":semantic,
+                "pass":True})
+            print("R3C_P5A_DUPLICATE "+case+": PASS "+
+                  ("RAW_SHA_IDENTICAL" if semantic["raw_roi_sha_identical"]
+                   else "SIM_ROI_IDENTICAL_HOST_ONLY_DIFFERENCE="+
+                   repr(sorted(semantic["changed_host_fields"]))),flush=True)
     result={
         "kind":"BPU8_R3C_P5A_SPLIT_G5_ONLY_RAW_RECOVERY",
         "verdict":(
-            "ORIGINAL_FULL11_G5_RAW_PASS_REPEAT3_EXACT_PASS_NOT_CORPUS_LOCK"
+            "ORIGINAL_FULL11_G5_RAW_PASS_REPEAT3_SIMSTATE_EQUIVALENT_NOT_CORPUS_LOCK"
             if original_full11 else
             "11_CASE_G5_ONLY_RAW_FUNCTIONAL_PASS_NOT_CORPUS_LOCK"
             if first_console_complete else
@@ -300,8 +370,10 @@ def main():
         "ignored_partial_case_dirs_after_disconnect":extras,
         "actual_profiles":["g5_native"],"six_profile_holdout_executions":0,
         "corpus_locked":False,"cases":results,
-        "limitation":("Full11 original and 3 independent repeated G5 cases "
-                     "are RAW+original runner-manifest independently rechecked."
+        "limitation":("Full11 original plus three independent repeated G5 cases "
+                     "have RAW+runner-manifest rechecks. Repeat ROI SHA may differ "
+                     "ONLY for five independently verified host-only statistics; "
+                     "all simulated first-ROI text and outputs must be identical."
                       if original_full11 else
                       "If first8 manifest is absent, original CLI PASS+raw "
                       "proves functional gate but host subprocess return-code "
