@@ -54,6 +54,29 @@ def validate_interrupted_console(observed: list[str], allow_incomplete: bool) ->
 def manifest(path):
     return json.loads(path.read_text()) if path.is_file() else None
 
+
+def classify_original_run(observed: list[str], first_manifest: dict | None,
+                          allow_incomplete: bool) -> str:
+    """Do not confuse a continuing SSH job with an interrupted 8/11 run.
+
+    A complete original 11-case run MUST have a final PASS manifest.
+    An eight-case log is a different, strictly lower-tier provenance.
+    """
+    if observed == list(FIRST + LAST):
+        require(first_manifest is not None,
+                "original 11/11 console present but final original manifest absent")
+        require(first_manifest.get("verdict") ==
+                "G5_ONLY_FEASIBILITY_PASS_NO_CORPUS_LOCK",
+                "original 11/11 console but original final manifest not PASS")
+        require(first_manifest.get("attempted_cases")==list(FIRST + LAST),
+                "original full11 attempted-cases mismatch")
+        require(list(first_manifest.get("cases",{}))==list(FIRST+LAST),
+                "original full11 manifest missing or misordered cases")
+        return "FULL11_COMPLETE_ORIGINAL"
+    if validate_interrupted_console(observed, allow_incomplete):
+        return "FIRST8_COMPLETE_CONSOLE"
+    return "FIRST8_RAW_WITH_INCOMPLETE_CONSOLE"
+
 def recheck_one(case, root, plan, profile, gem5, p3a, p3b, snapshot):
     case_root=root/case; sim=case_root/"sim"; work=case_root/"work"
     contract=plan["cases"][case]
@@ -154,15 +177,19 @@ def main():
             "original first console explicitly reports FAIL; preserve negative evidence")
     require(not console_failures(v["remaining_console"]),
             "resumed console explicitly reports FAIL; preserve negative evidence")
-    if first_seen!=list(FIRST):
-        print("R3C_P5A_FIRST_CONSOLE_OBSERVED="+repr(first_seen),flush=True)
-        print("R3C_P5A_FIRST_CONSOLE_EXPECTED="+repr(list(FIRST)),flush=True)
-    first_console_complete=validate_interrupted_console(
-        first_seen,args.allow_incomplete_first_console)
-    require(console_passes(v["remaining_console"])==list(LAST),
-            "resumed console missing expected 3/3 exact PASS")
     first=manifest(v["first_dir"]/"g5_functional_manifest.json")
     last=manifest(v["remaining_dir"]/"g5_functional_manifest.json")
+    if first_seen not in (list(FIRST),list(FIRST+LAST)):
+        print("R3C_P5A_FIRST_CONSOLE_OBSERVED="+repr(first_seen),flush=True)
+        print("R3C_P5A_FIRST_CONSOLE_EXPECTED_8="+repr(list(FIRST)),flush=True)
+        print("R3C_P5A_FIRST_CONSOLE_EXPECTED_11="+repr(list(FIRST+LAST)),flush=True)
+    first_mode=classify_original_run(
+        first_seen,first,args.allow_incomplete_first_console)
+    first_console_complete=(first_mode!="FIRST8_RAW_WITH_INCOMPLETE_CONSOLE")
+    original_full11=(first_mode=="FULL11_COMPLETE_ORIGINAL")
+    print("R3C_P5A_ORIGINAL_RUN_MODE="+first_mode,flush=True)
+    require(console_passes(v["remaining_console"])==list(LAST),
+            "resumed console missing expected 3/3 exact PASS")
     require(last is not None
             and last["verdict"]=="G5_ONLY_FEASIBILITY_PASS_NO_CORPUS_LOCK",
             "resumed runner final manifest not passed")
@@ -175,7 +202,8 @@ def main():
         if not first_console_complete:
             require(first["verdict"]=="G5_ONLY_FEASIBILITY_PASS_NO_CORPUS_LOCK",
                     "first interrupted manifest is not final PASS")
-    for label,m,subset in (("first",first,FIRST),("last",last,LAST)):
+    first_subset=FIRST+LAST if original_full11 else FIRST
+    for label,m,subset in (("first",first,first_subset),("last",last,LAST)):
         if m is None: continue
         require(m["kind"]=="BPU8_R3C_P4B_G5_ONLY_SE_FIRST_ROI_FEASIBILITY"
                 and m["control_profile"]=="g5_native"
@@ -195,15 +223,17 @@ def main():
         require(m["attempted_cases"]==list(subset) or
                 (label=="first" and m["attempted_cases"]==list(FIRST+LAST)),
                 label+" unexpected target list")
-        require(set(m["cases"])==set(subset),label+" recorded case set mismatch")
+        require(list(m["cases"])==list(subset),
+                label+" recorded case set/order mismatch")
     extras=[p.name for p in v["first_dir"].iterdir()
-            if p.is_dir() and p.name not in FIRST]
-    require(all(x in LAST for x in extras),
-            "unknown extra case from interrupted run")
+            if p.is_dir() and p.name not in first_subset]
+    require(all(x in LAST for x in extras) if not original_full11 else not extras,
+            "unknown extra case in original-run directory")
     results=[]
     for case in FIRST+LAST:
-        earlier=case in FIRST;folder=v["first_dir"] if earlier else v["remaining_dir"]
-        mf=first if earlier else last
+        from_first=original_full11 or case in FIRST
+        folder=v["first_dir"] if from_first else v["remaining_dir"]
+        mf=first if from_first else last
         record=recheck_one(case,folder,plan,control,gem5,
                            v["p3a_dir"],v["p3b_dir"],
                            mf["cases"][case] if mf else None)
@@ -211,11 +241,44 @@ def main():
         print("R3C_P5A_RAW "+case+": PASS",flush=True)
     require(len(results)==11 and len({x["workload"] for x in results})==11,
             "not exactly 11 G5-only cases")
+    # If the original job actually continued through 11/11, the user's
+    # separately run last three are genuinely INDEPENDENT REPEAT runs.
+    # Audit all 3 again and reject deterministic-counter or output drift.
+    repeated=[]
+    if original_full11:
+        for case in LAST:
+            again=recheck_one(case,v["remaining_dir"],plan,control,gem5,
+                              v["p3a_dir"],v["p3b_dir"],last["cases"][case])
+            prior=next(z for z in results if z["workload"]==case)
+            exact_fields=("elf_sha256","simulated_exit_code","simTicks",
+                          "simInsts","committedConditionalPredictions",
+                          "committedConditionalWrong","mpki","storageBits",
+                          "r3CauseJson","historyRestoreChecks",
+                          "historyStateRestores","roi_sha256",
+                          "app_stdout_sha256","app_stderr_sha256",
+                          "output_file_sha256")
+            drift={k:{"original":prior[k],"repeat":again[k]}
+                   for k in exact_fields if prior[k]!=again[k]}
+            require(not drift,case+": repeat G5 deterministic output/ROI drift "+
+                    repr(drift))
+            repeated.append({"case":case,"original_roi_sha256":prior["roi_sha256"],
+                             "repeat_roi_sha256":again["roi_sha256"],
+                             "pass":True})
+            print("R3C_P5A_DUPLICATE "+case+": PASS",flush=True)
     result={
         "kind":"BPU8_R3C_P5A_SPLIT_G5_ONLY_RAW_RECOVERY",
-        "verdict":("11_CASE_G5_ONLY_RAW_FUNCTIONAL_PASS_NOT_CORPUS_LOCK"
-                   if first_console_complete else
-                   "11_CASE_RAW_FUNCTIONAL_RECOVERED_FIRST_CONSOLE_INCOMPLETE_NOT_CORPUS_LOCK"),
+        "verdict":(
+            "ORIGINAL_FULL11_G5_RAW_PASS_REPEAT3_EXACT_PASS_NOT_CORPUS_LOCK"
+            if original_full11 else
+            "11_CASE_G5_ONLY_RAW_FUNCTIONAL_PASS_NOT_CORPUS_LOCK"
+            if first_console_complete else
+            "11_CASE_RAW_FUNCTIONAL_RECOVERED_FIRST_CONSOLE_INCOMPLETE_NOT_CORPUS_LOCK"),
+        "original_run_mode":first_mode,
+        "original_full11_final_manifest_verified":original_full11,
+        "original_final_manifest_sha256":(
+            p2.sha(v["first_dir"]/"g5_functional_manifest.json")
+            if first is not None else None),
+        "three_repeat_cases":repeated,
         "p4a_plan_sha256":p2.sha(plan_path),
         "gem5_sha256":EXPECTED_GEM5,
         "first_manifest_present":first is not None,
@@ -224,7 +287,9 @@ def main():
         "first_console_missing_passes":[x for x in FIRST if x not in first_seen],
         "first_console_witness_complete":first_console_complete,
         "first_evidence_level":(
-            "ORIGINAL_RAW_PLUS_ORIGINAL_COMPLETE_CONSOLE"
+            "COMPLETE_11_CASE_ORIGINAL_CONSOLE_FINAL_MANIFEST_AND_RAW"
+            if original_full11 else
+            "ORIGINAL_FIRST8_RAW_PLUS_COMPLETE_CONSOLE"
             if first_console_complete else
             "ORIGINAL_RAW_WITH_INCOMPLETE_SSH_CONSOLE_WITNESS"),
         "remaining_console_sha256":p2.sha(v["remaining_console"]),
@@ -233,9 +298,12 @@ def main():
         "ignored_partial_case_dirs_after_disconnect":extras,
         "actual_profiles":["g5_native"],"six_profile_holdout_executions":0,
         "corpus_locked":False,"cases":results,
-        "limitation":"If interrupted first manifest is absent, original CLI "
-                     "PASS+raw proves condition gate but does not independently "
-                     "rehash the host subprocess return-code integer.",
+        "limitation":("Full11 original and 3 independent repeated G5 cases "
+                     "are RAW+original runner-manifest independently rechecked."
+                      if original_full11 else
+                      "If first8 manifest is absent, original CLI PASS+raw "
+                      "proves functional gate but host subprocess return-code "
+                      "integer was not independently archived."),
     }
     v["out"].parent.mkdir(parents=True,exist_ok=True)
     with v["out"].open("x") as f:
@@ -245,6 +313,9 @@ def main():
     print("R3C_P5A_VERDICT="+result["verdict"],flush=True)
     print("R3C_P5A_FIRST_CONSOLE_WITNESS_COMPLETE="+
           str(first_console_complete).lower(),flush=True)
+    print("R3C_P5A_ORIGINAL_FULL11_VERIFIED="+
+          str(original_full11).lower(),flush=True)
+    print("R3C_P5A_REPEATED_CASES="+str(len(repeated)),flush=True)
     print("NO CLAIM: independent untouched workloads, paired TG7 "
           "performance, locked corpus or SRAM/RTL PPA",flush=True)
 
