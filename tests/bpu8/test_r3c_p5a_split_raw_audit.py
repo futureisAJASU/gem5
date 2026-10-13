@@ -43,5 +43,25 @@ class P5ASplitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             self.assertIsNone(p5.manifest(Path(td)/"missing.json"))
 
+    def test_complete_first_console_is_full_evidence(self):
+        self.assertTrue(p5.validate_interrupted_console(list(p5.FIRST),False))
+        self.assertTrue(p5.validate_interrupted_console(list(p5.FIRST),True))
+
+    def test_truncated_console_default_fail_closed(self):
+        with self.assertRaisesRegex(ValueError,"first interrupted console incomplete"):
+            p5.validate_interrupted_console(list(p5.FIRST[:7]),False)
+
+    def test_truncated_console_requires_explicit_downgrade(self):
+        self.assertFalse(p5.validate_interrupted_console(list(p5.FIRST[:7]),True))
+        self.assertFalse(p5.validate_interrupted_console([],True))
+
+    def test_fabricated_extra_case_fails_even_with_downgrade(self):
+        with self.assertRaisesRegex(ValueError,"unexpected, duplicated"):
+            p5.validate_interrupted_console(list(p5.FIRST[:7])+["unknown"],True)
+        with self.assertRaisesRegex(ValueError,"unexpected, duplicated"):
+            p5.validate_interrupted_console(["qsort","basicmath"],True)
+        with self.assertRaisesRegex(ValueError,"unexpected, duplicated"):
+            p5.validate_interrupted_console(["qsort","qsort"],True)
+
 if __name__=="__main__":
     unittest.main()
