@@ -1,0 +1,115 @@
+{
+  "kind": "BPU8_R3C_P7B_AI_ASSISTED_LICENSE_NOTES_V01",
+  "status": "SOURCE_MIRROR_EXCERPT_EVIDENCE_NOT_SIGNOFF",
+  "basis": "Public upstream/mirror GitHub LICENSE texts read 2026-10-13. OCI must match every case's exact pinned LICENSE SHA and listed literal phrase before an assisted review packet can be acknowledged. This is not independent legal counsel or external distribution permission.",
+  "scope": "PRIVATE_INTERNAL_ACADEMIC_ONLY_NO_SOURCE_OR_BINARY_DISTRIBUTION",
+  "cases": [
+    {
+      "case": "basicmath",
+      "required_literal_license_phrases": [
+        "This code is FREE with no restrictions."
+      ],
+      "model_summary": "Source mirror labels code unrestricted; private simulated execution; do not distribute unrelated files or claim additional third-party rights.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "bitcount",
+      "required_literal_license_phrases": [
+        "This code is FREE with no restrictions."
+      ],
+      "model_summary": "Source mirror labels code unrestricted; private simulated execution; unrelated dependencies remain outside this notice.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "qsort",
+      "required_literal_license_phrases": [
+        "It is GPL'ed."
+      ],
+      "model_summary": "Source marks GPL, version unspecified in short notice; internal executions not redistributed; preserve source and license, verify upstream obligations before release.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "susan_edges",
+      "required_literal_license_phrases": [
+        "research purposes only",
+        "must not be passed on",
+        "must not be sold"
+      ],
+      "model_summary": "SUSAN explicitly says research-only; retain original header and do not sell or forward source without header; historical patent notice is recorded, not a patent clearance.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "dijkstra",
+      "required_literal_license_phrases": [
+        "It is GPL'ed."
+      ],
+      "model_summary": "Source marks GPL; use privately for simulation only; no source/binary redistribution or unreviewed relicensing.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "patricia",
+      "required_literal_license_phrases": [
+        "No license was attached",
+        "GPL'ed"
+      ],
+      "model_summary": "Author's short notice says GPL'ed although upstream version/attribution may be ambiguous; treat as GPL-restricted; no distribution.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "rijndael_encrypt",
+      "required_literal_license_phrases": [
+        "Redistribution and use in source and binary forms",
+        "copyright"
+      ],
+      "model_summary": "Gladman notice permits source/binary use subject to copyright/disclaimer retention if redistributed; private simulated execution only.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "fft",
+      "required_literal_license_phrases": [
+        "This source code is public domain",
+        "Do not charge any money"
+      ],
+      "model_summary": "Don Cross readme calls source public domain and separately asks free redistribution, attribution and modifications notices; no redistribution in experiment.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "adpcm_encode",
+      "required_literal_license_phrases": [
+        "Permission to use, copy, modify, and distribute",
+        "not be used in advertising or publicity"
+      ],
+      "model_summary": "Stichting Mathematisch Centrum notice permits use with copyright/permission notices; no endorsement/publicity-name use or redistribution here.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "stringsearch",
+      "required_literal_license_phrases": [
+        "Assume GPL'ed"
+      ],
+      "model_summary": "Ambiguous wording: author describes possible public domain yet asks to assume GPL; conservatively treat as GPL-covered; private execution only.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    },
+    {
+      "case": "coremark_performance",
+      "required_literal_license_phrases": [
+        "COREMARK® ACCEPTABLE USE AGREEMENT",
+        "Modifications to the Software",
+        "Redistribution."
+      ],
+      "model_summary": "CoreMark Apache-style copyright terms coexist with an EEMBC trademark-use agreement. Internal 10-iteration gem5 first ROI is NOT an official score, and modified runs must not be represented with EEMBC-certified trademark claims.",
+      "redistribution": "NOT_APPROVED",
+      "official_score": "NOT_CLAIMED"
+    }
+  ]
+}
