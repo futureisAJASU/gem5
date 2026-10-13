@@ -38,7 +38,7 @@ class P7CCommittedGate(unittest.TestCase):
             p7c.verify_committed_lock(self.out)
 
     def test_staged_but_never_committed_new_lock_rejected(self):
-        self.out.write_text('{"verdict":"STAGED_ONLY"}\\n')
+        self.out.write_text('{"verdict":"STAGED_ONLY"}\n')
         self.cmd("add","docs/r3c_corpus_lock.json")
         with self.assertRaisesRegex(ValueError,"uncommitted modifications"):
             p7c.verify_committed_lock(self.out)
