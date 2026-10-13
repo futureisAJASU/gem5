@@ -62,6 +62,10 @@ def attest_config(lock:dict,draft:dict,review:dict,plan:dict,gem5:Path,
             and lock.get("original_p7a_sha256")==draft_digest
             and lock.get("signed_review_packet_sha256")==review_digest,
             "lock original draft/manual-review hash chain altered")
+    require(lock.get("review_method")==review.get("review_method",p7b.DIRECT_METHOD)
+            and lock.get("ai_assisted_notes_sha256")==review.get("ai_assisted_notes_sha256")
+            and lock.get("acknowledgement_source")==review.get("acknowledgement_source"),
+            "lock review method/provenance differs from acknowledged source")
     require(lock.get("review_scope")==REVIEW_SCOPE
             and lock.get("third_party_redistribution_rights")=="NOT_GRANTED"
             and lock.get("approved_usage_scope")==
