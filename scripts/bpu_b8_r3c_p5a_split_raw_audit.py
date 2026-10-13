@@ -86,7 +86,7 @@ def recheck_one(case, root, plan, profile, gem5, p3a, p3b, snapshot):
     return {
         "workload":case,"source_root":str(case_root),
         "runner_evidence":"verified_runner_manifest_and_original_RAW" if snapshot
-                else "original_console_PASS_and_original_RAW_no_final_manifest",
+                else "original_RAW_no_final_manifest_with_console_witness_status_separate",
         "simulated_exit_code":simulated_exit,
         "elf_sha256":contract["binary_sha256"],
         "simTicks":row["simTicks"],"simInsts":row["simInsts"],
@@ -111,8 +111,12 @@ def main():
     for arg in ("p4a_plan","p3a_dir","p3b_dir","first_dir","remaining_dir",
                 "first_console","remaining_console","gem5","out"):
         ap.add_argument("--"+arg.replace("_","-"),type=Path,required=True)
+    ap.add_argument("--allow-incomplete-first-console",action="store_true",
+        help="If original SSH log is truncated, re-audit all eight RAW "
+             "directories without claiming a complete original CLI witness")
     args=ap.parse_args()
-    v={k:p.expanduser().resolve() for k,p in vars(args).items()}
+    v={k:p.expanduser().resolve() for k,p in vars(args).items()
+       if isinstance(p,Path)}
     require(not v["out"].exists(),"output already exists")
     gem5=v["gem5"];plan_path=v["p4a_plan"]
     require(gem5.is_file() and p2.sha(gem5)==EXPECTED_GEM5,
@@ -120,8 +124,19 @@ def main():
     require(tuple(p2.ORDER)==FIRST+LAST,"pre-registered case order altered")
     plan=json.loads(plan_path.read_text())
     control=p4b.verify_plan(plan,gem5,plan_path,v["p3a_dir"],v["p3b_dir"])
-    require(console_passes(v["first_console"])==list(FIRST),
-            "first interrupted console missing expected 8/8 exact PASS")
+    first_seen=console_passes(v["first_console"])
+    first_console_complete=first_seen==list(FIRST)
+    if not first_console_complete:
+        print("R3C_P5A_FIRST_CONSOLE_OBSERVED="+repr(first_seen),flush=True)
+        print("R3C_P5A_FIRST_CONSOLE_EXPECTED="+repr(list(FIRST)),flush=True)
+        require(args.allow_incomplete_first_console,
+                "first interrupted console incomplete: inspect saved original "
+                "log, or opt into explicitly downgraded RAW-only recovery")
+        # Even in degraded mode, reject any unknown, repeated, or out-of-
+        # order PASS lines. An absent line is not retroactively imputed PASS.
+        require(len(set(first_seen))==len(first_seen)
+                and first_seen==[x for x in FIRST if x in first_seen],
+                "first console has unexpected, duplicated or out-of-order PASS")
     require(console_passes(v["remaining_console"])==list(LAST),
             "resumed console missing expected 3/3 exact PASS")
     first=manifest(v["first_dir"]/"g5_functional_manifest.json")
@@ -129,6 +144,15 @@ def main():
     require(last is not None
             and last["verdict"]=="G5_ONLY_FEASIBILITY_PASS_NO_CORPUS_LOCK",
             "resumed runner final manifest not passed")
+    # Never accept a fallback if the original interrupted manifest actually
+    # declares a failure: raw recovery must not override negative evidence.
+    if first is not None:
+        require(all(x.get("pass") is True
+                    for x in first.get("cases",{}).values()),
+                "first manifest contains explicit FAIL; cannot recover")
+        if not first_console_complete:
+            require(first["verdict"]=="G5_ONLY_FEASIBILITY_PASS_NO_CORPUS_LOCK",
+                    "first interrupted manifest is not final PASS")
     for label,m,subset in (("first",first,FIRST),("last",last,LAST)):
         if m is None: continue
         require(m["kind"]=="BPU8_R3C_P4B_G5_ONLY_SE_FIRST_ROI_FEASIBILITY"
@@ -167,11 +191,20 @@ def main():
             "not exactly 11 G5-only cases")
     result={
         "kind":"BPU8_R3C_P5A_SPLIT_G5_ONLY_RAW_RECOVERY",
-        "verdict":"11_CASE_G5_ONLY_RAW_FUNCTIONAL_PASS_NOT_CORPUS_LOCK",
+        "verdict":("11_CASE_G5_ONLY_RAW_FUNCTIONAL_PASS_NOT_CORPUS_LOCK"
+                   if first_console_complete else
+                   "11_CASE_RAW_FUNCTIONAL_RECOVERED_FIRST_CONSOLE_INCOMPLETE_NOT_CORPUS_LOCK"),
         "p4a_plan_sha256":p2.sha(plan_path),
         "gem5_sha256":EXPECTED_GEM5,
         "first_manifest_present":first is not None,
         "first_console_sha256":p2.sha(v["first_console"]),
+        "first_console_observed_passes":first_seen,
+        "first_console_missing_passes":[x for x in FIRST if x not in first_seen],
+        "first_console_witness_complete":first_console_complete,
+        "first_evidence_level":(
+            "ORIGINAL_RAW_PLUS_ORIGINAL_COMPLETE_CONSOLE"
+            if first_console_complete else
+            "ORIGINAL_RAW_WITH_INCOMPLETE_SSH_CONSOLE_WITNESS"),
         "remaining_console_sha256":p2.sha(v["remaining_console"]),
         "remaining_manifest_sha256":p2.sha(
             v["remaining_dir"]/"g5_functional_manifest.json"),
@@ -188,6 +221,8 @@ def main():
         f.write("\n")
     print("R3C_P5A_LEDGER="+str(v["out"]),flush=True)
     print("R3C_P5A_VERDICT="+result["verdict"],flush=True)
+    print("R3C_P5A_FIRST_CONSOLE_WITNESS_COMPLETE="+
+          str(first_console_complete).lower(),flush=True)
     print("NO CLAIM: independent untouched workloads, paired TG7 "
           "performance, locked corpus or SRAM/RTL PPA",flush=True)
 
