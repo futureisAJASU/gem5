@@ -1,0 +1,833 @@
+{
+  "acknowledgement_source": "USER_INTERACTIVE_TERMINAL_ACK",
+  "ai_assisted_notes_sha256": "ac37fea7dbeaab721b8867e7cf829daf566be251812de8284d92cdbe2844278d",
+  "approved_for_execution_only_after": "LOCK_FILE_GIT_COMMITTED_AND_RUNNER_SOURCE_VERIFIED",
+  "approved_usage_scope": "PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_CODE_BINARY_DISTRIBUTION",
+  "case_list": [
+    {
+      "argv": [],
+      "case": "basicmath",
+      "correctness_gate": "EXACT_PREQUALIFIED_QEMU_RV64_STDOUT",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/basicmath.rv64.elf",
+        "sha256": "fc8918aaf1749f77f98dba48c5a8f8c0dfc82cfd6db173358077910725267e29",
+        "size": 564408
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "3d54024ad8e52b5288f2ddc1d010f3f8825fec7fa498d5a970dd47833d2d8a2f",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "5a2f93a14101585e8142d092fcd946b532eb00d63f138890214bc55b48bd9156",
+        "written_file_sha256": null
+      },
+      "index": 0,
+      "input_files": [],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/basicmath/LICENSE",
+            "sha256": "d5433a2f12b96fb7dd1ec0e09f8268ce220a93859fa2c6441ac11724169dad95"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [
+        "75000"
+      ],
+      "case": "bitcount",
+      "correctness_gate": "ALGORITHM_COUNTS_NOT_HOST_TIMES",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/bitcount.rv64.elf",
+        "sha256": "9694237a360905de28f6d650e86f668f3efde3db4b5e222da2d2a94610ab9629",
+        "size": 510240
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "dd5c76a40660399db1d180ad80fb0dc20969f83206f629aca5426c990b306b8b",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "31617bab55788cef87510c47966a7fbf6dcf95a0e1d731403208b34f6e650635",
+        "written_file_sha256": null
+      },
+      "index": 1,
+      "input_files": [],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/bitcount/LICENSE",
+            "sha256": "d5433a2f12b96fb7dd1ec0e09f8268ce220a93859fa2c6441ac11724169dad95"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [
+        "input_small.dat"
+      ],
+      "case": "qsort",
+      "correctness_gate": "EXACT_PREQUALIFIED_QEMU_RV64_STDOUT",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/qsort.rv64.elf",
+        "sha256": "24c6e8983ad1e2caf60c1bb5b892b27f8a651bd0cb71100ab7e80cc51e1118dc",
+        "size": 560496
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "25321c0d20a3d84082563635ea97d57997f5df1be7644cbd9e829cfd42205d7f",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "9fda40184a517cd9bdd3748a61c30ea1a6b3fbfa36942422d540de05ae0b69b5",
+        "written_file_sha256": null
+      },
+      "index": 2,
+      "input_files": [
+        {
+          "name": "input_small.dat",
+          "sha256": "1de1c6a5dc220baacba72c915ca9931400bb30c77e2451e0613df8fb2fcee50a",
+          "size": 53437,
+          "source_path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/qsort/input_small.dat"
+        }
+      ],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/qsort/LICENSE",
+            "sha256": "ebdf405e65ff7aadf6878c761d601be6a4d422c55769eebb962daa6f3fa6067d"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [
+        "input_small.pgm",
+        "edges.pgm",
+        "-e"
+      ],
+      "case": "susan_edges",
+      "correctness_gate": "EXACT_P5_EDGES_IMAGE",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/susan_edges.rv64.elf",
+        "sha256": "070524fb1803982e6416f7348571c14b68f0f3568f69e4910a2714195b53d506",
+        "size": 539656
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "b024ba29f4b2d55154ac06f04cc5bbf856d1f153c19b2f13040f808e054dc193",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_file_sha256": "9192c724d47c3432a11a1bbc01b86b8699d141868e3f81567051c1d02b5474a0"
+      },
+      "index": 3,
+      "input_files": [
+        {
+          "name": "input_small.pgm",
+          "sha256": "3980e33fe2d59a6070c741fad12f74e2939852e39cda655e6701d3feb0892915",
+          "size": 7292,
+          "source_path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/susan/input_small.pgm"
+        }
+      ],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/susan/LICENSE",
+            "sha256": "702bcfb69118191a1a543782d3087bda6c09157e07a82712c8533a1b456d68bc"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": "edges.pgm",
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [
+        "input.dat"
+      ],
+      "case": "dijkstra",
+      "correctness_gate": "EXACT_PREQUALIFIED_QEMU_RV64_STDOUT",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/dijkstra.rv64.elf",
+        "sha256": "4ccfa29db71ffe4a302d514655be8e0a3d9146a24ec5900676424af7753fb15d",
+        "size": 565160
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "92e6a4f272e4e7ad95ad9b820a66ab13524c0cd116cbe65a14167e3acf8e52ea",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "a951e07e70e04b3100dd6684c2c8a1074959a86de89b747c3ba2041b970938c9",
+        "written_file_sha256": null
+      },
+      "index": 4,
+      "input_files": [
+        {
+          "name": "input.dat",
+          "sha256": "2a88640108ad1917fec66a51ec5bef564d9c8f14ae23137fe67bf042142841de",
+          "size": 29144,
+          "source_path": "/home/ubuntu/bpu8_r3c_external/mibench/network/dijkstra/input.dat"
+        }
+      ],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/network/dijkstra/LICENSE",
+            "sha256": "0bb1d50d03b2676f4064644e72afa33790f5bf87b89387e15e638a2ff02fa9ff"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [
+        "small.udp"
+      ],
+      "case": "patricia",
+      "correctness_gate": "NONEMPTY_EXACT_STDOUT_AND_EXPECTED_EXIT_1",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2b_lp64_01/patricia.rv64.elf",
+        "sha256": "4a72fb3e705b8d9cb9db0004e1a3617b6bbbadfcefa3023b1d25540370e0d143",
+        "size": 565856
+      },
+      "expected_process_exit_code": 1,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "c04827aa48ad3b3cd20d6de9d2f78de3b9c72ce67c444111c1dcd9d6f89aa2c8",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "7bb022867b25d6757e3d27feeec3282701599b6084759fcbb13c6dadb71c2a43",
+        "written_file_sha256": null
+      },
+      "index": 5,
+      "input_files": [
+        {
+          "name": "small.udp",
+          "sha256": "ed0c6a4791b07cad17bdff92893467c1b07f4d33014c3db6989a830408e37681",
+          "size": 251969,
+          "source_path": "/home/ubuntu/bpu8_r3c_p2b_lp64_01/overlay_source/mibench/network/patricia/small.udp"
+        }
+      ],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/network/patricia/LICENSE",
+            "sha256": "68d40feb2abbfdeb1aeacac85045d3925c507b213ce2f208c006644eff09df65"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "LP64_SIDECAR",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [
+        "input_small.asc",
+        "encrypted.bin",
+        "e",
+        "1234567890abcdeffedcba09876543211234567890abcdeffedcba0987654321"
+      ],
+      "case": "rijndael_encrypt",
+      "correctness_gate": "EXACT_CIPHERTEXT_PLUS_PRIOR_ROUNDTRIPS",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2b_lp64_01/rijndael_encrypt.rv64.elf",
+        "sha256": "6a809132d7344806e5f95e4866d4bbd960e7b286b71cb21e7ca2e03546158603",
+        "size": 545960
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "2da82685dab6e28841aa302ec256252b51836e4e9b1cf643917e080f53553241",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_file_sha256": "feab957dc6d9a9e4c8a58b46f605e5fbdeb6a81508b3fb090c81499b346c2229"
+      },
+      "index": 6,
+      "input_files": [
+        {
+          "name": "input_small.asc",
+          "sha256": "e70de01be9119601583a3541b1645d552b6103a3a652ef35f8ac4f08667da7b0",
+          "size": 311824,
+          "source_path": "/home/ubuntu/bpu8_r3c_p2b_lp64_01/overlay_source/mibench/security/rijndael/input_small.asc"
+        }
+      ],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/security/rijndael/LICENSE",
+            "sha256": "aea9b8d824f6290bda1399b89c9b56b4532c16ea2b53ac7d16bca524dad3c067"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": "encrypted.bin",
+      "source_kind": "LP64_SIDECAR",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [
+        "4",
+        "4096"
+      ],
+      "case": "fft",
+      "correctness_gate": "FINITE_FLOAT_VECTORS_ABS_1E-4_REL_1E-5",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/fft.rv64.elf",
+        "sha256": "2e07ee15081e50fa7df6fc1d74cb0dfba5c2db910c07574049c1c7d346cb50a8",
+        "size": 522720
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "2e7bde438fab133851f7c8f5587960b61dae1192aeada3bdeebe4f8b9cd74dc8",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "872b926b4fd7ca67e64b6becbdec93804100f33544b6c31b05e059001c9c3735",
+        "written_file_sha256": null
+      },
+      "index": 7,
+      "input_files": [],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/telecomm/FFT/LICENSE",
+            "sha256": "177ee719fdb94ec770019538eafb0fc90e61ae47992445f90ac74843f862a9b2"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [],
+      "case": "adpcm_encode",
+      "correctness_gate": "EXACT_ENCODER_BYTES_PLUS_TERMINAL_STATE",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/adpcm_encode.rv64.elf",
+        "sha256": "503c53be5d05eb4c0a8b816d7a4271b6daa4c79d8ebbd5bbb9b430fc7fa67471",
+        "size": 509064
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "80fa70468710b3a400a4610fc6854f3e7521c01bf090443260f9ae999a4fc945",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "403516c4f256af617d2f5ffbb3b50bdfa943f931460eea6ebd41170b014cece2",
+        "stdout_sha256": "d7d05588248b7a83d58aaea1d925f47f4950f851f642859c3cd1a350d720f7c7",
+        "written_file_sha256": null
+      },
+      "index": 8,
+      "input_files": [
+        {
+          "name": "data/small.pcm",
+          "sha256": "2705978af13d893f334f747084ae5c6850227a2bf95db8844cd1779e3bf37a3d",
+          "size": 1368864,
+          "source_path": "/home/ubuntu/bpu8_r3c_external/mibench/telecomm/adpcm/data/small.pcm"
+        }
+      ],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/telecomm/adpcm/LICENSE",
+            "sha256": "5a706f708697154145732776c83bf0fb26ede1bed767391d0a3e5f2786d76788"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": "data/small.pcm"
+    },
+    {
+      "argv": [],
+      "case": "stringsearch",
+      "correctness_gate": "EXACT_PREQUALIFIED_QEMU_RV64_STDOUT",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/stringsearch.rv64.elf",
+        "sha256": "c9bb702aeeb33dfbc404283843a69396d744ae8c993d836fd29f26152ceae6de",
+        "size": 510080
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "44059b49eec29e33dacd9da27e9b8564fd6d78a8e5a09a26798876841c24aadc",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "17b43f05792f9286d963bd61079aea6c9b653b6df520b4e5b2e85b6f2d038bf8",
+        "written_file_sha256": null
+      },
+      "index": 9,
+      "input_files": [],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/mibench/office/stringsearch/LICENSE",
+            "sha256": "b43faa73aa52be87b3121a49495c833d728f10df7652b30d02a9d8578c56f819"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": null
+    },
+    {
+      "argv": [
+        "0x0",
+        "0x0",
+        "0x66",
+        "10",
+        "7",
+        "1",
+        "2000"
+      ],
+      "case": "coremark_performance",
+      "correctness_gate": "EEMBC_UPSTREAM_2K_PERFORMANCE_CRC_ONLY",
+      "elf": {
+        "path": "/home/ubuntu/bpu8_r3c_p2_full11_01/coremark_performance.rv64.elf",
+        "sha256": "24c5a6cf62df2f17d1b69c0669a1479f317cd64b54293a66f7c996f5d923c047",
+        "size": 518472
+      },
+      "expected_process_exit_code": 0,
+      "g5_reference_outputs": {
+        "first_roi_sha256": "9cdf2b87ab7eecd611d8ae0024dc720051af317a2ac76be0ece16ab2f452a866",
+        "source": "P5A original G5-only control (not a TG geometry result)",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "e26c5ff5dc54821da97cfaa5c254b81909a890920199e37dc93c36e99814cbbe",
+        "written_file_sha256": null
+      },
+      "index": 10,
+      "input_files": [],
+      "license": {
+        "case_terms": "MANUAL_REVIEW_PENDING",
+        "files": [
+          {
+            "path": "/home/ubuntu/bpu8_r3c_external/coremark/LICENSE.md",
+            "sha256": "9577b9c846f61fd69a0d8ac965998c6450c7d8969f71f0bb4a931b91aebad28a"
+          }
+        ],
+        "publication_or_binary_redistribution": "NOT_APPROVED"
+      },
+      "program_output_file_relative": null,
+      "source_kind": "ORIGINAL_P1_PINNED",
+      "stdin_file_relative": null
+    }
+  ],
+  "cases": 11,
+  "coremark_presentation_scope": "INTERNAL_FIRST_ROI_NOT_OFFICIAL_SCORE",
+  "frozen_geometry_profiles": {
+    "g5_h11": {
+      "base_entries": 2048,
+      "bp_type": "tage-r3-h11-tg5-45",
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "fixed_index_hash_log_size": 11,
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ],
+      "r3_diagnostics": true,
+      "source_profile": "tg5_45",
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "total_bits": 45736
+    },
+    "g5_native": {
+      "base_entries": 2048,
+      "bp_type": "tage-r3-native-tg5-45",
+      "entries": [
+        512,
+        512,
+        1024,
+        512,
+        512
+      ],
+      "fixed_index_hash_log_size": 0,
+      "histories": [
+        5,
+        11,
+        25,
+        58,
+        130
+      ],
+      "r3_diagnostics": true,
+      "source_profile": "tg5_45",
+      "tag_bits": [
+        8,
+        8,
+        9,
+        10,
+        10
+      ],
+      "total_bits": 45736
+    },
+    "tg6_h11": {
+      "base_entries": 2048,
+      "bp_type": "tage-r3-h11-tg6-45",
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "fixed_index_hash_log_size": 11,
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ],
+      "r3_diagnostics": true,
+      "source_profile": "tg6_45",
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "total_bits": 45736
+    },
+    "tg6_native": {
+      "base_entries": 2048,
+      "bp_type": "tage-r3-native-tg6-45",
+      "entries": [
+        512,
+        512,
+        512,
+        512,
+        512,
+        512
+      ],
+      "fixed_index_hash_log_size": 0,
+      "histories": [
+        5,
+        10,
+        20,
+        39,
+        75,
+        130
+      ],
+      "r3_diagnostics": true,
+      "source_profile": "tg6_45",
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        10,
+        10
+      ],
+      "total_bits": 45736
+    },
+    "tg7_h11": {
+      "base_entries": 2048,
+      "bp_type": "tage-r3-h11-tg7-45",
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        256
+      ],
+      "fixed_index_hash_log_size": 11,
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ],
+      "r3_diagnostics": true,
+      "source_profile": "tg7_45",
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "total_bits": 45736
+    },
+    "tg7_native": {
+      "base_entries": 2048,
+      "bp_type": "tage-r3-native-tg7-45",
+      "entries": [
+        256,
+        512,
+        512,
+        512,
+        512,
+        512,
+        256
+      ],
+      "fixed_index_hash_log_size": 0,
+      "histories": [
+        5,
+        9,
+        15,
+        25,
+        44,
+        76,
+        130
+      ],
+      "r3_diagnostics": true,
+      "source_profile": "tg7_45",
+      "tag_bits": [
+        8,
+        8,
+        9,
+        9,
+        9,
+        10,
+        10
+      ],
+      "total_bits": 45736
+    }
+  },
+  "frozen_r3_geometry_sha256": "35b3105730e25a9647932c83f34364bd54856892fe7f03ae4b88bfce0ad2db09",
+  "historical_scope_review": {
+    "decision": "ACCEPT_LIMITED_FIVE_ARCHIVES_AND_84_PRE_R3C_GIT_FILES",
+    "limitations": {
+      "absolute_unseen_input_proof": false,
+      "claim": "NO_KNOWN_OVERLAP_IN_EXPLICITLY_REVIEWED_RECORDS_ONLY",
+      "inspected_5_archives": true,
+      "inspected_84_pre_R3C_git_files": true,
+      "unarchived_OCI_runs_coverage": "UNKNOWN"
+    },
+    "review_notes": "I reviewed the summary of exactly 5 past archived experiments and 84 pre-R3C Git files. No listed candidate reuse was observed in this bounded evidence; unarchived OCI runs remain UNKNOWN and no absolute unseen-workload claim is authorized."
+  },
+  "kind": "BPU8_R3C_FIXED_CORPUS_LOCK_V01",
+  "linked_simulator_gem5_sha256": "12681de7975d5082b64dee6e085585dbbd1d078fa7be7f477f4553ab98344a1a",
+  "lock_created_utc": "2026-10-13T04:27:12.267427+00:00",
+  "manual_case_reviews": [
+    {
+      "case": "basicmath",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/basicmath/LICENSE",
+          "sha256": "d5433a2f12b96fb7dd1ec0e09f8268ce220a93859fa2c6441ac11724169dad95"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Source mirror labels code unrestricted; private simulated execution; do not distribute unrelated files or claim additional third-party rights."
+    },
+    {
+      "case": "bitcount",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/bitcount/LICENSE",
+          "sha256": "d5433a2f12b96fb7dd1ec0e09f8268ce220a93859fa2c6441ac11724169dad95"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Source mirror labels code unrestricted; private simulated execution; unrelated dependencies remain outside this notice."
+    },
+    {
+      "case": "qsort",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/qsort/LICENSE",
+          "sha256": "ebdf405e65ff7aadf6878c761d601be6a4d422c55769eebb962daa6f3fa6067d"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Source marks GPL, version unspecified in short notice; internal executions not redistributed; preserve source and license, verify upstream obligations before release."
+    },
+    {
+      "case": "susan_edges",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/automotive/susan/LICENSE",
+          "sha256": "702bcfb69118191a1a543782d3087bda6c09157e07a82712c8533a1b456d68bc"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. SUSAN explicitly says research-only; retain original header and do not sell or forward source without header; historical patent notice is recorded, not a patent clearance."
+    },
+    {
+      "case": "dijkstra",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/network/dijkstra/LICENSE",
+          "sha256": "0bb1d50d03b2676f4064644e72afa33790f5bf87b89387e15e638a2ff02fa9ff"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Source marks GPL; use privately for simulation only; no source/binary redistribution or unreviewed relicensing."
+    },
+    {
+      "case": "patricia",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/network/patricia/LICENSE",
+          "sha256": "68d40feb2abbfdeb1aeacac85045d3925c507b213ce2f208c006644eff09df65"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Author's short notice says GPL'ed although upstream version/attribution may be ambiguous; treat as GPL-restricted; no distribution."
+    },
+    {
+      "case": "rijndael_encrypt",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/security/rijndael/LICENSE",
+          "sha256": "aea9b8d824f6290bda1399b89c9b56b4532c16ea2b53ac7d16bca524dad3c067"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Gladman notice permits source/binary use subject to copyright/disclaimer retention if redistributed; private simulated execution only."
+    },
+    {
+      "case": "fft",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/telecomm/FFT/LICENSE",
+          "sha256": "177ee719fdb94ec770019538eafb0fc90e61ae47992445f90ac74843f862a9b2"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Don Cross readme calls source public domain and separately asks free redistribution, attribution and modifications notices; no redistribution in experiment."
+    },
+    {
+      "case": "adpcm_encode",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/telecomm/adpcm/LICENSE",
+          "sha256": "5a706f708697154145732776c83bf0fb26ede1bed767391d0a3e5f2786d76788"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Stichting Mathematisch Centrum notice permits use with copyright/permission notices; no endorsement/publicity-name use or redistribution here."
+    },
+    {
+      "case": "stringsearch",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/mibench/office/stringsearch/LICENSE",
+          "sha256": "b43faa73aa52be87b3121a49495c833d728f10df7652b30d02a9d8578c56f819"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. Ambiguous wording: author describes possible public domain yet asks to assume GPL; conservatively treat as GPL-covered; private execution only."
+    },
+    {
+      "case": "coremark_performance",
+      "decision": "REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION",
+      "license_files": [
+        {
+          "path": "/home/ubuntu/bpu8_r3c_external/coremark/LICENSE.md",
+          "sha256": "9577b9c846f61fd69a0d8ac965998c6450c7d8969f71f0bb4a931b91aebad28a"
+        }
+      ],
+      "redistribution_permission": "NOT_REQUESTED_NOT_GRANTED",
+      "review_notes": "AI_ASSISTED_PINNED_SOURCE_CHECK: I acknowledge the SHA-verified AI-assisted summary and private-only / no-redistribution limits. CoreMark Apache-style copyright terms coexist with an EEMBC trademark-use agreement. Internal 10-iteration gem5 first ROI is NOT an official score, and modified runs must not be represented with EEMBC-certified trademark claims."
+    }
+  ],
+  "not_little_v052_original_cpu_architecture_freeze": true,
+  "original_p7a_sha256": "ab10c2b7ed79430932d5ed29a3f714e7c2ab1daeab1689bc77501c65d538fbc8",
+  "planned_jobs": 66,
+  "profile_order": [
+    "g5_native",
+    "g5_h11",
+    "tg6_native",
+    "tg6_h11",
+    "tg7_native",
+    "tg7_h11"
+  ],
+  "profiles_per_case": 6,
+  "protocol_review": {
+    "coremark_result": "INTERNAL_10_ITERATION_FIRST_ROI_NOT_OFFICIAL_SCORE",
+    "decision": "FREEZE_UNCHANGED_ELEVEN_CASES_SIX_PROFILES_BEFORE_ANY_TG_COMPARISON",
+    "no_geometry_retuning": true,
+    "no_holdout_metric_peek": true,
+    "review_notes": "I accept the pre-result fixed 11 cases x six unchanged 45,736-bit R3 profiles. No geometry retuning, case cherry-picking, unofficial CoreMark score, or metric peeking is authorized."
+  },
+  "review_date_utc": "2026-10-13T04:27:12.213340Z",
+  "review_method": "AI_ASSISTED_PINNED_LICENSE_BRIEFING_V01",
+  "review_scope": "BOUNDED_HISTORICAL_NO_KNOWN_OVERLAP_NOT_ABSOLUTE_UNSEEN",
+  "reviewer_identifier": "research_author",
+  "signed_review_packet_sha256": "b6650566743ed47eaf2840f33c60987b514afc6f17484ee8c239aae69c941fad",
+  "simulator_runs_executed_at_sealing": 0,
+  "source_evidence_sha256": {
+    "p1": "07473259f9193eb893aab54f62c05e8db6303f9b1dba4a29ddff0cd4579be95d",
+    "p4a": "76896416de31b751be5d09381bd766f7a3c1cc3203c25fbbe58353312ef9faf6",
+    "p6a": "bb160377c5477a3d977190acfa3936e7f6a75e4ec80bce60bb4924b151b9d4ca",
+    "p6b": "5b8330658cc705ca091fb19abc11143ff698c16bf822983c1d8ac11aa2122dbc",
+    "p6c": "874aabb98be4323f564d0bf7b5b5a324510bc18666a816a84816b2245f9cb2b8",
+    "p6d": "3499635675e35c1d81a584af0988780aa06c5a0b3adcbff9cceafe8c9f490143"
+  },
+  "source_revisions": {
+    "coremark": {
+      "commit": "1f483d5b8316753a742cbf5590caf5bd0a4e4777",
+      "source_status": "PINNED_P1_BYTES_REVERIFIED",
+      "url": "https://github.com/eembc/coremark.git"
+    },
+    "mibench": {
+      "commit": "0f3cbcf6b3d589a2b0753cfb9289ddf40b6b9ed8",
+      "source_status": "PINNED_P1_BYTES_REVERIFIED",
+      "url": "https://github.com/embecosm/mibench.git"
+    }
+  },
+  "third_party_redistribution_rights": "NOT_GRANTED",
+  "verdict": "SEALED_PRE_RESULT_INPUTS_PENDING_GIT_COMMIT_AND_RUNNER_GATE"
+}
