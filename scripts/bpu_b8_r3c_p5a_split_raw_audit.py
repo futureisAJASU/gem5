@@ -26,6 +26,14 @@ def console_passes(path):
             for line in lines if line.startswith("R3C_P4B_G5_ONLY ")
             and line.endswith(": PASS")]
 
+def console_failures(path: Path) -> list[str]:
+    """Preserve any explicit negative result printed in the original log."""
+    lines=path.read_text(errors="replace").splitlines()
+    return [line[len("R3C_P4B_G5_ONLY "):-len(": FAIL")]
+            for line in lines if line.startswith("R3C_P4B_G5_ONLY ")
+            and line.endswith(": FAIL")]
+
+
 def validate_interrupted_console(observed: list[str], allow_incomplete: bool) -> bool:
     """Require the exact original 8/8, or explicit lower-tier subset only.
 
@@ -142,6 +150,10 @@ def main():
     plan=json.loads(plan_path.read_text())
     control=p4b.verify_plan(plan,gem5,plan_path,v["p3a_dir"],v["p3b_dir"])
     first_seen=console_passes(v["first_console"])
+    require(not console_failures(v["first_console"]),
+            "original first console explicitly reports FAIL; preserve negative evidence")
+    require(not console_failures(v["remaining_console"]),
+            "resumed console explicitly reports FAIL; preserve negative evidence")
     if first_seen!=list(FIRST):
         print("R3C_P5A_FIRST_CONSOLE_OBSERVED="+repr(first_seen),flush=True)
         print("R3C_P5A_FIRST_CONSOLE_EXPECTED="+repr(list(FIRST)),flush=True)
