@@ -24,6 +24,13 @@ P6A_VERDICT="11_CASE_CUSTODY_CHECKED_HISTORICAL_INDEPENDENCE_NOT_VERIFIED_NOT_LO
 P6D_VERDICT="EVIDENCE_READY_FOR_MANUAL_LOCK_SIGNOFF_NOT_CORPUS_LOCK"
 EXPECTED_6=tuple(p6a.EXPECTED_6)
 EXPECTED_GEM5=p5a.EXPECTED_GEM5
+# Exact, observed USER OCI evidence digests, to prohibit silent substitution.
+ORIGINAL_PASS_SHA256={
+    "p6a":"bb160377c5477a3d977190acfa3936e7f6a75e4ec80bce60bb4924b151b9d4ca",
+    "p6b":"5b8330658cc705ca091fb19abc11143ff698c16bf822983c1d8ac11aa2122dbc",
+    "p6c":"874aabb98be4323f564d0bf7b5b5a324510bc18666a816a84816b2245f9cb2b8",
+    "p6d":"3499635675e35c1d81a584af0988780aa06c5a0b3adcbff9cceafe8c9f490143",
+}
 
 def require(ok,why):
     if not ok:
@@ -38,6 +45,9 @@ def load(path:Path):
 def validate_chain(p1,p4a_plan,p6a_snapshot,p6b,p6c,p6d,
                    fingerprints,gem5,paths):
     """No candidate stats or post-lock results permitted in this procedure."""
+    require(all(fingerprints.get(key)==digest
+                for key,digest in ORIGINAL_PASS_SHA256.items()),
+            "source has changed from user-confirmed P6A/B/C/D original PASS digest")
     order=tuple(p2.ORDER)
     require(order==("basicmath","bitcount","qsort","susan_edges","dijkstra",
                     "patricia","rijndael_encrypt","fft","adpcm_encode",
