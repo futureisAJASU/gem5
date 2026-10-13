@@ -50,6 +50,39 @@ class P5ASplitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             self.assertIsNone(p5.manifest(Path(td)/"missing.json"))
 
+    def test_surviving_original_full11_is_primary_evidence(self):
+        full=list(p5.FIRST+p5.LAST)
+        manifest={"verdict":"G5_ONLY_FEASIBILITY_PASS_NO_CORPUS_LOCK",
+                  "attempted_cases":full,
+                  "cases":{name:{"pass":True} for name in full}}
+        self.assertEqual(p5.classify_original_run(full,manifest,False),
+                         "FULL11_COMPLETE_ORIGINAL")
+        self.assertEqual(p5.classify_original_run(full,manifest,True),
+                         "FULL11_COMPLETE_ORIGINAL")
+
+    def test_full11_requires_real_completed_manifest(self):
+        full=list(p5.FIRST+p5.LAST)
+        with self.assertRaisesRegex(ValueError,"manifest absent"):
+            p5.classify_original_run(full,None,False)
+        with self.assertRaisesRegex(ValueError,"manifest absent"):
+            p5.classify_original_run(full,None,True)
+        with self.assertRaisesRegex(ValueError,"not PASS"):
+            p5.classify_original_run(full,{
+                "verdict":"INCOMPLETE_OR_G5_FEASIBILITY_FAIL",
+                "attempted_cases":full,
+                "cases":{x:{} for x in full}},False)
+
+    def test_first8_preserves_split_mode(self):
+        self.assertEqual(
+            p5.classify_original_run(list(p5.FIRST),None,False),
+            "FIRST8_COMPLETE_CONSOLE")
+
+    def test_eleventh_original_pass_is_not_missing_witness(self):
+        observed=list(p5.FIRST+p5.LAST)
+        self.assertNotEqual(observed,list(p5.FIRST))
+        with self.assertRaisesRegex(ValueError,"manifest absent"):
+            p5.classify_original_run(observed,None,True)
+
     def test_complete_first_console_is_full_evidence(self):
         self.assertTrue(p5.validate_interrupted_console(list(p5.FIRST),False))
         self.assertTrue(p5.validate_interrupted_console(list(p5.FIRST),True))
