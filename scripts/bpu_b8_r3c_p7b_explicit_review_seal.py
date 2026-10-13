@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""R3C P7B: explicit human review packet and corpus-lock seal candidate.
+"""R3C P7B: explicit operator review packet and corpus-lock seal candidate.
 
---init-review writes PENDING answers only. --seal cannot succeed unless the
-operator has personally reviewed every pinned LICENSE and accepts the
-documented, bounded historical-exposure scope. The lock produced by --seal
-MUST be separately committed to Git and validated by a future execution gate.
-No simulations run; no legal opinion or absolute unseen-input assertion.
+Default requires direct pinned license review. An explicit, separately tracked
+AI-assisted summary path is also supported: the operator reviews a pinned-byte
+and literal-text-anchored license briefing, not necessarily each full license,
+and acknowledges private-only use/limited historical evidence personally.
+This is recorded as AI-assisted, NEVER misrepresented as direct original reading.
+--seal does not commit or launch any simulator. No legal approval implied.
 """
 from __future__ import annotations
 
@@ -20,6 +21,9 @@ import bpu_b8_r3c_p7a_lock_draft as p7a
 
 EXPECTED_DRAFT_SHA256="ab10c2b7ed79430932d5ed29a3f714e7c2ab1daeab1689bc77501c65d538fbc8"
 REVIEW_KIND="BPU8_R3C_P7B_PERSONAL_REVIEW_PACKET"
+ASSISTED_METHOD="AI_ASSISTED_PINNED_LICENSE_BRIEFING_V01"
+DIRECT_METHOD="DIRECT_PINNED_LICENSE_REVIEW"
+ASSISTED_NOTES=Path(__file__).resolve().parents[1] / "docs/bpu8_r3c_p7b_ai_assisted_license_notes_v01.json"
 REVIEW_CASE_DECISION="REVIEWED_FOR_PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_REDISTRIBUTION"
 REVIEW_SCOPE_DECISION="ACCEPT_LIMITED_FIVE_ARCHIVES_AND_84_PRE_R3C_GIT_FILES"
 REVIEW_PROTOCOL_DECISION="FREEZE_UNCHANGED_ELEVEN_CASES_SIX_PROFILES_BEFORE_ANY_TG_COMPARISON"
@@ -83,6 +87,7 @@ def review_template(draft):
         "kind":REVIEW_KIND,
         "status":"REVIEW_REQUIRED_NOT_A_LOCK",
         "p7a_lock_draft_sha256":EXPECTED_DRAFT_SHA256,
+        "review_method":DIRECT_METHOD,
         "reviewer_identifier":"", 
         "review_date_utc":"",
         "intended_use":"PRIVATE_INTERNAL_ACADEMIC_RESEARCH_ONLY_NO_THIRD_PARTY_REDISTRIBUTION",
@@ -132,6 +137,14 @@ def validate_review(draft, review, review_digest=None):
           and isinstance(review.get("review_date_utc"),str)
           and review["review_date_utc"].endswith("Z"),
           "explicit reviewer ID and ISO UTC review date required")
+    method=review.get("review_method",DIRECT_METHOD)
+    check(method in (DIRECT_METHOD,ASSISTED_METHOD),
+          "unknown review method or unsupported approval")
+    if method==ASSISTED_METHOD:
+        check(ASSISTED_NOTES.is_file()
+              and review.get("ai_assisted_notes_sha256")==p2.sha(ASSISTED_NOTES)
+              and review.get("acknowledgement_source")=="USER_INTERACTIVE_TERMINAL_ACK",
+              "AI-assisted summary SHA/interactive user acknowledgement missing")
     hist=review.get("historical_exposure_review",{})
     expected_scope=review_template(draft)["historical_exposure_review"]["limitations"]
     check(hist.get("limitations")==expected_scope
@@ -158,6 +171,9 @@ def validate_review(draft, review, review_digest=None):
               and entry.get("redistribution_permission")=="NOT_REQUESTED_NOT_GRANTED"
               and len(str(entry.get("review_notes","")).strip())>=20,
               orig["case"]+": license terms not reviewed, redist boundary or pinned license differs")
+        if method==ASSISTED_METHOD:
+            check(str(entry["review_notes"]).startswith("AI_ASSISTED_PINNED_SOURCE_CHECK:"),
+                  orig["case"]+": assisted review method not labeled in per-case notes")
         # Source must still be available with the original exact SHA.
         for f in entry["license_files"]:
             path=Path(f["path"])
@@ -178,6 +194,9 @@ def seal(draft, review, draft_sha, review_sha):
         "signed_review_packet_sha256":review_sha,
         "reviewer_identifier":review["reviewer_identifier"],
         "review_date_utc":review["review_date_utc"],
+        "review_method":review.get("review_method",DIRECT_METHOD),
+        "ai_assisted_notes_sha256":review.get("ai_assisted_notes_sha256"),
+        "acknowledgement_source":review.get("acknowledgement_source"),
         "review_scope":"BOUNDED_HISTORICAL_NO_KNOWN_OVERLAP_NOT_ABSOLUTE_UNSEEN",
         "approved_usage_scope":"PRIVATE_INTERNAL_ACADEMIC_RESEARCH_NO_CODE_BINARY_DISTRIBUTION",
         "coremark_presentation_scope":"INTERNAL_FIRST_ROI_NOT_OFFICIAL_SCORE",
