@@ -37,6 +37,12 @@ class P7CCommittedGate(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"not tracked"):
             p7c.verify_committed_lock(self.out)
 
+    def test_staged_but_never_committed_new_lock_rejected(self):
+        self.out.write_text('{"verdict":"STAGED_ONLY"}\\n')
+        self.cmd("add","docs/r3c_corpus_lock.json")
+        with self.assertRaisesRegex(ValueError,"uncommitted modifications"):
+            p7c.verify_committed_lock(self.out)
+
     def test_git_committed_exact_bytes_allowed(self):
         self.out.write_text('{"verdict":"COMMITTED"}\n')
         self.cmd("add","docs/r3c_corpus_lock.json")
