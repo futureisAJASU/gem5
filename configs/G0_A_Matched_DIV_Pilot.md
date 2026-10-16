@@ -110,17 +110,20 @@ from the config file to close that gate.
 
 ```bash
 git fetch origin research/g0-a-matched-div-20261016
-git -C "$HOME/gem5-g0-a-20261016" pull --ff-only origin research/g0-a-matched-div-20261016
+cd "$HOME/gem5-g0-a-20261016"
+git diff --quiet && git diff --cached --quiet || {
+  echo "Worktree has tracked changes; abort fast-forward" >&2
+  exit 1
+}
+git merge --ff-only origin/research/g0-a-matched-div-20261016
 cd "$HOME/gem5-g0-a-20261016"
 python3 -m unittest discover -s configs -p 'test_g0_contract_audit.py' -v
 scons build/RISCV/gem5.opt -j4
 bash configs/g0_run_div_pilot.sh
 ```
 
-`git pull` works only if the worktree has a tracking/local branch.
-**Important**: the initial G0 worktree recipe used `--detach`, so the safe
-command for that detached worktree is `git fetch ...` and
-`git merge --ff-only origin/research/g0-a-matched-div-20261016` *only
-when the detached HEAD is an ancestor and the tree is clean*. Do not
-reset or clean user files. Consult the final response for verified
-detached-worktree steps.
+The starting worktree is detached by design. `git merge --ff-only`
+advances the detached HEAD only when it is an ancestor of the remote branch.
+It refuses a divergent history and does not invoke reset or clean.
+Preserve any pre-existing untracked files; inspect a merge conflict instead
+of forcing an update.
