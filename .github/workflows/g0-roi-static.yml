@@ -37,6 +37,9 @@ jobs:
           grep -q 'M5OP_WORK_BEGIN = 0x5a' configs/g0_pair_roi_markers.S
           grep -q '0xb400007b' configs/g0_pair_roi_markers.S
           grep -q '0xb600007b' configs/g0_pair_roi_markers.S
+          grep -Fq 'std::array<::gem5::Counter, 2> startInsts' src/sim/pseudo_inst.cc
+          grep -Fq 'const ::gem5::Counter committed =' src/sim/pseudo_inst.cc
+          grep -Fq 'OUT="${G0_OUTPUT_DIR:-$HOME/little-v052-g0-roi-$(date +%Y%m%d-%H%M%S)-$}"' configs/g0_run_div_roi.sh
           grep -q 'g0PairRoiCommittedDiv' src/cpu/o3/cpu.cc
           grep -Fq 'inst->opClass() == enums::IntDiv' src/cpu/o3/cpu.cc
           grep -Fq '#include "enums/OpClass.hh"' src/cpu/o3/cpu.cc
