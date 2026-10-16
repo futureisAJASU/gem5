@@ -38,4 +38,7 @@ jobs:
           grep -q 'LITTLE_G0_AUDIT_FU=1' configs/g0_run_div_pilot.sh
           grep -q 'G0_CXX_FU_POOL' src/cpu/o3/fu_pool.cc
           grep -q 'reactiveSleepTransitions' configs/g0_verify_effective_config.py
-          grep -q 'G0_CONSTRUCTED_MANIFEST_JSON' configs/g0_fu_contract.py
+          grep -q 'G0_CONSTRUCTED_MANIFEST_FILE' configs/g0_fu_contract.py
+          grep -q 'LITTLE_G0_CONSTRUCTED_MANIFEST_PATH' configs/g0_run_div_pilot.sh
+          grep -q 'LEGACY_LOG_JSON_RECOVERED_UNHASHED' configs/g0_verify_effective_config.py
+          grep -q 'gem5_version_cli=UNSUPPORTED_use_sha256_and_git_head' configs/g0_run_div_pilot.sh
