@@ -40,7 +40,7 @@ def _effective_wake(pool, label):
     return result
 
 
-def verify_g0_constructed(cores, mode):
+def verify_g0_constructed(cores, mode, expect_fp_shared=False):
     if mode not in ("private2", "shared1") or len(cores) != 2:
         raise RuntimeError("G0 construction audit requires exactly two cores")
     fu_sources = []
@@ -68,9 +68,8 @@ def verify_g0_constructed(cores, mode):
     shared_expected = mode == "shared1"
     if (div_pools[0] is div_pools[1]) != shared_expected:
         raise RuntimeError("G0 pair-shared DIV Python SimObject ownership mismatch")
-    if fp_pools[0] is fp_pools[1]:
-        # This G0-A experiment does not yet enable full pair-shared FP/SIMD.
-        raise RuntimeError("G0-A requires identical independent private FP/SIMD pools")
+    if (fp_pools[0] is fp_pools[1]) != expect_fp_shared:
+        raise RuntimeError("G0 FP/SIMD ownership differs from explicit selector")
     for pool in div_pools:
         if len(pool.FUList) != 1 or _int(pool.FUList[0].count, "DIV.count") != 1:
             raise RuntimeError("G0 DIV effective count must be one per pool")
@@ -134,6 +133,11 @@ def verify_g0_constructed(cores, mode):
         "wake_controls_effective": all_pools,
         "div_pair_physical_count_expected": physical_total,
         "div_python_shared_pool": shared_expected,
+        "fp_python_shared_pool": expect_fp_shared,
+        "fpu_domain_scope": (
+            "FULL_PAIR_SHARED_FP_SIMD" if expect_fp_shared
+            else "PRIVATE_FP_SIMD_NOT_FMA_ONLY"
+        ),
         "fpu_capability_manifest": [
             row for row in fu_sources
             if row["opClass"].startswith(("Float", "Bf16", "Simd", "Matrix"))
