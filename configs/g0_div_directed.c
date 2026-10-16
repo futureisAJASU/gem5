@@ -29,8 +29,12 @@ int main(void)
         if (i % G0_DIV_EVERY == 0) {
             uint64_t numerator = x | (UINT64_C(1) << 55);
             uint64_t denominator = ((x >> 17) & 0x7fffU) | 1U;
-            uint64_t quotient = numerator / denominator;
-            uint64_t remainder = numerator % denominator;
+            uint64_t quotient, remainder;
+            /* Force exactly one dynamic DIVU and one REMU per hit. */
+            __asm__ __volatile__(
+                "divu %0, %2, %3\\n\\tremu %1, %2, %3"
+                : "=&r"(quotient), "=&r"(remainder)
+                : "r"(numerator), "r"(denominator));
             checksum ^= quotient + (remainder << 1) + i;
             checksum = (checksum << 11) | (checksum >> 53);
             div_ops += 2; /* dynamic DIVU and REMU expected; inspect objdump */
