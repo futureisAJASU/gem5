@@ -1193,7 +1193,7 @@ CPU::instDone(ThreadID tid, const DynInstPtr &inst)
 
     // Measurement-only G0 hook: count committed (not merely issued)
     // integer-division-class uops within the synchronized pair ROI.
-    if (inst->opClass() == IntDiv)
+    if (inst->opClass() == enums::IntDiv)
         pseudo_inst::g0PairRoiCommittedDiv(threadContexts[tid]);
 
     probeInstCommit(inst->staticInst, inst->pcState().instAddr());
