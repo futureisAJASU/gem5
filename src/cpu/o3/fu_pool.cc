@@ -42,6 +42,8 @@
 #include "sim/core.hh"
 
 #include <sstream>
+#include <cstdlib>
+#include <iostream>
 
 #include "cpu/func_unit.hh"
 
@@ -324,6 +326,21 @@ FUPool::FUPool(const Params &p)
                 funcUnits.push_back(fu2);
             }
         }
+    }
+
+    // G0-only, opt-in, diagnostic-only inventory. This prints after the
+    // actual C++ FuncUnit objects have been constructed and does not
+    // modify arbitration, acceptance, or latency semantics.
+    if (std::getenv("LITTLE_G0_AUDIT_FU") != nullptr) {
+        std::cerr << "G0_CXX_FU_POOL name=" << name()
+                  << " physical_units=" << numFU
+                  << " pair_rr=" << (pairRrArb ? 1 : 0)
+                  << " reactive=" << (reactivePowerGating ? 1 : 0)
+                  << " decode=" << (predictiveWakeEnabled ? 1 : 0)
+                  << " raw=" << (rawPredictiveWakeEnabled ? 1 : 0)
+                  << " latency=" << powerWakeLatency
+                  << " threshold=" << powerIdleThreshold
+                  << std::endl;
     }
 
     unitBusy.resize(numFU);
