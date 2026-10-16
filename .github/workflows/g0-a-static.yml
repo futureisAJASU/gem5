@@ -1,0 +1,30 @@
+name: Little v0.52 G0-A syntax gates
+on:
+  push:
+    branches: [research/g0-a-matched-div-20261016]
+    paths:
+      - configs/02_little_v052_rv64_proxy.py
+      - configs/g0_div_directed.c
+      - configs/g0_run_div_pilot.sh
+      - .github/workflows/g0-a-static.yml
+  workflow_dispatch:
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python parse and compile (no gem5 runtime)
+        run: python3 -m py_compile configs/02_little_v052_rv64_proxy.py
+      - name: Bash parser (no gem5 runtime)
+        run: bash -n configs/g0_run_div_pilot.sh
+      - name: C front-end parser (no RV64 run)
+        run: cc -std=gnu11 -fsyntax-only -Wall -Wextra -Werror configs/g0_div_directed.c
+      - name: Legacy versus G0 source invariants
+        shell: bash
+        run: |
+          grep -q 'class LittleG0PrivateDivFU(LittleDivFU)' configs/02_little_v052_rv64_proxy.py
+          grep -q 'class LittlePairSharedDivFU(FUDesc)' configs/02_little_v052_rv64_proxy.py
+          grep -q 'G0_DIV_STRUCTURE_ASSERT' configs/02_little_v052_rv64_proxy.py
+          grep -q 'SIMULATION_EXIT_CODE=0' configs/g0_run_div_pilot.sh
