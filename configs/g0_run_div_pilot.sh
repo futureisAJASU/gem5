@@ -38,6 +38,7 @@ done
 COMMON=(
   --cores 2 --distributed-iq --local-iq-picker --n-skip -1
   --int-steering int1-first --clock 1.4GHz
+  --div-wake-latency 0 --div-idle-threshold 8
   --l2-topology shared4
 )
 for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
@@ -47,7 +48,7 @@ for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
     [[ "$mode" == "shared1" ]] && mode_args+=(--pair-shared-div)
     outdir="$OUT/$pair/$mode"
     mkdir -p "$outdir"
-    "$BIN" --outdir="$outdir" "$PY" \
+    LITTLE_G0_AUDIT_FU=1 "$BIN" --outdir="$outdir" "$PY" \
       --binary "$OUT/bin/$first" \
       --core-binary "$OUT/bin/$first" \
       --core-binary "$OUT/bin/$second" \
@@ -68,7 +69,11 @@ for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
     [[ -s "$outdir/config.ini" && -s "$outdir/stats.txt" ]] || {
       echo "FAIL missing config.ini or stats.txt: $pair $mode" >&2; exit 8;
     }
-    sha256sum "$outdir/config.ini" "$outdir/stats.txt" >> "$OUT/manifest.txt"
+    python3 "$ROOT/configs/g0_verify_effective_config.py" \
+      "$outdir" --mode "$mode" --json "$outdir/effective_config_audit.json" \
+      | tee "$outdir/effective_config_gate.log"
+    sha256sum "$outdir/config.ini" "$outdir/stats.txt" \
+      "$outdir/effective_config_audit.json" >> "$OUT/manifest.txt"
   done
   diff -u "$OUT/$pair/private2/checksums.txt" "$OUT/$pair/shared1/checksums.txt" || {
     echo "FAIL functional checksums diverged for $pair" >&2; exit 9;
@@ -78,4 +83,5 @@ done
 python3 "$ROOT/configs/g0_summarize_div_pilot.py" "$OUT" --csv "$OUT/summary.csv" > "$OUT/summary_stdout.csv"
 echo "G0_A_PILOT_COMPLETED: $OUT"
 echo "G0_A_PILOT_SUMMARY: $OUT/summary.csv (full-process ticks only)"
-echo "OPEN: audit FU count in config.ini/C++ runtime; extract synchronized ROI/per-core completion, pair makespan and grant/wait counters before publishing slowdown"
+echo "G0_A_CONSTRUCTION_AND_WAKE_GATE: audited from config.ini, C++ inventory and stats"
+echo "OPEN: synchronized ROI, per-core completion/pair makespan, dynamic op counts, contention, NoFreeFU and wait counters; no accepted performance slowdown yet"
