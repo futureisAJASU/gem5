@@ -8,6 +8,12 @@ OBJDUMP="${G0_RV64_OBJDUMP:-riscv64-linux-gnu-objdump}"
 SRC="$ROOT/configs/g0_div_roi_directed.c"
 MARKERS="$ROOT/configs/g0_pair_roi_markers.S"
 ITERATIONS="${G0_ITERATIONS:-3072}"
+# Start with one two-mode case to catch instrumentation/build mismatch cheaply.
+if [[ "${G0_ROI_SMOKE:-0}" == "1" ]]; then
+  CASES=(heavy_sparse)
+else
+  CASES=(heavy_sparse sparse_heavy heavy_heavy sparse_sparse)
+fi
 PY="$ROOT/configs/02_little_v052_rv64_proxy.py"
 OUT="${G0_OUTPUT_DIR:-$HOME/little-v052-g0-roi-$(date +%Y%m%d-%H%M%S)-$}"
 [[ -x "$BIN" ]] || { echo "Missing gem5 binary $BIN. Build with: scons build/RISCV/gem5.opt -j4" >&2; exit 2; }
@@ -19,6 +25,7 @@ mkdir -p "$OUT/bin"
 {
   echo "G0-A SYNCHRONIZED ROI DIRECTED PILOT - NOT FULL PAPER PERFORMANCE"
   echo "g0_iterations=$ITERATIONS"
+  echo "g0_roi_cases=${CASES[*]}"
   echo "g0_pair_barrier=m5_work_begin/end_global_tick"
   echo "gem5_head=$(git -C "$ROOT" rev-parse HEAD)"
   echo "gem5_dirty=$(git -C "$ROOT" status --porcelain | wc -l)"
@@ -62,7 +69,7 @@ COMMON=(
   --div-wake-latency 0 --div-idle-threshold 8
   --l2-topology shared4 --g0-pair-roi
 )
-for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
+for pair in "${CASES[@]}"; do
   first="${pair%%_*}"; second="${pair#*_}"
   for mode in private2 shared1; do
     mode_args=(--g0-div-mode "$mode")
@@ -106,7 +113,8 @@ for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
   echo "PAIR-GUEST-OUTPUT PASS $pair (ROI analysis still pending)" | tee -a "$OUT/manifest.txt"
 done
 python3 "$ROOT/configs/g0_verify_pair_roi.py" "$OUT" \
-  --iterations "$ITERATIONS" --csv "$OUT/pair_roi_summary.csv" \
+  --iterations "$ITERATIONS" --cases "${CASES[@]}" \
+  --csv "$OUT/pair_roi_summary.csv" \
   | tee "$OUT/pair_roi_gate.log"
 sha256sum "$OUT/pair_roi_summary.csv" "$OUT/pair_roi_gate.log" >> "$OUT/manifest.txt"
 echo "G0_A_ROI_PILOT_COMPLETED: $OUT"
