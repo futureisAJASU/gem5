@@ -8,7 +8,7 @@ OBJDUMP="${G0_RV64_OBJDUMP:-riscv64-linux-gnu-objdump}"
 SRC="$ROOT/configs/g0_div_directed.c"
 PY="$ROOT/configs/02_little_v052_rv64_proxy.py"
 OUT="${G0_OUTPUT_DIR:-$HOME/little-v052-g0-a-$(date +%Y%m%d-%H%M%S)-$$}"
-[[ -x "$BIN" ]] || { echo "Missing gem5 binary $BIN. Build with: scons build/RISCV/gem5.opt -j2" >&2; exit 2; }
+[[ -x "$BIN" ]] || { echo "Missing gem5 binary $BIN. Build with: scons build/RISCV/gem5.opt -j4" >&2; exit 2; }
 command -v "$CC" >/dev/null || { echo "Missing RV64 compiler $CC" >&2; exit 2; }
 command -v "$OBJDUMP" >/dev/null || { echo "Missing RV64 objdump $OBJDUMP" >&2; exit 2; }
 [[ -f "$PY" && -f "$SRC" ]] || { echo "Missing G0 config/source" >&2; exit 2; }
@@ -21,7 +21,7 @@ mkdir -p "$OUT/bin"
   echo "gem5_binary=$BIN"
   sha256sum "$BIN" "$PY" "$SRC"
   "$CC" --version | head -1
-  "$BIN" --version | head -2 || true
+  echo "gem5_version_cli=UNSUPPORTED_use_sha256_and_git_head"
 } > "$OUT/manifest.txt"
 for kind in heavy sparse; do
   every=1
@@ -48,7 +48,9 @@ for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
     [[ "$mode" == "shared1" ]] && mode_args+=(--pair-shared-div)
     outdir="$OUT/$pair/$mode"
     mkdir -p "$outdir"
-    LITTLE_G0_AUDIT_FU=1 "$BIN" --outdir="$outdir" "$PY" \
+    LITTLE_G0_AUDIT_FU=1 \
+    LITTLE_G0_CONSTRUCTED_MANIFEST_PATH="$outdir/constructed_fu_manifest.json" \
+      "$BIN" --outdir="$outdir" "$PY" \
       --binary "$OUT/bin/$first" \
       --core-binary "$OUT/bin/$first" \
       --core-binary "$OUT/bin/$second" \
@@ -73,6 +75,7 @@ for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
       "$outdir" --mode "$mode" --json "$outdir/effective_config_audit.json" \
       | tee "$outdir/effective_config_gate.log"
     sha256sum "$outdir/config.ini" "$outdir/stats.txt" \
+      "$outdir/constructed_fu_manifest.json" \
       "$outdir/effective_config_audit.json" >> "$OUT/manifest.txt"
   done
   diff -u "$OUT/$pair/private2/checksums.txt" "$OUT/$pair/shared1/checksums.txt" || {
