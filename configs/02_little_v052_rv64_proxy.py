@@ -678,6 +678,17 @@ class LittleDivPool(FUPool):
     FUList = [LittleDivFU()]
 
 
+# G0 matched 2->1 DIV performance comparator.  The legacy 2/core
+# definition above is deliberately preserved for historical experiments.
+class LittleG0PrivateDivFU(LittleDivFU):
+    """One dedicated 20-cycle non-pipelined IntDiv per private core."""
+    count = 1
+
+
+class LittleG0PrivateDivPool(FUPool):
+    FUList = [LittleG0PrivateDivFU()]
+
+
 class LittlePairSharedDivFU(FUDesc):
     """One physical non-pipelined divider shared by a two-core pair."""
 
@@ -901,6 +912,7 @@ def make_little_distributed_iqs(
     div_pool=None,
     fpsimd_pool=None,
     pair_requester_id: int = -1,
+    g0_private_div_one_per_core: bool = False,
 ):
     sizes = {
         "INT0": int0_entries,
@@ -952,7 +964,11 @@ def make_little_distributed_iqs(
             fuPool=(
                 div_pool
                 if div_pool is not None
-                else LittleDivPool()
+                else (
+                    LittleG0PrivateDivPool()
+                    if g0_private_div_one_per_core
+                    else LittleDivPool()
+                )
             ),
             fuRequesterId=(
                 pair_requester_id
@@ -1029,6 +1045,7 @@ class LittleV052Rv64Core(BaseCPUCore):
         shared_div_pool=None,
         shared_fpsimd_pool=None,
         pair_requester_id: int = -1,
+        g0_private_div_one_per_core: bool = False,
     ) -> None:
         if fetch_width is not None and fetch_width <= 0:
             raise ValueError(
@@ -1147,6 +1164,7 @@ class LittleV052Rv64Core(BaseCPUCore):
                 div_pool=shared_div_pool,
                 fpsimd_pool=shared_fpsimd_pool,
                 pair_requester_id=pair_requester_id,
+                g0_private_div_one_per_core=g0_private_div_one_per_core,
             )
         else:
             iq = IQUnit(numEntries=iq_entries)
@@ -1230,6 +1248,7 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
         num_cores: int,
         pair_shared_div: bool,
         pair_shared_fpsimd: bool = False,
+        g0_div_mode: str = "legacy",
         div_reactive_power: bool = False,
         div_decode_wake: bool = False,
         div_raw_wake: bool = False,
@@ -1277,6 +1296,24 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
             raise ValueError(
                 "--div-raw-wake requires --div-reactive-power"
             )
+
+        if g0_div_mode not in ("legacy", "private2", "shared1"):
+            raise ValueError(f"unsupported G0 DIV mode: {g0_div_mode}")
+        if g0_div_mode != "legacy":
+            if num_cores != 2 or not distributed_iq or not local_iq_picker:
+                raise ValueError(
+                    "G0 matched DIV requires --cores 2, --distributed-iq "
+                    "and --local-iq-picker"
+                )
+            if pair_shared_div != (g0_div_mode == "shared1"):
+                raise ValueError(
+                    "G0 private2 requires no --pair-shared-div; "
+                    "G0 shared1 requires --pair-shared-div"
+                )
+            if div_reactive_power or div_decode_wake or div_raw_wake:
+                raise ValueError(
+                    "G0-A is W0 always-awake: omit every DIV wake flag"
+                )
 
         if pair_shared_div:
             if num_cores != 2:
@@ -1364,9 +1401,38 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
                 shared_div_pool=shared_div_pool,
                 shared_fpsimd_pool=shared_fpsimd_pool,
                 pair_requester_id=core_idx,
+                g0_private_div_one_per_core=(g0_div_mode == "private2"),
             )
             for core_idx in range(num_cores)
         ]
+        if g0_div_mode != "legacy":
+            div_pools = [
+                core.get_simobject().instQueues[3].fuPool
+                for core in cores
+            ]
+            if any(len(pool.FUList) != 1 for pool in div_pools):
+                raise RuntimeError("G0 DIV FUList must contain one FUDesc")
+            counts = [int(pool.FUList[0].count) for pool in div_pools]
+            if counts != [1, 1]:
+                raise RuntimeError(
+                    f"G0 expected exactly 1 physical DIV per pool: {counts}"
+                )
+            same_pool = div_pools[0] is div_pools[1]
+            expected_shared = g0_div_mode == "shared1"
+            if same_pool != expected_shared:
+                raise RuntimeError(
+                    "G0 DIV pool aliasing mismatch: "
+                    f"shared={same_pool} expected={expected_shared}"
+                )
+            expected_pair_total = 1 if expected_shared else 2
+            print(
+                "G0_DIV_STRUCTURE_ASSERT: "
+                f"mode={g0_div_mode} "
+                f"pool_fu_counts={counts} "
+                f"pair_physical_divs={expected_pair_total} "
+                f"shared_pool={same_pool} "
+                "latency=20 pipelined=False wake=W0"
+            )
         super().__init__(cores=cores)
 
 
@@ -1409,6 +1475,17 @@ def parse_args() -> argparse.Namespace:
         help=(
             "For a two-core distributed-IQ configuration, make both private "
             "DIV IQs reference one physical 20-cycle non-pipelined divider"
+        ),
+    )
+    parser.add_argument(
+        "--g0-div-mode",
+        choices=("legacy", "private2", "shared1"),
+        default="legacy",
+        help=(
+            "G0-A structural comparator. private2=one independent "
+            "divider per core; shared1=one pair-shared divider. "
+            "Requires matching --pair-shared-div only for shared1. "
+            "legacy preserves all historical FU counts."
         ),
     )
     parser.add_argument(
@@ -2003,6 +2080,7 @@ def main() -> None:
         num_cores=args.cores,
         pair_shared_div=args.pair_shared_div,
         pair_shared_fpsimd=args.pair_shared_fpsimd,
+        g0_div_mode=args.g0_div_mode,
         div_reactive_power=args.div_reactive_power,
         div_decode_wake=args.div_decode_wake,
         div_raw_wake=args.div_raw_wake,
@@ -2115,6 +2193,7 @@ def main() -> None:
         f"bp-choice-size={args.bp_choice_size}",
         f"btb-entries={args.btb_entries}",
         f"pair-shared-div={args.pair_shared_div}",
+        f"g0-div-mode={args.g0_div_mode}",
         f"div-decode-wake={args.div_decode_wake}",
         f"div-raw-wake={args.div_raw_wake}",
         f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
