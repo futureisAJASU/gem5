@@ -23,6 +23,16 @@ mkdir -p "$OUT/bin"
   "$CC" --version | head -1
   echo "gem5_version_cli=UNSUPPORTED_use_sha256_and_git_head"
 } > "$OUT/manifest.txt"
+# Fail before spending simulation CPU time if the verifier's own RED
+# regression cases do not pass. Keep the exact test transcript as evidence.
+if ! python3 -m unittest discover -s "$ROOT/configs" \
+    -p 'test_g0_contract_audit.py' -v \
+    > "$OUT/g0_audit_unit_tests.log" 2>&1; then
+  echo "FAIL G0 verifier preflight; test log: $OUT/g0_audit_unit_tests.log" >&2
+  tail -n 65 "$OUT/g0_audit_unit_tests.log" >&2
+  exit 12
+fi
+sha256sum "$OUT/g0_audit_unit_tests.log" >> "$OUT/manifest.txt"
 for kind in heavy sparse; do
   every=1
   [[ "$kind" == "sparse" ]] && every=16
