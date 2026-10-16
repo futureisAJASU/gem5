@@ -32,7 +32,7 @@ int main(void)
             uint64_t quotient, remainder;
             /* Force exactly one dynamic DIVU and one REMU per hit. */
             __asm__ __volatile__(
-                "divu %0, %2, %3\\n\\tremu %1, %2, %3"
+                "divu %0, %2, %3\n\tremu %1, %2, %3"
                 : "=&r"(quotient), "=&r"(remainder)
                 : "r"(numerator), "r"(denominator));
             checksum ^= quotient + (remainder << 1) + i;
