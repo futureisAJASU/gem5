@@ -38,6 +38,8 @@ jobs:
           grep -q '0xb400007b' configs/g0_pair_roi_markers.S
           grep -q '0xb600007b' configs/g0_pair_roi_markers.S
           grep -q 'g0PairRoiCommittedDiv' src/cpu/o3/cpu.cc
+          grep -Fq 'inst->opClass() == enums::IntDiv' src/cpu/o3/cpu.cc
+          grep -Fq '#include "enums/OpClass.hh"' src/cpu/o3/cpu.cc
           grep -q 'G0_PAIR_ROI_SUMMARY' src/sim/pseudo_inst.cc
           grep -q 'LITTLE_G0_PAIR_ROI=1' configs/g0_run_div_roi.sh
           grep -q 'effective_config_audit.json' configs/g0_verify_pair_roi.py
