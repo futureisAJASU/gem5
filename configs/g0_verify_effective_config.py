@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -43,6 +44,68 @@ def parse_config(path: Path) -> configparser.ConfigParser:
     with path.open(encoding="utf-8") as fh:
         cfg.read_file(fh)
     return cfg
+
+
+def read_constructed_manifest(root: Path, log: str) -> tuple[dict, str]:
+    """Verify the new SHA-linked artifact; support strict legacy log recovery.
+
+    Never recreate a constructor-origin manifest from config.ini merely to
+    satisfy this acceptance gate: that would launder missing evidence.
+    """
+    marker = re.compile(
+        r"^G0_CONSTRUCTED_MANIFEST_FILE=(\S+) sha256=([0-9a-f]{64})\s*$",
+        re.MULTILINE,
+    )
+    records = marker.findall(log)
+    artifact = root / "constructed_fu_manifest.json"
+    if records:
+        if len(records) != 1:
+            raise RuntimeError(f"G0 ambiguous constructor file markers: {len(records)}")
+        raw_path, reported_hash = records[0]
+        if Path(raw_path).resolve() != artifact.resolve():
+            raise RuntimeError(
+                f"G0 constructor manifest path mismatch: {raw_path} != {artifact}"
+            )
+        if not artifact.is_file():
+            raise RuntimeError(f"G0 constructor manifest artifact missing: {artifact}")
+        raw = artifact.read_bytes()
+        actual_hash = hashlib.sha256(raw).hexdigest()
+        if reported_hash != actual_hash:
+            raise RuntimeError(
+                f"G0 constructed manifest SHA mismatch: "
+                f"witness={reported_hash} artifact={actual_hash}"
+            )
+        try:
+            result = json.loads(raw)
+        except (ValueError, UnicodeDecodeError) as error:
+            raise RuntimeError("G0 malformed constructor manifest artifact") from error
+        return result, "SHA256_BOUND_CONSTRUCTOR_FILE"
+
+    if artifact.exists():
+        raise RuntimeError(
+            "G0 constructed manifest file exists but log has no SHA witness"
+        )
+
+    # Previously run source printed JSON into one potentially huge log line.
+    # raw_decode supports an embedded or prefixed marker, unlike ^...$ regex.
+    prefix = "G0_CONSTRUCTED_MANIFEST_JSON="
+    markers = [m.start() for m in re.finditer(re.escape(prefix), log)]
+    if len(markers) != 1:
+        raise RuntimeError(
+            "constructed capability manifest missing/duplicated: "
+            f"legacy_marker_count={len(markers)} "
+            f"artifact_exists={artifact.exists()}; "
+            "new runs require LITTLE_G0_CONSTRUCTED_MANIFEST_PATH"
+        )
+    text = log[markers[0] + len(prefix):].lstrip()
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(text)
+    except ValueError as error:
+        raise RuntimeError(
+            "legacy constructor JSON found but could not be decoded; "
+            "inspect the original log; never impute missing fields"
+        ) from error
+    return obj, "LEGACY_LOG_JSON_RECOVERED_UNHASHED"
 
 
 def audit_run(root: Path, mode: str) -> dict:
@@ -156,12 +219,7 @@ def audit_run(root: Path, mode: str) -> dict:
                 )
         counter_coverage[name] = per_pool
 
-    manifest_rows = re.findall(
-        r"^G0_CONSTRUCTED_MANIFEST_JSON=(\{.*\})$", log, re.MULTILINE
-    )
-    if len(manifest_rows) != 1:
-        raise RuntimeError("constructed capability manifest missing/duplicated")
-    construction = json.loads(manifest_rows[0])
+    construction, manifest_provenance = read_constructed_manifest(root, log)
     if construction.get("mode") != mode:
         raise RuntimeError("constructed manifest mode differs")
     if construction.get("runtime_config_ini_and_cpp_instances_verified") is not False:
@@ -170,6 +228,7 @@ def audit_run(root: Path, mode: str) -> dict:
         raise RuntimeError("FP/SIMD capability manifest is empty")
     output = {
         "status": "G0_A_CONFIG_AND_POWER_DISABLED_VERIFIED_NOT_PERFORMANCE",
+        "constructor_manifest_provenance": manifest_provenance,
         "mode": mode,
         "div_core_iq_names": iq3_names,
         "div_pools": pool_refs,
