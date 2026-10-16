@@ -5,6 +5,7 @@ from m5.objects import RiscvO3CPU, RiscvISA, IQUnit, L2XBar
 from m5.objects.FUPool import FUPool
 from m5.params import NULL
 from m5.objects.FuncUnit import FUDesc, OpDesc
+from g0_fu_contract import verify_g0_constructed
 
 from gem5.components.boards.simple_board import SimpleBoard
 from gem5.components.cachehierarchies.classic.private_l1_shared_l2_cache_hierarchy import (
@@ -965,7 +966,13 @@ def make_little_distributed_iqs(
                 div_pool
                 if div_pool is not None
                 else (
-                    LittleG0PrivateDivPool()
+                    LittleG0PrivateDivPool(
+                        reactivePowerGating=False,
+                        predictiveWakeEnabled=False,
+                        rawPredictiveWakeEnabled=False,
+                        powerIdleThreshold=8,
+                        powerWakeLatency=0,
+                    )
                     if g0_private_div_one_per_core
                     else LittleDivPool()
                 )
@@ -1312,7 +1319,12 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
                 )
             if div_reactive_power or div_decode_wake or div_raw_wake:
                 raise ValueError(
-                    "G0-A is W0 always-awake: omit every DIV wake flag"
+                    "G0 architecture-only requires all three wake enables false"
+                )
+            if div_wake_latency != 0 or div_idle_threshold != 8:
+                raise ValueError(
+                    "G0 architecture-only requires explicit wake latency=0 "
+                    "and idle threshold=8, independent of disabling gating"
                 )
 
         if pair_shared_div:
@@ -1349,11 +1361,26 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
 
         shared_div_pool = (
             LittlePairSharedDivPool(
-                reactivePowerGating=div_reactive_power,
-                predictiveWakeEnabled=div_decode_wake,
-                rawPredictiveWakeEnabled=div_raw_wake,
-                powerIdleThreshold=div_idle_threshold,
-                powerWakeLatency=div_wake_latency,
+                reactivePowerGating=(
+                    False if g0_div_mode != "legacy"
+                    else div_reactive_power
+                ),
+                predictiveWakeEnabled=(
+                    False if g0_div_mode != "legacy"
+                    else div_decode_wake
+                ),
+                rawPredictiveWakeEnabled=(
+                    False if g0_div_mode != "legacy"
+                    else div_raw_wake
+                ),
+                powerIdleThreshold=(
+                    8 if g0_div_mode != "legacy"
+                    else div_idle_threshold
+                ),
+                powerWakeLatency=(
+                    0 if g0_div_mode != "legacy"
+                    else div_wake_latency
+                ),
             )
             if pair_shared_div
             else None
@@ -1406,32 +1433,8 @@ class LittleV052Rv64Processor(BaseCPUProcessor):
             for core_idx in range(num_cores)
         ]
         if g0_div_mode != "legacy":
-            div_pools = [
-                core.get_simobject().instQueues[3].fuPool
-                for core in cores
-            ]
-            if any(len(pool.FUList) != 1 for pool in div_pools):
-                raise RuntimeError("G0 DIV FUList must contain one FUDesc")
-            counts = [int(pool.FUList[0].count) for pool in div_pools]
-            if counts != [1, 1]:
-                raise RuntimeError(
-                    f"G0 expected exactly 1 physical DIV per pool: {counts}"
-                )
-            same_pool = div_pools[0] is div_pools[1]
-            expected_shared = g0_div_mode == "shared1"
-            if same_pool != expected_shared:
-                raise RuntimeError(
-                    "G0 DIV pool aliasing mismatch: "
-                    f"shared={same_pool} expected={expected_shared}"
-                )
-            expected_pair_total = 1 if expected_shared else 2
-            print(
-                "G0_DIV_STRUCTURE_ASSERT: "
-                f"mode={g0_div_mode} "
-                f"pool_fu_counts={counts} "
-                f"pair_physical_divs={expected_pair_total} "
-                f"shared_pool={same_pool} "
-                "latency=20 pipelined=False wake=W0"
+            verify_g0_constructed(
+                cores, g0_div_mode, expect_fp_shared=pair_shared_fpsimd
             )
         super().__init__(cores=cores)
 
