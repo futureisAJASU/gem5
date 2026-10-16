@@ -117,7 +117,7 @@ git diff --quiet && git diff --cached --quiet || {
 }
 git merge --ff-only origin/research/g0-a-matched-div-20261016
 cd "$HOME/gem5-g0-a-20261016"
-python3 -m unittest discover -s configs -p 'test_g0_contract_audit.py' -v
+python3 configs/test_g0_contract_audit.py -v
 scons build/RISCV/gem5.opt -j4
 bash configs/g0_run_div_pilot.sh
 ```
@@ -127,3 +127,34 @@ advances the detached HEAD only when it is an ancestor of the remote branch.
 It refuses a divergent history and does not invoke reset or clean.
 Preserve any pre-existing untracked files; inspect a merge conflict instead
 of forcing an update.
+
+## 2026-10-16 follow-up: isolated Python regression runner
+
+OCI observed after a successful gem5 SCons link: all ten targeted
+`test_g0_contract_audit` test methods PASS, yet the **broad**
+`unittest discover -s configs` command also imports
+`configs/common/cores/arm/__init__.py` and `HPI.py`.
+That unrelated ARM config import fails with `ModuleNotFoundError: m5`
+in the ordinary host Python environment. This is a test-discovery
+scope defect, **not** a G0 functional failure.
+
+The pilot and GitHub static CI now call only
+`python3 configs/test_g0_contract_audit.py -v`. Its import path contains
+`configs` automatically; no host-side `m5` installation is required.
+The preflight remains fail-closed for any failing G0 regression case.
+
+This change touched **only** the Bash runner, workflow, and documentation.
+The previously successful `build/RISCV/gem5.opt` does **not** need
+relinking because of this edit. New runs use unique output directories
+and preserve the failed preflight's original transcript. Static files
+are updated on GitHub; runtime status requires fresh OCI evidence.
+
+Fast-forward the existing detached worktree (no hard reset) and run:
+```bash
+cd "$HOME/gem5-g0-a-20261016"
+git status --short
+git fetch origin research/g0-a-matched-div-20261016
+git merge --ff-only origin/research/g0-a-matched-div-20261016
+python3 configs/test_g0_contract_audit.py -v
+bash configs/g0_run_div_pilot.sh
+```
