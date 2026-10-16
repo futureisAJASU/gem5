@@ -59,6 +59,7 @@
 #include "sim/cur_tick.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
+#include "sim/pseudo_inst.hh"
 #include "sim/stat_control.hh"
 #include "sim/system.hh"
 
@@ -1189,6 +1190,11 @@ CPU::instDone(ThreadID tid, const DynInstPtr &inst)
     thread[tid]->numOp++;
     thread[tid]->threadStats.numOps++;
     commitStats[tid]->numOpsNotNOP++;
+
+    // Measurement-only G0 hook: count committed (not merely issued)
+    // integer-division-class uops within the synchronized pair ROI.
+    if (inst->opClass() == IntDiv)
+        pseudo_inst::g0PairRoiCommittedDiv(threadContexts[tid]);
 
     probeInstCommit(inst->staticInst, inst->pcState().instAddr());
 }
