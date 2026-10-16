@@ -8,7 +8,8 @@ on:
       - configs/g0_run_div_pilot.sh
       - configs/g0_fu_contract.py
       - configs/g0_verify_effective_config.py
-      - configs/g0_summarize_div_pilot.py
+      - configs/g0_summarize_div_pilot.py configs/test_g0_contract_audit.py
+      - configs/test_g0_contract_audit.py
       - src/cpu/o3/fu_pool.cc
       - .github/workflows/g0-a-static.yml
   workflow_dispatch:
@@ -21,6 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Python parse and compile (no gem5 runtime)
         run: python3 -m py_compile configs/02_little_v052_rv64_proxy.py configs/g0_fu_contract.py configs/g0_verify_effective_config.py configs/g0_summarize_div_pilot.py
+      - name: Fail-closed audit RED regression fixtures (no gem5 runtime)
+        run: python3 -m unittest discover -s configs -p 'test_g0_contract_audit.py' -v
       - name: Bash parser (no gem5 runtime)
         run: bash -n configs/g0_run_div_pilot.sh
       - name: C front-end parser (no RV64 run)
