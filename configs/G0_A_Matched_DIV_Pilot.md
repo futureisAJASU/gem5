@@ -8,7 +8,7 @@ Status: **IMPLEMENTATION STAGED / GEM5 EXECUTION OPEN**. New source is isolated 
 - `--g0-div-mode private2`: new `LittleG0PrivateDivFU count=1` instantiated independently under each core, two total.
 - `--g0-div-mode shared1 --pair-shared-div`: existing pair-shared non-pipelined 20-cycle pool, one total; RR enabled.
 
-Both experimental variants require two cores, distributed IQ, local picker and W0 always awake. A construction-time assertion checks per-pool counts and Python SimObject pool identity. **After simulator runs, inspect generated config.ini and physical FUPool construction to substantiate actual C++ count**; the marker alone is not proof of independently measured FU count.
+Both experimental variants require two cores, distributed IQ, local picker and an **explicitly disabled** gating control. W=0 is wake latency only, not a state-disable control. G0-A enforces effective `reactivePowerGating=false`, `predictiveWakeEnabled=false`, `rawPredictiveWakeEnabled=false`, `powerWakeLatency=0`, `powerIdleThreshold=8` in every constructed pool. `g0_fu_contract.py` emits `G0_CONSTRUCTED_MANIFEST_JSON` with FU OpClass/latency/II/coupling, and checks private/shared ownership. For each Pilot run, `g0_verify_effective_config.py` **also** checks actual emitted `config.ini`, an opt-in C++ post-construction inventory (`G0_CXX_FU_POOL`), and three shared-DIV wake counters zero. Missing evidence blocks the run rather than being imputed as zero. This C++ inventory is diagnostic-only and enabled solely when `LITTLE_G0_AUDIT_FU=1`.
 
 ## Execute on Linux RV64 gem5 host
 
@@ -26,17 +26,39 @@ bash configs/g0_run_div_pilot.sh
 
 Requires `riscv64-linux-gnu-gcc`, `riscv64-linux-gnu-objdump`, and `build/RISCV/gem5.opt`.
 
-Pilot cases: heavy/sparse, sparse/heavy, heavy/heavy, sparse/sparse, each run twice (PRIVATE2 and SHARED1). The script builds identical RV64IMAFD static ELFs, records their checksums, emitted DIV instructions, config and stats, and **fails closed** on nonzero exit, missing structure marker or divergent functional output. This is a **correctness smoke only**: it does not yet close the ten-case matrix, ISA DIV/DIVW/REM/REMW coverage, real ROI, time-to-completion, per-core wait histograms, run-to-run determinism, or representative benchmark performance.
+Pilot cases: heavy/sparse, sparse/heavy, heavy/heavy, sparse/sparse, each run twice (PRIVATE2 and SHARED1). The script builds identical RV64IMAFD static ELFs, records their checksums, emitted DIV instructions, config, C++ physical FU count, effective wake controls, and stats, and **fails closed** on nonzero exit, missing evidence, nonzero shared wake counter, or divergent functional output. This is a **correctness smoke only**: it does not yet close the ten-case matrix, ISA DIV/DIVW/REM/REMW coverage, real ROI, time-to-completion, per-core wait histograms, run-to-run determinism, or representative benchmark performance.
 
 ### Current limits and negative controls
 
 - The `configs/02_little_v052_rv64_proxy.py` 4-core `pair2` L2 implementation rejects two cores. The initial matched two-core DIV pilot uses **`shared4` L2** on both sides, explicitly **not** frozen final L2 topology. It isolates the DIV resource question within a matched cache proxy; a proper two-core PAIR2 mapping remains an integration task.
 - `--n-skip -1` uses FULL visibility to isolate DIV. Frozen FIXED24 needs its own independent no-backfill implementation/verification for A3–A5. Do not call this pilot A5.
 - Compiler `divu/remu` checks only establish instruction presence in ELF, not dynamic instruction counts. Dynamic DIV/REM counts, per-core completion time, contention/NoFreeFU/wait p50/p95 and pair makespan must be added before quantitative claims.
+- `G0_A_CONSTRUCTION_AND_WAKE_GATE` (if actually executed successfully) establishes construction configuration only, not cycle-accurate whole-work performance/energy.
+- Dynamic operation counts remain `null / OPEN` in the generated capability manifest; capability descriptions are OpClass names, not proof of executed RV64 instruction counts.
 - No downstream data yet substantiates a DIV slowdown or energy improvement.
 - The helper avoids concurrent per-core `m5_reset_stats`/dump ROI interference and currently measures the **whole multi-program system**, including launch/drain, as a smoke. Introduce an agreed coordinated ROI before paper figures.
 - Existing block routed DIV `-42.303393%` at 3000ps is independent frozen PPA evidence, not a projected full-core saving.
 
 ## G0-B / I-EXEC carryforward
 
-G0-B must compare A0 (FULL, 33313 first-fit, DIV1/core, FMA2/core, W0) vs A5 (P21313 int1-first, exact FIXED24, DIV1/pair, FMA2/pair, W0), same binaries/ROI/cache. No A0/A5 performance claim from this pilot. Separately the available RTL `little_v052/flow/scripts/run_rtl_two_core_iexec_composition_tests.sh` establishes prior directed two-core functional closure, but neither a conventional wrapper nor new joint synthesis has been run in this G0 attempt.
+G0-B must compare A0 (FULL, 33313 first-fit, DIV1/core, **full private FP/SIMD** configuration, gating explicitly disabled) vs A5 (P21313 int1-first, literal FIXED24 no-backfill, DIV1/pair, **full pair-shared FP/SIMD backend**, gating explicitly disabled). The private FP-Mul/FMA FU also executes Div/Sqrt; the shared version splits Mul/FMA and Div/Sqrt onto different FU domains. This is not an FMA-only ablation. A separate `G0-C-FMA` must hold all other FP/SIMD capacities/latencies/ownership/resource-coupling constant while comparing 4 private vs 2 shared FMA lanes. For A6, shared-DIV-only B2 uses gating=true, raw hint=true, decode hint=false (subject to validated final source), T8/W4; it does NOT prove any FP/SIMD or physical power gating benefit. No A0/A5 performance claim from this pilot. Separately the available RTL `little_v052/flow/scripts/run_rtl_two_core_iexec_composition_tests.sh` establishes prior directed two-core functional closure, but neither a conventional wrapper nor new joint synthesis has been run in this G0 attempt.
+
+## Explicit Addendum 2026-10-16 HIGH-1/HIGH-2 and measurement contract
+
+The **binding authority** is Notion Execution Plan §29.5 / Checklist §21.1 / Contract v1.6 §§11,13–15. This experiment branch intentionally does **not** implement an A0↔A5 full-compute benchmark because the historical gem5 `--n-skip 4` is sliding, not the literal FIXED24 same-cycle snapshot. A new no-backfill implementation and directed verification are required before A3/A5 acceptance.
+
+- For synchronized pair timing define `T_pair = max(T_core0_finish, T_core1_finish) - T_pair_start`, not a sum of per-core times and not a cycle-parity requirement. Capture both core completions and explicitly define optional drain.
+- Pair weighted speedup needs standalone solo-reference cycle measurements for **each** constituent workload and a declared definition.
+- A complete same-work energy window includes earlier-core idle time until later-core finish and, when specified, drain; dynamic, leakage and clock power measured on equivalent domains.
+- The current pilot's `simTicks` comparison is **full simulation length only**; it is not per-core completion or aligned ROI. No G0-A slowdown, G0-B integrated PPA or energy claim is permitted yet.
+- All source paths and generated outputs are kept outside the frozen branch; the final-tag architecture remains unchanged.
+
+## Required diagnostic evidence per run
+
+1. `G0_CONSTRUCTED_MANIFEST_JSON` from the Python construction gate.
+2. `G0_CXX_FU_POOL` record after the actual C++ `numFU` constructor loop; enabled by `LITTLE_G0_AUDIT_FU=1`.
+3. `config.ini` FUPool flags and FuDesc/OpDesc geometry, cross-compared with C++ inventory.
+4. `stats.txt` for shared DIV `reactiveSleepTransitions=0`, `reactiveWakingSamples=0`, `reactivePowerBlockedRequests=0`; private counter absence is documented `UNOBSERVED`.
+5. Same two printed result checksums, process exit code 0, ELF SHA and disassembly check.
+
+If the reporter fails because gem5 names or serialized config structure differ, inspect the **real** emitted artifacts and fix the verifier in this experimental branch. Do not relax the evidence gate merely to get a green marker. The current source modifications have not yet been compiled or run with the RV64 gem5 simulator; all performance and C++ audit statuses remain OPEN.
