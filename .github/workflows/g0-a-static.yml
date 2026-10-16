@@ -8,7 +8,7 @@ on:
       - configs/g0_run_div_pilot.sh
       - configs/g0_fu_contract.py
       - configs/g0_verify_effective_config.py
-      - configs/g0_summarize_div_pilot.py configs/test_g0_contract_audit.py
+      - configs/g0_summarize_div_pilot.py
       - configs/test_g0_contract_audit.py
       - src/cpu/o3/fu_pool.cc
       - .github/workflows/g0-a-static.yml
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Python parse and compile (no gem5 runtime)
-        run: python3 -m py_compile configs/02_little_v052_rv64_proxy.py configs/g0_fu_contract.py configs/g0_verify_effective_config.py configs/g0_summarize_div_pilot.py
+        run: python3 -m py_compile configs/02_little_v052_rv64_proxy.py configs/g0_fu_contract.py configs/g0_verify_effective_config.py configs/g0_summarize_div_pilot.py configs/test_g0_contract_audit.py
       - name: Fail-closed audit RED regression fixtures (no gem5 runtime)
         run: python3 -m unittest discover -s configs -p 'test_g0_contract_audit.py' -v
       - name: Bash parser (no gem5 runtime)
@@ -33,7 +33,7 @@ jobs:
         run: |
           grep -q 'class LittleG0PrivateDivFU(LittleDivFU)' configs/02_little_v052_rv64_proxy.py
           grep -q 'class LittlePairSharedDivFU(FUDesc)' configs/02_little_v052_rv64_proxy.py
-          grep -q 'G0_DIV_STRUCTURE_ASSERT' configs/02_little_v052_rv64_proxy.py
+          grep -q 'G0_DIV_STRUCTURE_ASSERT' configs/g0_fu_contract.py
           grep -q 'SIMULATION_EXIT_CODE=0' configs/g0_run_div_pilot.sh
           grep -q 'LITTLE_G0_AUDIT_FU=1' configs/g0_run_div_pilot.sh
           grep -q 'G0_CXX_FU_POOL' src/cpu/o3/fu_pool.cc
