@@ -1,0 +1,43 @@
+name: Little v0.52 G0 Pair ROI static and synthetic audit
+on:
+  push:
+    branches: [research/g0-a-pair-roi-20261016]
+    paths:
+      - configs/02_little_v052_rv64_proxy.py
+      - configs/g0_div_roi_directed.c
+      - configs/g0_pair_roi_markers.S
+      - configs/g0_run_div_roi.sh
+      - configs/g0_verify_pair_roi.py
+      - configs/test_g0_pair_roi.py
+      - src/sim/pseudo_inst.cc
+      - src/sim/pseudo_inst.hh
+      - src/cpu/o3/cpu.cc
+      - .github/workflows/g0-roi-static.yml
+  workflow_dispatch:
+jobs:
+  roi-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python isolated source and verifier syntax
+        run: python3 -m py_compile configs/02_little_v052_rv64_proxy.py configs/g0_verify_pair_roi.py configs/test_g0_pair_roi.py
+      - name: ROI RED/GREEN tests without imported gem5 m5
+        run: python3 configs/test_g0_pair_roi.py -v
+      - name: Retain prior effective FU/Wake regressions
+        run: python3 configs/test_g0_contract_audit.py -v
+      - name: Validate Bash syntax
+        run: bash -n configs/g0_run_div_roi.sh
+      - name: Guest C host syntax only (not RV64 runtime)
+        run: cc -std=gnu11 -Wall -Wextra -Werror -fsyntax-only configs/g0_div_roi_directed.c
+      - name: Strict artifact and ISA pseudo-op source markers
+        shell: bash
+        run: |
+          grep -q 'M5OP_WORK_BEGIN = 0x5a' configs/g0_pair_roi_markers.S
+          grep -q '0xb400007b' configs/g0_pair_roi_markers.S
+          grep -q '0xb600007b' configs/g0_pair_roi_markers.S
+          grep -q 'g0PairRoiCommittedDiv' src/cpu/o3/cpu.cc
+          grep -q 'G0_PAIR_ROI_SUMMARY' src/sim/pseudo_inst.cc
+          grep -q 'LITTLE_G0_PAIR_ROI=1' configs/g0_run_div_roi.sh
+          grep -q 'effective_config_audit.json' configs/g0_verify_pair_roi.py
