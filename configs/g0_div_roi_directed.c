@@ -1,0 +1,58 @@
+/*
+ * Little v0.52 G0-A directed DIV workload.
+ * Compile twice: -DG0_DIV_EVERY=1 (sustained), or =16 (sparse).
+ * G0 pair ROI markers use simulator-owned workbegin/workend synchronization.
+ * No global m5 reset/dump: independent SE cores cannot safely reset stats.
+ * Every completed process prints a deterministic, comparable checksum.
+ */
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
+#ifndef G0_DIV_EVERY
+#define G0_DIV_EVERY 1
+#endif
+#ifndef G0_ITERATIONS
+#define G0_ITERATIONS 3072
+#endif
+#if G0_DIV_EVERY <= 0
+#error G0_DIV_EVERY must be positive
+#endif
+static volatile uint64_t initial_value = UINT64_C(0x123456789abcdef1);
+extern void g0_pair_roi_begin(void);
+extern void g0_pair_roi_end(void);
+
+int main(void)
+{
+    uint64_t x = initial_value;
+    uint64_t checksum = UINT64_C(0x97f4a7c159e3779b);
+    uint64_t div_ops = 0;
+    // Barrier is AFTER static startup and BEFORE the first hot-loop iteration.
+    g0_pair_roi_begin();
+    for (unsigned i = 0; i < G0_ITERATIONS; ++i) {
+        x ^= (x << 7);
+        x ^= (x >> 9);
+        x += UINT64_C(0x9e3779b97f4a7c15) + i;
+        if (i % G0_DIV_EVERY == 0) {
+            uint64_t numerator = x | (UINT64_C(1) << 55);
+            uint64_t denominator = ((x >> 17) & 0x7fffU) | 1U;
+            uint64_t quotient, remainder;
+            /* Force exactly one dynamic DIVU and one REMU per hit. */
+            __asm__ __volatile__(
+                "divu %0, %2, %3\n\tremu %1, %2, %3"
+                : "=&r"(quotient), "=&r"(remainder)
+                : "r"(numerator), "r"(denominator));
+            checksum ^= quotient + (remainder << 1) + i;
+            checksum = (checksum << 11) | (checksum >> 53);
+            div_ops += 2; /* dynamic DIVU and REMU expected; inspect objdump */
+        } else {
+            checksum ^= (x * UINT64_C(0x100000001b3)) + i;
+            checksum = (checksum << 11) | (checksum >> 53);
+        }
+    }
+    g0_pair_roi_end();
+    printf("G0_RESULT every=%d iterations=%d div_ops_expected=%" PRIu64
+           " checksum=%016" PRIx64 "\n",
+           G0_DIV_EVERY, G0_ITERATIONS, div_ops, checksum);
+    fflush(stdout);
+    return 0;
+}
