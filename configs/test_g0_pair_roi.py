@@ -75,6 +75,17 @@ class G0PairRoiParserTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,"duplicate"):
             read_run(self.root,"heavy_sparse","shared1",self.iters)
 
+    def test_legitimate_same_tick_arrival_is_not_false_failure(self):
+        self.mutate("heavy_sparse", "private2",
+                    "G0_PAIR_ROI_READY core=0 ready_tick=9000",
+                    "G0_PAIR_ROI_READY core=0 ready_tick=10000")
+        self.mutate("heavy_sparse", "private2",
+                    "ready0=9000 ready1=10000",
+                    "ready0=10000 ready1=10000")
+        result=read_run(self.root,"heavy_sparse","private2",self.iters)
+        self.assertFalse(result["arrival_barrier_quiesce_exercised"])
+        self.assertEqual(result["ready_tick_skew"],0)
+
     def test_div_dynamic_count_incorrect_rejected(self):
         self.mutate("heavy_sparse","shared1",
                     "committed_intdivs=64",
