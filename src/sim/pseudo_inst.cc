@@ -510,7 +510,7 @@ struct G0PairRoiState
     std::array<bool, 2> finished{{false, false}};
     std::array<Tick, 2> readyTick{{0, 0}};
     std::array<Tick, 2> finishTick{{0, 0}};
-    std::array<Counter, 2> startInsts{{0, 0}};
+    std::array<::gem5::Counter, 2> startInsts{{0, 0}};
     std::array<uint64_t, 2> committedDivs{{0, 0}};
     Tick pairStartTick = 0;
     Tick clockPeriodTicks = 0;
@@ -589,7 +589,7 @@ g0PairRoiEnd(ThreadContext *tc)
     if (!state.arrived[id] || state.finished[id] ||
         curTick() < state.pairStartTick)
         fatal("G0 pair ROI invalid/duplicate finish for cpu%d", id);
-    const Counter committed = tc->getCpuPtr()->totalInsts();
+    const ::gem5::Counter committed = tc->getCpuPtr()->totalInsts();
     if (committed < state.startInsts[id])
         fatal("G0 pair ROI negative committed instruction delta cpu%d", id);
     state.finished[id] = true;
