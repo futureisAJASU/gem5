@@ -75,5 +75,7 @@ for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
   }
   echo "PILOT FUNCTIONAL PASS $pair (not quantitative acceptance)" | tee -a "$OUT/manifest.txt"
 done
+python3 "$ROOT/configs/g0_summarize_div_pilot.py" "$OUT" --csv "$OUT/summary.csv" > "$OUT/summary_stdout.csv"
 echo "G0_A_PILOT_COMPLETED: $OUT"
-echo "OPEN: audit FU count in config.ini/C++ runtime; extract per-core cycles, pair makespan and grant/wait counters before publishing slowdown"
+echo "G0_A_PILOT_SUMMARY: $OUT/summary.csv (full-process ticks only)"
+echo "OPEN: audit FU count in config.ini/C++ runtime; extract synchronized ROI/per-core completion, pair makespan and grant/wait counters before publishing slowdown"
