@@ -1492,6 +1492,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--g0-pair-roi",
+        action="store_true",
+        help=(
+            "G0 only: enables a simulator-owned synchronized two-core "
+            "workbegin/workend ROI barrier; also requires "
+            "LITTLE_G0_PAIR_ROI=1 and RV64 G0 annotated binaries"
+        ),
+    )
+    parser.add_argument(
         "--div-reactive-power",
         action="store_true",
         help=(
@@ -2015,6 +2024,15 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     requires(isa_required=ISA.RISCV)
+    if args.g0_pair_roi:
+        import os
+
+        if (args.cores != 2 or args.g0_div_mode == "legacy" or
+            os.environ.get("LITTLE_G0_PAIR_ROI") != "1"):
+            raise ValueError(
+                "--g0-pair-roi requires two cores, G0 private2/shared1 "
+                "comparator and LITTLE_G0_PAIR_ROI=1"
+            )
 
     binary_path = Path(args.binary).resolve()
     if not binary_path.is_file():
@@ -2174,7 +2192,8 @@ def main() -> None:
                     architecture=ISA.RISCV,
                 )
                 for core_path in multi_binary_paths
-            ]
+            ],
+            exit_on_work_items=not args.g0_pair_roi,
         )
 
     print(
@@ -2197,6 +2216,7 @@ def main() -> None:
         f"btb-entries={args.btb_entries}",
         f"pair-shared-div={args.pair_shared_div}",
         f"g0-div-mode={args.g0_div_mode}",
+        f"g0-pair-roi={args.g0_pair_roi}",
         f"div-decode-wake={args.div_decode_wake}",
         f"div-raw-wake={args.div_raw_wake}",
         f"pair-shared-fpsimd={args.pair_shared_fpsimd}",
