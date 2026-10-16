@@ -15,7 +15,7 @@ else
   CASES=(heavy_sparse sparse_heavy heavy_heavy sparse_sparse)
 fi
 PY="$ROOT/configs/02_little_v052_rv64_proxy.py"
-OUT="${G0_OUTPUT_DIR:-$HOME/little-v052-g0-roi-$(date +%Y%m%d-%H%M%S)-$}"
+OUT="${G0_OUTPUT_DIR:-$HOME/little-v052-g0-roi-$(date +%Y%m%d-%H%M%S)-$BASHPID}"
 # The SHA-bound construction witness uses an absolute run-directory path.
 case "$OUT" in
   /*) ;;
