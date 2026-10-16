@@ -167,3 +167,20 @@ launched by this gem5 branch**.
   `configs/test_g0_pair_roi.py`.
 
 **Disposition before actual new gem5 logs: IMPLEMENTED-IN-BRANCH / SIMULATOR-UNVERIFIED / QUANTITATIVE RESULTS OPEN.**
+
+## Build blocker resolved in source: OpClass enum qualification
+
+The first OCI ROI-branch C++ build reported
+`src/cpu/o3/cpu.cc:1196: error: 'IntDiv' was not declared in this scope`,
+with compiler suggestion `gem5::enums::IntDiv`. The newly added
+O3-commit instrumentation now compares to `enums::IntDiv` and explicitly
+includes `enums/OpClass.hh`. This is limited to the experimental
+measurement hook and does not change any FU counts/latencies/policies.
+The G0 ROI CI has a static guard against the unqualified token.
+
+**No subsequent OCI C++ compile or runtime success has been observed at the
+time of this documentation update.** There is no reason to erase working
+build objects; merge the fast-forward commit and resume with
+`scons build/RISCV/gem5.opt -j4`. Run the two-mode smoke only after
+the executable actually links successfully. Keep the historical G0-A
+evidence unchanged.
