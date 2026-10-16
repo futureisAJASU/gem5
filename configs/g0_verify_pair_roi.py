@@ -74,9 +74,10 @@ def read_run(out: Path, case: str, mode: str, n: int) -> dict:
         raise RuntimeError(f"{directory}: invalid clock/start")
     if [ready0, ready1] != [ready[0][0], ready[1][0]]:
         raise RuntimeError(f"{directory}: ready/summary timestamps inconsistent")
-    if max(ready0, ready1) != start or min(ready0, ready1) >= start:
-        # Two cores arrive in different ticks for a real suspension test.
+    if max(ready0, ready1) != start or min(ready0, ready1) > start:
         raise RuntimeError(f"{directory}: common barrier not observed")
+    # Same-tick arrivals are a legitimate common start. They do not
+    # independently demonstrate that the first core stayed suspended.
     if summary_start != start or summary_period != period:
         raise RuntimeError(f"{directory}: clock/start mismatched between markers")
     if finish0 != finish[0][0] or finish1 != finish[1][0]:
@@ -127,6 +128,8 @@ def read_run(out: Path, case: str, mode: str, n: int) -> dict:
         "committed_div": (finish[0][3], finish[1][3]),
         "guest_results": actual_outputs,
         "early_core_quiesce_ticks": abs(finish0 - finish1),
+        "ready_tick_skew": abs(ready0 - ready1),
+        "arrival_barrier_quiesce_exercised": ready0 != ready1,
     }
 
 
@@ -155,6 +158,8 @@ def compare_pair(out: Path, case: str, n: int) -> dict:
             f"{mode}_core0_committed_div":x["committed_div"][0],
             f"{mode}_core1_committed_div":x["committed_div"][1],
             f"{mode}_early_core_quiesce_ticks":x["early_core_quiesce_ticks"],
+            f"{mode}_ready_tick_skew":x["ready_tick_skew"],
+            f"{mode}_arrival_barrier_quiesce_exercised":x["arrival_barrier_quiesce_exercised"],
         })
     row.update({
         "core0_shared_over_private_runtime":b["runtime_cycles"][0]/a["runtime_cycles"][0],
@@ -171,11 +176,14 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("root", type=Path)
     ap.add_argument("--iterations", type=int, required=True)
+    ap.add_argument("--cases", nargs="+", choices=PAIRS, default=list(PAIRS))
     ap.add_argument("--csv", type=Path, required=True)
     args=ap.parse_args()
     if args.iterations <= 0:
         raise SystemExit("--iterations must be positive")
-    rows=[compare_pair(args.root, case, args.iterations) for case in PAIRS]
+    if len(set(args.cases)) != len(args.cases):
+        raise RuntimeError("duplicate G0 ROI case")
+    rows=[compare_pair(args.root, case, args.iterations) for case in args.cases]
     if args.csv.exists():
         raise RuntimeError(f"refusing overwrite: {args.csv}")
     with args.csv.open("x", newline="", encoding="utf-8") as f:
