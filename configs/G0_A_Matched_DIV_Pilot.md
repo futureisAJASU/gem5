@@ -20,7 +20,7 @@ git fetch origin research/g0-a-matched-div-20261016
 git worktree add --detach "$HOME/gem5-g0-a-20261016" origin/research/g0-a-matched-div-20261016
 cd "$HOME/gem5-g0-a-20261016"
 # A new build is needed if no compatible binary exists:
-scons build/RISCV/gem5.opt -j2
+scons build/RISCV/gem5.opt -j4
 bash configs/g0_run_div_pilot.sh
 ```
 
@@ -62,3 +62,65 @@ The **binding authority** is Notion Execution Plan §29.5 / Checklist §21.1 / C
 5. Same two printed result checksums, process exit code 0, ELF SHA and disassembly check.
 
 If the reporter fails because gem5 names or serialized config structure differ, inspect the **real** emitted artifacts and fix the verifier in this experimental branch. Do not relax the evidence gate merely to get a green marker. The current source modifications have not yet been compiled or run with the RV64 gem5 simulator; all performance and C++ audit statuses remain OPEN.
+
+## 2026-10-16 post-build manifest hotfix / host thread policy
+
+Observed on OCI: `scons: done building targets`, but the first Python post-run
+verifier stopped with `constructed capability manifest missing/duplicated`.
+That traceback occurred after the verifier's checks of DIV ownership, each
+FUPool's effective wake settings, C++ physical count, DIV capability, and the
+applicable shared counter(s). The first completed simulator log therefore
+*may* contain sound evidence, but this is not declared PASS without
+successfully extracting and cross-verifying the actual manifest.
+
+Changes:
+- Removed unsupported `gem5.opt --version` invocation; binary SHA-256 and
+  exact Git HEAD remain as version/provenance identifiers.
+- The constructor now writes the whole manifest to a **new** per-run
+  `constructed_fu_manifest.json` (exclusive create, fsync) and prints
+  `G0_CONSTRUCTED_MANIFEST_FILE=... sha256=...`. The verifier checks the
+  pathname, file bytes and SHA-256 against the log witness. Missing or
+  inconsistent evidence means FAIL; no synthetic FU manifest backfill.
+- Old simulator logs can be salvaged only if a complete
+  `G0_CONSTRUCTED_MANIFEST_JSON=` object is truly present and decodable.
+  In that case the recovered provenance is marked
+  `LEGACY_LOG_JSON_RECOVERED_UNHASHED`, *not* a SHA-bound new artifact.
+- G0-A execution still excludes performance/PPA acceptance until synchronized
+  start/finish and dynamic operation counting are independently validated.
+
+Host parallelism convention (future commands):
+- OCI gem5 host: `scons build/RISCV/gem5.opt -j4` (4 compilation jobs).
+- Dedicated OpenROAD server: 8 worker threads for supported OpenROAD/ORFS
+  steps; do not assume `scons -j4` configures OpenROAD parallelism.
+
+For a **previously completed** configuration-only run, the upgraded verifier
+can be used directly without rerunning gem5. Choose the actual legacy run
+folder (do not overwrite prior audit JSON):
+
+```bash
+python3 configs/g0_verify_effective_config.py \
+  /path/to/old-root/heavy_sparse/private2 \
+  --mode private2 \
+  --json /path/to/old-root/heavy_sparse/private2/effective_config_recovered.json
+```
+
+If legacy JSON was truncated or missing, keep the original logs and run the
+updated pilot to a fresh output directory. Do not manufacture a manifest
+from the config file to close that gate.
+
+```bash
+git fetch origin research/g0-a-matched-div-20261016
+git -C "$HOME/gem5-g0-a-20261016" pull --ff-only origin research/g0-a-matched-div-20261016
+cd "$HOME/gem5-g0-a-20261016"
+python3 -m unittest discover -s configs -p 'test_g0_contract_audit.py' -v
+scons build/RISCV/gem5.opt -j4
+bash configs/g0_run_div_pilot.sh
+```
+
+`git pull` works only if the worktree has a tracking/local branch.
+**Important**: the initial G0 worktree recipe used `--detach`, so the safe
+command for that detached worktree is `git fetch ...` and
+`git merge --ff-only origin/research/g0-a-matched-div-20261016` *only
+when the detached HEAD is an ancestor and the tree is clean*. Do not
+reset or clean user files. Consult the final response for verified
+detached-worktree steps.
