@@ -16,6 +16,11 @@ else
 fi
 PY="$ROOT/configs/02_little_v052_rv64_proxy.py"
 OUT="${G0_OUTPUT_DIR:-$HOME/little-v052-g0-roi-$(date +%Y%m%d-%H%M%S)-$}"
+# The SHA-bound construction witness uses an absolute run-directory path.
+case "$OUT" in
+  /*) ;;
+  *) OUT="$PWD/$OUT" ;;
+esac
 [[ -x "$BIN" ]] || { echo "Missing gem5 binary $BIN. Build with: scons build/RISCV/gem5.opt -j4" >&2; exit 2; }
 command -v "$CC" >/dev/null || { echo "Missing RV64 compiler $CC" >&2; exit 2; }
 command -v "$OBJDUMP" >/dev/null || { echo "Missing RV64 objdump $OBJDUMP" >&2; exit 2; }
