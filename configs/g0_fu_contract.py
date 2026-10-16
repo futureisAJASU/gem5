@@ -5,7 +5,10 @@ and C++ FU inventory verification. Never equate class names to real silicon PPA.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+from pathlib import Path
 
 
 def _bool(value, label):
@@ -143,7 +146,30 @@ def verify_g0_constructed(cores, mode, expect_fp_shared=False):
             if row["opClass"].startswith(("Float", "Bf16", "Simd", "Matrix"))
         ],
     }
-    print("G0_CONSTRUCTED_MANIFEST_JSON=" + json.dumps(manifest, sort_keys=True))
+    # A whole-FP/SIMD capability manifest can be very large. Do not rely
+    # on single-line gem5 stdout logs for its preservation. The pilot sets
+    # LITTLE_G0_CONSTRUCTED_MANIFEST_PATH to a fresh per-run output file.
+    # A SHA-256 witness in simulator.log ties the file to this constructor.
+    artifact = os.environ.get("LITTLE_G0_CONSTRUCTED_MANIFEST_PATH")
+    serialized = (json.dumps(manifest, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    if artifact:
+        target = Path(artifact).resolve()
+        if not target.parent.is_dir():
+            raise RuntimeError(f"G0 manifest parent does not exist: {target.parent}")
+        with target.open("xb") as handle:
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+        digest = hashlib.sha256(serialized).hexdigest()
+        print(
+            f"G0_CONSTRUCTED_MANIFEST_FILE={target} "
+            f"sha256={digest}",
+            flush=True,
+        )
+    else:
+        # Legacy/manual mode remains possible, but its log is untrusted until
+        # verified against the effective config and the C++ inventory.
+        print("G0_CONSTRUCTED_MANIFEST_JSON=" + json.dumps(manifest, sort_keys=True))
     print(
         f"G0_DIV_STRUCTURE_ASSERT: mode={mode} "
         f"pair_physical_divs_expected={physical_total} "
