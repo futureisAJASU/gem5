@@ -1,4 +1,5 @@
 """Standalone fail-closed verifier regression; no gem5 binary required."""
+import hashlib
 import json
 import tempfile
 import unittest
@@ -17,6 +18,7 @@ class G0EffectiveConfigAuditTests(unittest.TestCase):
         self.config = self.root / "config.ini"
         self.log = self.root / "simulator.log"
         self.stats = self.root / "stats.txt"
+        self.manifest_file = self.root / "constructed_fu_manifest.json"
         self.write_fixture()
 
     def write_fixture(self):
@@ -43,15 +45,16 @@ opClass=IntDiv
 opLat=20
 pipelined=false
 """.strip()+"\n")
+        self.construction = {
+            "mode": "shared1",
+            "runtime_config_ini_and_cpp_instances_verified": False,
+            "fpu_capability_manifest": [{"opClass": "FloatMultAcc"}],
+        }
+        self.write_construction()
         self.log.write_text(
             f"G0_CXX_FU_POOL name={n} physical_units=1 pair_rr=1 "
             "reactive=0 decode=0 raw=0 latency=0 threshold=8\n"
-            "G0_CONSTRUCTED_MANIFEST_JSON="
-            + json.dumps({
-                "mode": "shared1",
-                "runtime_config_ini_and_cpp_instances_verified": False,
-                "fpu_capability_manifest": [{"opClass": "FloatMultAcc"}]
-            }) + "\n"
+            + self.manifest_witness
         )
         self.stats.write_text(
             "".join(f"{n}.{metric} 0 # synthetic\n" for metric in (
@@ -59,6 +62,15 @@ pipelined=false
                 "reactiveWakingSamples",
                 "reactivePowerBlockedRequests"
             ))
+        )
+
+    def write_construction(self):
+        raw = (json.dumps(self.construction, sort_keys=True, indent=2) + "\n").encode()
+        self.manifest_file.write_bytes(raw)
+        self.manifest_witness = (
+            "G0_CONSTRUCTED_MANIFEST_FILE="
+            + str(self.manifest_file.resolve())
+            + " sha256=" + hashlib.sha256(raw).hexdigest() + "\n"
         )
 
     def test_all_constructed_counters_zero_and_count_one(self):
@@ -104,14 +116,43 @@ pipelined=false
             audit_run(self.root, self.mode)
 
     def test_source_manifest_cannot_self_certify_runtime(self):
+        old_witness = self.manifest_witness
+        self.construction["runtime_config_ini_and_cpp_instances_verified"] = True
+        self.write_construction()
         self.log.write_text(
-            self.log.read_text().replace(
-                '"runtime_config_ini_and_cpp_instances_verified": false',
-                '"runtime_config_ini_and_cpp_instances_verified": true'
-            )
+            self.log.read_text().replace(old_witness, self.manifest_witness)
         )
         with self.assertRaisesRegex(RuntimeError, "self-certify"):
             audit_run(self.root, self.mode)
+
+    def test_manifest_tamper_does_not_pass(self):
+        self.manifest_file.write_bytes(
+            self.manifest_file.read_bytes() + b" "
+        )
+        with self.assertRaisesRegex(RuntimeError, "SHA mismatch"):
+            audit_run(self.root, self.mode)
+
+    def test_manifest_without_sha_witness_does_not_pass(self):
+        self.log.write_text(
+            self.log.read_text().replace(self.manifest_witness, "")
+        )
+        with self.assertRaisesRegex(RuntimeError, "no SHA witness"):
+            audit_run(self.root, self.mode)
+
+    def test_legacy_log_may_be_recovered_without_imputing_fields(self):
+        self.manifest_file.unlink()
+        self.log.write_text(
+            self.log.read_text().replace(
+                self.manifest_witness,
+                "prefix: G0_CONSTRUCTED_MANIFEST_JSON="
+                + json.dumps(self.construction) + "\n"
+            )
+        )
+        output = audit_run(self.root, self.mode)
+        self.assertEqual(
+            output["constructor_manifest_provenance"],
+            "LEGACY_LOG_JSON_RECOVERED_UNHASHED",
+        )
 
     def test_no_cpp_record_is_invalid(self):
         self.log.write_text(
