@@ -45,6 +45,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cstdlib>
@@ -510,6 +511,7 @@ struct G0PairRoiState
     std::array<Tick, 2> readyTick{{0, 0}};
     std::array<Tick, 2> finishTick{{0, 0}};
     std::array<Counter, 2> startInsts{{0, 0}};
+    std::array<uint64_t, 2> committedDivs{{0, 0}};
     Tick pairStartTick = 0;
     Tick clockPeriodTicks = 0;
     bool synchronized = false;
@@ -596,6 +598,7 @@ g0PairRoiEnd(ThreadContext *tc)
               << " finish_tick=" << curTick()
               << " pair_start_tick=" << state.pairStartTick
               << " committed_insts=" << (committed - state.startInsts[id])
+              << " committed_intdivs=" << state.committedDivs[id]
               << std::endl;
 
     if (!state.finished[1-id]) {
@@ -622,6 +625,20 @@ g0PairRoiEnd(ThreadContext *tc)
     state.context[1-id]->activate();
 }
 } // namespace
+
+void
+g0PairRoiCommittedDiv(ThreadContext *tc)
+{
+    if (!g0PairRoiEnabled())
+        return;
+    auto it = g0PairRoiStates.find(tc->getSystemPtr());
+    if (it == g0PairRoiStates.end() || !it->second.synchronized)
+        return;
+    auto &state = it->second;
+    const int id = g0PairRoiCoreId(tc);
+    if (!state.finished[id])
+        ++state.committedDivs[id];
+}
 
 //
 // This function is executed when annotated work items begin.  Depending on
