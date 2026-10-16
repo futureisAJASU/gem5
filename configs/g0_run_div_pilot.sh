@@ -41,8 +41,6 @@ COMMON=(
   --l2-topology shared4
 )
 for pair in heavy_sparse sparse_heavy heavy_heavy sparse_sparse; do
-  # Use case spelling independent of locale/Unicode (first string normalized).
-  [[ "$pair" == "heavy_sparse" ]] && pair="heavy_sparse"
   first="${pair%%_*}"; second="${pair#*_}"
   for mode in private2 shared1; do
     mode_args=(--g0-div-mode "$mode")
