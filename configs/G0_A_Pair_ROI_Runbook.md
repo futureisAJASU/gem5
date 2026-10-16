@@ -32,6 +32,10 @@ pseudo-instructions:
 The frozen gem5 `util/m5/src/abi/riscv/m5op.S` encodes operations with
 `0x0000007b | (M5FUNC << 25)`, and the frozen generic m5ops header
 assigns WorkBegin 0x5a and WorkEnd 0x5b.
+The frozen `src/arch/riscv/isa/formats/m5ops.isa` generates this operation
+with `['IsNonSpeculative', 'IsSerializeAfter']`. That is source-backed
+evidence for an ordered marker; actual O3 Commit retirement boundaries
+must still be checked from measured `committed_intdivs`.
 
 **Simulator** (experimental `src/sim/pseudo_inst.cc` modifications):
 
