@@ -25,8 +25,7 @@ mkdir -p "$OUT/bin"
 } > "$OUT/manifest.txt"
 # Fail before spending simulation CPU time if the verifier's own RED
 # regression cases do not pass. Keep the exact test transcript as evidence.
-if ! python3 -m unittest discover -s "$ROOT/configs" \
-    -p 'test_g0_contract_audit.py' -v \
+if ! python3 "$ROOT/configs/test_g0_contract_audit.py" -v \
     > "$OUT/g0_audit_unit_tests.log" 2>&1; then
   echo "FAIL G0 verifier preflight; test log: $OUT/g0_audit_unit_tests.log" >&2
   tail -n 65 "$OUT/g0_audit_unit_tests.log" >&2
