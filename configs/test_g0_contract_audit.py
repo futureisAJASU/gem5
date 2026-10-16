@@ -100,7 +100,7 @@ pipelined=false
                 "physical_units=1", "physical_units=2"
             )
         )
-        with self.assertRaisesRegex(RuntimeError, "C\+\+ DIV FU count"):
+        with self.assertRaisesRegex(RuntimeError, r"C\+\+ DIV FU count"):
             audit_run(self.root, self.mode)
 
     def test_source_manifest_cannot_self_certify_runtime(self):
