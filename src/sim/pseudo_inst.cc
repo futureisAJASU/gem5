@@ -47,11 +47,15 @@
 
 #include <array>
 #include <cerrno>
+#include <cstdlib>
+#include <iostream>
+#include <unordered_map>
 #include <fstream>
 #include <string>
 #include <vector>
 
 #include "base/debug.hh"
+#include "base/logging.hh"
 #include "base/output.hh"
 #include "cpu/base.hh"
 #include "cpu/thread_context.hh"
@@ -488,6 +492,137 @@ triggerWorkloadEvent(ThreadContext *tc)
     tc->getSystemPtr()->workload->event(tc);
 }
 
+
+// G0-A isolated research instrumentation, disabled for every original/frozen
+// workload unless BOTH the simulator environment and the guest work-id match.
+// The two SE address spaces cannot implement a correct shared-memory barrier.
+// The simulator owns the common global tick and quiesces the first arrival.
+// This measures a synchronized application kernel; not physical power.
+namespace
+{
+constexpr uint64_t G0PairRoiWorkId = 0x4730;
+
+struct G0PairRoiState
+{
+    std::array<ThreadContext *, 2> context{{nullptr, nullptr}};
+    std::array<bool, 2> arrived{{false, false}};
+    std::array<bool, 2> finished{{false, false}};
+    std::array<Tick, 2> readyTick{{0, 0}};
+    std::array<Tick, 2> finishTick{{0, 0}};
+    std::array<Counter, 2> startInsts{{0, 0}};
+    Tick pairStartTick = 0;
+    Tick clockPeriodTicks = 0;
+    bool synchronized = false;
+};
+
+std::unordered_map<System *, G0PairRoiState> g0PairRoiStates;
+
+bool
+g0PairRoiEnabled()
+{
+    const char *enable = std::getenv("LITTLE_G0_PAIR_ROI");
+    return enable != nullptr && std::string(enable) == "1";
+}
+
+int
+g0PairRoiCoreId(ThreadContext *tc)
+{
+    const int id = tc->getCpuPtr()->cpuId();
+    if (id != 0 && id != 1)
+        fatal("G0 pair ROI requires physical gem5 CPU IDs 0 and 1; got %d", id);
+    return id;
+}
+
+void
+g0PairRoiBegin(ThreadContext *tc)
+{
+    auto &state = g0PairRoiStates[tc->getSystemPtr()];
+    const int id = g0PairRoiCoreId(tc);
+    if (state.arrived[id] || state.synchronized || state.finished[id])
+        fatal("G0 pair ROI duplicate/out-of-order begin for cpu%d", id);
+
+    state.arrived[id] = true;
+    state.readyTick[id] = curTick();
+    state.context[id] = tc;
+    std::cerr << "G0_PAIR_ROI_READY core=" << id
+              << " ready_tick=" << curTick() << std::endl;
+
+    if (!state.arrived[1-id]) {
+        // This core must not enter the kernel before the peer arrives.
+        tc->quiesce();
+        return;
+    }
+
+    // Second arrival establishes a single global simulator tick. The
+    // previously quiesced CPU is woken only after the start time is set.
+    state.pairStartTick = curTick();
+    state.clockPeriodTicks = tc->getCpuPtr()->clockPeriod();
+    if (state.clockPeriodTicks == 0 ||
+        state.context[1-id]->getCpuPtr()->clockPeriod() !=
+            state.clockPeriodTicks)
+        fatal("G0 pair ROI mismatched or zero CPU clock period");
+
+    state.startInsts[0] = state.context[0]->getCpuPtr()->totalInsts();
+    state.startInsts[1] = state.context[1]->getCpuPtr()->totalInsts();
+    state.synchronized = true;
+    std::cerr << "G0_PAIR_ROI_SYNC start_tick=" << state.pairStartTick
+              << " ready0=" << state.readyTick[0]
+              << " ready1=" << state.readyTick[1]
+              << " clock_period_ticks=" << state.clockPeriodTicks
+              << " early_core_idle_policy=quiesce"
+              << std::endl;
+    if (state.context[1-id]->status() != ThreadContext::Suspended)
+        fatal("G0 pair ROI first requester was not suspended");
+    state.context[1-id]->activate();
+}
+
+void
+g0PairRoiEnd(ThreadContext *tc)
+{
+    auto it = g0PairRoiStates.find(tc->getSystemPtr());
+    if (it == g0PairRoiStates.end() || !it->second.synchronized)
+        fatal("G0 pair ROI end without synchronized start");
+    auto &state = it->second;
+    const int id = g0PairRoiCoreId(tc);
+    if (!state.arrived[id] || state.finished[id] ||
+        curTick() < state.pairStartTick)
+        fatal("G0 pair ROI invalid/duplicate finish for cpu%d", id);
+    const Counter committed = tc->getCpuPtr()->totalInsts();
+    if (committed < state.startInsts[id])
+        fatal("G0 pair ROI negative committed instruction delta cpu%d", id);
+    state.finished[id] = true;
+    state.finishTick[id] = curTick();
+    std::cerr << "G0_PAIR_ROI_FINISH core=" << id
+              << " finish_tick=" << curTick()
+              << " pair_start_tick=" << state.pairStartTick
+              << " committed_insts=" << (committed - state.startInsts[id])
+              << std::endl;
+
+    if (!state.finished[1-id]) {
+        // Prevent early core's libc/exit work from competing with the
+        // still-running core. The quiesced core's clock/leakage treatment
+        // is a separate explicit energy-model question, not a PPA claim.
+        tc->quiesce();
+        return;
+    }
+
+    const Tick maxFinish =
+        std::max(state.finishTick[0], state.finishTick[1]);
+    std::cerr << "G0_PAIR_ROI_SUMMARY pair_start_tick="
+              << state.pairStartTick
+              << " finish0=" << state.finishTick[0]
+              << " finish1=" << state.finishTick[1]
+              << " pair_makespan_ticks=" << (maxFinish - state.pairStartTick)
+              << " clock_period_ticks=" << state.clockPeriodTicks
+              << " first_finished_core=" << (state.finishTick[0] <=
+                  state.finishTick[1] ? 0 : 1)
+              << std::endl;
+    if (state.context[1-id]->status() != ThreadContext::Suspended)
+        fatal("G0 pair ROI first finisher was not suspended");
+    state.context[1-id]->activate();
+}
+} // namespace
+
 //
 // This function is executed when annotated work items begin.  Depending on
 // what the user specified at the command line, the simulation may exit and/or
@@ -499,6 +634,13 @@ workbegin(ThreadContext *tc, uint64_t workid, uint64_t threadid)
     DPRINTF(PseudoInst, "pseudo_inst::workbegin(%i, %i)\n", workid, threadid);
     System *sys = tc->getSystemPtr();
     const System::Params &params = sys->params();
+
+    if (g0PairRoiEnabled() && workid == G0PairRoiWorkId) {
+        if (params.exit_on_work_items)
+            fatal("G0 pair ROI needs exit_on_work_items=false");
+        g0PairRoiBegin(tc);
+        return;
+    }
 
     if (params.exit_on_work_items) {
         exitSimLoop("workbegin", static_cast<int>(workid));
@@ -562,6 +704,13 @@ workend(ThreadContext *tc, uint64_t workid, uint64_t threadid)
     DPRINTF(PseudoInst, "pseudo_inst::workend(%i, %i)\n", workid, threadid);
     System *sys = tc->getSystemPtr();
     const System::Params &params = sys->params();
+
+    if (g0PairRoiEnabled() && workid == G0PairRoiWorkId) {
+        if (params.exit_on_work_items)
+            fatal("G0 pair ROI needs exit_on_work_items=false");
+        g0PairRoiEnd(tc);
+        return;
+    }
 
     if (params.exit_on_work_items) {
         exitSimLoop("workend", static_cast<int>(workid));
