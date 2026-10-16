@@ -184,3 +184,35 @@ build objects; merge the fast-forward commit and resume with
 `scons build/RISCV/gem5.opt -j4`. Run the two-mode smoke only after
 the executable actually links successfully. Keep the historical G0-A
 evidence unchanged.
+
+## 2026-10-17: second actual OCI C++ build blocker, scoped fix
+
+The next OCI `scons -j4` compile failed in
+`src/sim/pseudo_inst.cc` at `std::array<Counter, 2>` and
+`const Counter committed`. The same translation unit uses
+`using namespace statistics;`; both `gem5::Counter` (signed 64-bit
+instruction counter) and `gem5::statistics::Counter` (double) are visible.
+`BaseCPU::totalInsts()` explicitly returns `gem5::Counter`.
+The correct fix is **both** qualified declarations:
+
+```cpp
+std::array<::gem5::Counter, 2> startInsts{{0, 0}};
+const ::gem5::Counter committed = tc->getCpuPtr()->totalInsts();
+```
+
+A separate `c++ -std=c++17 -Wall -Wextra -Werror -fsyntax-only`
+minimal namespace/type reproduction passed; that is **not** proof of
+full gem5 compilation. GitHub CI now fails the static source guard if
+either qualifier is lost. No FU resource or architectural semantics
+were changed.
+
+During the same source audit the ROI runner's default output path was
+found to have a literal `-$` suffix instead of a process ID.
+It now uses `-$BASHPID`, and makes custom relative output paths
+absolute before passing their paths to the constructor manifest writer.
+A targeted Bash parsing/expansion smoke check passed.
+
+The old 8-run G0 functional results remain valid and untouched.
+The new synchronized ROI build **remains UNVERIFIED pending the next
+complete OCI rebuild**, followed by a 2-mode smoke and eventually the
+4-by-2 workload matrix.
