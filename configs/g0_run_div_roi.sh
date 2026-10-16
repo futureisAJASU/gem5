@@ -36,7 +36,14 @@ if ! python3 "$ROOT/configs/test_g0_contract_audit.py" -v \
   tail -n 65 "$OUT/g0_audit_unit_tests.log" >&2
   exit 12
 fi
-sha256sum "$OUT/g0_audit_unit_tests.log" >> "$OUT/manifest.txt"
+if ! python3 "$ROOT/configs/test_g0_pair_roi.py" -v \
+    > "$OUT/g0_roi_unit_tests.log" 2>&1; then
+  echo "FAIL G0 ROI verifier preflight; log: $OUT/g0_roi_unit_tests.log" >&2
+  tail -n 65 "$OUT/g0_roi_unit_tests.log" >&2
+  exit 13
+fi
+sha256sum "$OUT/g0_audit_unit_tests.log" "$OUT/g0_roi_unit_tests.log" \
+  >> "$OUT/manifest.txt"
 for kind in heavy sparse; do
   every=1
   [[ "$kind" == "sparse" ]] && every=16
