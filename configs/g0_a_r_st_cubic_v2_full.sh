@@ -94,9 +94,12 @@ EOF
     echo "MISSING EXISTING OBJ SET: $APP (bench/platform/support)" >&2
     exit 3
   fi
-  if ! "$NM" -A --defined-only "${BENCH_OBJS[@]}" | \
-       grep -Eq '[[:space:]]T[[:space:]]verify_benchmark$'; then
+  # Avoid nm | grep -q under pipefail: early grep exit can SIGPIPE nm
+  # and falsely report a missing strong verifier symbol.
+  "$NM" -A --defined-only "${BENCH_OBJS[@]}" > "$OUT/symbols-$APP.txt"
+  if ! grep -Eq '[[:space:]]T[[:space:]]verify_benchmark$' "$OUT/symbols-$APP.txt"; then
     echo "STRONG VERIFY SYMBOL MISSING: $APP" >&2
+    grep -E 'verify_benchmark' "$OUT/symbols-$APP.txt" >&2 || true
     exit 3
   fi
   sha256sum "${BENCH_OBJS[@]}" "${PLATFORM_OBJS[@]}" "${SUPPORT_OBJS[@]}" \
